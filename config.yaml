@@ -1,0 +1,34 @@
+# This file defines charm config options, and populates the Configure tab on Charmhub.
+# If your charm does not require configuration options, delete this file entirely.
+#
+# See https://juju.is/docs/config for guidance.
+
+options:
+  # An example config option to customise the log level of the workload
+  log-level:
+    description: |
+      Configures the log level of gunicorn. 
+
+      Acceptable values are: "info", "debug", "warning", "error" and "critical"
+    default: "info"
+    type: string
+  s3-access-key:
+    description: |
+      S3 access key
+    default: ""
+    type: string
+  s3-secret-key:
+    description: |
+      S3 secret key
+    default: ""
+    type: string
+  s3-endpoint:
+    description: |
+      S3 instance endpoint
+    default: ""
+    type: string
+  spark-logs-s3-dir:
+    description: |
+      S3 directory for Spark logs
+    default: ""
+    type: string

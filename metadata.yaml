@@ -1,0 +1,15 @@
+name: spark-history-server
+display-name: Spark History Server
+summary: Kubernetes based charm for Spark History Server.
+description: |
+  ""
+
+containers:
+  sparkhistoryserver:
+    resource: sparkhistoryserver-image
+
+resources:
+  sparkhistoryserver-image:
+    type: oci-image
+    description: OCI image for Spark History Server
+    upstream-source: dataplatformoci/spark:3.3.1
