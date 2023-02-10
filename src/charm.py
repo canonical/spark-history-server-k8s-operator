@@ -116,8 +116,9 @@ class SparkHistoryServerCharm(CharmBase):
             )
 
             if not container.exists(SPARK_PROPERTIES_FILE):
+                logger.error(f"{SPARK_PROPERTIES_FILE} not found")
                 self.unit.status = BlockedStatus(
-                    "Spark configuration push error. Please retry configuration..."
+                    "Missing service configuration"
                 )
                 return
 
