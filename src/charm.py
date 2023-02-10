@@ -19,7 +19,8 @@ from ops.charm import (
     InstallEvent,
 )
 from ops.main import main
-from ops.model import ActiveStatus, WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
+from constants import *
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -49,10 +50,10 @@ class SparkHistoryServerCharm(CharmBase):
         """
         # Get a reference the container attribute on the PebbleReadyEvent
         container = event.workload
-        contents = "spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"
-        container.push("/opt/spark/conf/spark-properties.conf", contents, make_dirs=True)
+        contents = f"spark.hadoop.fs.s3a.aws.credentials.provider={AWS_CREDS_PROVIDER}"
+        container.push(SPARK_PROPERTIES_FILE, contents, make_dirs=True)
         # Add initial Pebble config layer using the Pebble API
-        container.add_layer("sparkhistoryserver", self._spark_history_server_layer, combine=True)
+        container.add_layer(CONTAINER, self._spark_history_server_layer, combine=True)
         # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
         container.replan()
         # Learn more about statuses in the SDK docs:
@@ -68,13 +69,13 @@ class SparkHistoryServerCharm(CharmBase):
         Learn more about config at https://juju.is/docs/sdk/config
         """
         # The config is good, so update the configuration of the workload
-        container = self.unit.get_container("sparkhistoryserver")
+        container = self.unit.get_container(CONTAINER)
         # Verify that we can connect to the Pebble API in the workload container
         if container.can_connect():
-            s3_endpoint = self.model.config["s3-endpoint"]
-            s3_access_key = self.model.config["s3-access-key"]
-            s3_secret_key = self.model.config["s3-secret-key"]
-            spark_logs_dir = self.model.config["spark-logs-s3-dir"]
+            s3_endpoint = self.model.config[CONFIG_KEY_S3_ENDPOINT]
+            s3_access_key = self.model.config[CONFIG_KEY_S3_ACCESS_KEY]
+            s3_secret_key = self.model.config[CONFIG_KEY_S3_SECRET_KEY]
+            spark_logs_dir = self.model.config[CONFIG_KEY_S3_LOGS_DIR]
 
             self.spark_config = f"spark.hadoop.fs.s3a.endpoint={s3_endpoint}"
             self.spark_config += "\n"
@@ -86,7 +87,7 @@ class SparkHistoryServerCharm(CharmBase):
             self.spark_config += "\n"
             self.spark_config += f"spark.history.fs.logDirectory={spark_logs_dir}"
             self.spark_config += "\n"
-            self.spark_config += "spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"
+            self.spark_config += f"spark.hadoop.fs.s3a.aws.credentials.provider={AWS_CREDS_PROVIDER}"
             self.spark_config += "\n"
             self.spark_config += "spark.hadoop.fs.s3a.connection.ssl.enabled=false"
             self.spark_config += "\n"
@@ -94,22 +95,21 @@ class SparkHistoryServerCharm(CharmBase):
             self.spark_config += "\n"
             self.spark_config += "spark.eventLog.enabled=true"
 
-            logger.info("Spark Properties:")
-            logger.info(f"{self.spark_config}")
-
             container.push(
-                "/opt/spark/conf/spark-properties.conf",
+                SPARK_PROPERTIES_FILE,
                 self.spark_config,
-                user_id=185,
-                group_id=185,
+                user_id=SPARK_USER_UID,
+                group_id=SPARK_USER_GID,
                 make_dirs=True,
             )
 
-            logger.info(f"{container.list_files('/opt/spark/conf/spark-properties.conf')}")
+            if not container.exists(SPARK_PROPERTIES_FILE):
+                self.unit.status = BlockedStatus("Spark configuration push error. Please retry configuration...")
+                return
 
             # Push an updated layer with the new config
             container.add_layer(
-                "spark-history-server", self._spark_history_server_layer, combine=True
+                CONTAINER_LAYER, self._spark_history_server_layer, combine=True
             )
             container.replan()
 
@@ -127,13 +127,13 @@ class SparkHistoryServerCharm(CharmBase):
             "summary": "spark history server layer",
             "description": "pebble config layer for spark history server",
             "services": {
-                "sparkhistoryserver": {
+                CONTAINER: {
                     "override": "replace",
                     "summary": "spark history server",
-                    "command": "/opt/spark/sbin/start-history-server.sh --properties-file /opt/spark/conf/spark-properties.conf",
-                    "user": "spark",
-                    "group": "spark",
-                    "working_dir": "/opt/spark",
+                    "command": SPARK_HISTORY_SERVER_LAUNCH_CMD,
+                    "user": SPARK_USER,
+                    "group": SPARK_USER_GROUP,
+                    "working_dir": SPARK_USER_WORKDIR,
                     "startup": "enabled",
                     "environment": {"SPARK_NO_DAEMONIZE": "true"},
                 }

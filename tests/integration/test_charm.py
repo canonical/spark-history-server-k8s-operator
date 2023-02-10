@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
+from src.constants import  *
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +45,10 @@ async def test_build_and_deploy(ops_test: OpsTest):
     app = ops_test.model.applications.get(APP_NAME)
     await app.set_config(
         {
-            "s3-endpoint": "http://192.168.1.7:9000",
-            "s3-access-key": "5mHwHrovJXVTMsQV",
-            "s3-secret-key": "dKQ9DyhcPltC3U4jSqlHsBhykiflT5kR",
-            "spark-logs-s3-dir": "s3a://history-server/spark-events/",
+            CONFIG_KEY_S3_ENDPOINT: "http://192.168.1.8:9000",
+            CONFIG_KEY_S3_ACCESS_KEY: "5mHwHrovJXVTMsQV",
+            CONFIG_KEY_S3_SECRET_KEY: "dKQ9DyhcPltC3U4jSqlHsBhykiflT5kR",
+            CONFIG_KEY_S3_LOGS_DIR: "s3a://history-server/spark-events/",
         }
     )
 
