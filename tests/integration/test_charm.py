@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2023 Abhishek Verma
+# Copyright 2023 Canonical Limited
 # See LICENSE file for licensing details.
 
 import asyncio
@@ -9,7 +9,14 @@ from pathlib import Path
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
-from src.constants import  *
+
+from src.constants import (
+    CONFIG_KEY_S3_ACCESS_KEY,
+    CONFIG_KEY_S3_ENDPOINT,
+    CONFIG_KEY_S3_LOGS_DIR,
+    CONFIG_KEY_S3_SECRET_KEY,
+    CONFIG_KEY_S3_CREDS_PROVIDER
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +33,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
     # Build and deploy charm from local source folder
     charm = await ops_test.build_charm(".")
     resources = {
-        "sparkhistoryserver-image": METADATA["resources"]["sparkhistoryserver-image"][
+        "spark-history-server-image": METADATA["resources"]["spark-history-server-image"][
             "upstream-source"
         ]
     }
@@ -45,10 +52,11 @@ async def test_build_and_deploy(ops_test: OpsTest):
     app = ops_test.model.applications.get(APP_NAME)
     await app.set_config(
         {
-            CONFIG_KEY_S3_ENDPOINT: "http://192.168.1.8:9000",
-            CONFIG_KEY_S3_ACCESS_KEY: "5mHwHrovJXVTMsQV",
-            CONFIG_KEY_S3_SECRET_KEY: "dKQ9DyhcPltC3U4jSqlHsBhykiflT5kR",
-            CONFIG_KEY_S3_LOGS_DIR: "s3a://history-server/spark-events/",
+            CONFIG_KEY_S3_ENDPOINT: "http://S3_SERVER:S3_PORT",
+            CONFIG_KEY_S3_ACCESS_KEY: "S3_ACCESS_KEY",
+            CONFIG_KEY_S3_SECRET_KEY: "S3_SECRET_KEY",
+            CONFIG_KEY_S3_LOGS_DIR: "S3_LOGS_DIR",
+            CONFIG_KEY_S3_CREDS_PROVIDER: "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"
         }
     )
 

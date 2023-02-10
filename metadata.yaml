@@ -5,11 +5,11 @@ description: |
   ""
 
 containers:
-  sparkhistoryserver:
-    resource: sparkhistoryserver-image
+  spark-history-server:
+    resource: spark-history-server-image
 
 resources:
-  sparkhistoryserver-image:
+  spark-history-server-image:
     type: oci-image
     description: OCI image for Spark History Server
     upstream-source: dataplatformoci/spark:3.3.1

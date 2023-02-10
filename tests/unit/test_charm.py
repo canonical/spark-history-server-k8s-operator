@@ -1,4 +1,4 @@
-# Copyright 2023 Abhishek Verma
+# Copyright 2023 Canonical Limited
 # See LICENSE file for licensing details.
 #
 # Learn more about testing at: https://juju.is/docs/sdk/testing
@@ -8,9 +8,18 @@ from unittest.mock import patch
 
 import ops.testing
 from charm import SparkHistoryServerCharm
-from src.constants import *
 from ops.model import ActiveStatus, WaitingStatus
 from ops.testing import Harness
+
+from src.constants import (
+    CONFIG_KEY_S3_ACCESS_KEY,
+    CONFIG_KEY_S3_ENDPOINT,
+    CONFIG_KEY_S3_LOGS_DIR,
+    CONFIG_KEY_S3_SECRET_KEY,
+    CONFIG_KEY_S3_CREDS_PROVIDER,
+    CONTAINER,
+    SPARK_HISTORY_SERVER_LAUNCH_CMD,
+)
 
 
 class TestCharm(unittest.TestCase):
@@ -46,9 +55,7 @@ class TestCharm(unittest.TestCase):
         # Check we've got the plan we expected
         self.assertEqual(expected_plan, updated_plan)
         # Check the service was started
-        service = self.harness.model.unit.get_container(CONTAINER).get_service(
-            CONTAINER
-        )
+        service = self.harness.model.unit.get_container(CONTAINER).get_service(CONTAINER)
         self.assertTrue(service.is_running())
         # Ensure we set an ActiveStatus with no message
         self.assertEqual(
@@ -61,11 +68,18 @@ class TestCharm(unittest.TestCase):
             # Ensure the simulated Pebble API is reachable
             self.harness.set_can_connect(CONTAINER, True)
             # Trigger a config-changed event with an updated value
-            self.harness.update_config({CONFIG_KEY_S3_ENDPOINT: "http://192.168.1.7:9000"})
-            self.harness.update_config({CONFIG_KEY_S3_ACCESS_KEY: "5mHwHrovJXVTMsQV"})
-            self.harness.update_config({CONFIG_KEY_S3_SECRET_KEY: "dKQ9DyhcPltC3U4jSqlHsBhykiflT5kR"})
-            self.harness.update_config({CONFIG_KEY_S3_LOGS_DIR: "s3a://history-server/spark-events/"})
+            self.harness.update_config({CONFIG_KEY_S3_ENDPOINT: "http://S3_SERVER:S3_PORT"})
+            self.harness.update_config({CONFIG_KEY_S3_ACCESS_KEY: "S3_ACCESS_KEY"})
+            self.harness.update_config(
+                {CONFIG_KEY_S3_SECRET_KEY: "S3_SECRET_KEY"}
+            )
+            self.harness.update_config(
+                {CONFIG_KEY_S3_LOGS_DIR: "S3_LOGS_DIR"}
+            )
+            self.harness.update_config(
+                {CONFIG_KEY_S3_CREDS_PROVIDER: "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"}
+            )
 
             self.assertEqual(
-                self.harness.model.unit.status, ActiveStatus("s3a://history-server/spark-events/")
+                self.harness.model.unit.status, ActiveStatus("S3_LOGS_DIR")
             )
