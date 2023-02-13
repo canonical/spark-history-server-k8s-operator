@@ -6,6 +6,10 @@
 
 import logging
 
+from ops.charm import CharmBase, InstallEvent
+from ops.main import main
+from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
+
 from config import SparkHistoryServerConfigModel
 from constants import (
     CONFIG_KEY_S3_LOGS_DIR,
@@ -19,9 +23,6 @@ from constants import (
     SPARK_USER_UID,
     SPARK_USER_WORKDIR,
 )
-from ops.charm import CharmBase, InstallEvent
-from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)

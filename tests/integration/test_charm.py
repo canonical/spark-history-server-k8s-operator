@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
-
 from src.constants import (
     CONFIG_KEY_S3_ACCESS_KEY,
     CONFIG_KEY_S3_CREDS_PROVIDER,

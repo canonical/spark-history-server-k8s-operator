@@ -1,16 +1,20 @@
-# spark-history-server
+# Charmed Spark History Server Operator
 
-Charmhub package name: operator-template
-More information: https://charmhub.io/spark-history-server
+## Overview
+The Charmed Spark History Server Operator delivers automated operations management from day 0 to day 2 on the Apache Spark History Server. 
+It is part of an open source, end-to-end, production ready data platform on top of cloud native technologies provided by Canonical.
 
-Describe your charm in one or two sentences.
+History Server is the component of Apache Spark which enables the user to view and analyze logs of completed Spark applications.
 
-## Other resources
+This operator charm deploys and operates Apache Spark History Server on Kubernetes environments. 
+It depends on the S3 integrator charm from Canonical for S3 related configuration.
 
-<!-- If your charm is documented somewhere else other than Charmhub, provide a link separately. -->
+## Usage
 
-- [Read more](https://example.com)
+```bash
+$ juju deploy s3-integrator --channel latest/edge
+$ juju deploy spark-history-server-k8s --channel latest/edge
+$ juju relate spark-history-server-k8s s3-integrator
+```
 
-- [Contributing](CONTRIBUTING.md) <!-- or link to other contribution documentation -->
-
-- See the [Juju SDK documentation](https://juju.is/docs/sdk) for more information about developing and improving charms.
+Once the spark history server unit is active, go to the IP of the unit at port 18080 to load the history server UI.

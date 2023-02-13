@@ -7,10 +7,8 @@ import unittest
 from unittest.mock import patch
 
 import ops.testing
-from charm import SparkHistoryServerCharm
 from ops.model import ActiveStatus, BlockedStatus
 from ops.testing import Harness
-
 from src.constants import (
     CONFIG_KEY_S3_ACCESS_KEY,
     CONFIG_KEY_S3_CREDS_PROVIDER,
@@ -20,6 +18,8 @@ from src.constants import (
     CONTAINER,
     SPARK_HISTORY_SERVER_LAUNCH_CMD,
 )
+
+from charm import SparkHistoryServerCharm
 
 
 class TestCharm(unittest.TestCase):
