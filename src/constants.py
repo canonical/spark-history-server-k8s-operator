@@ -4,14 +4,16 @@
 #
 # Learn more at: https://juju.is/docs/sdk
 
+"""Literals and constants."""
+
 SPARK_PROPERTIES_FILE = "/opt/spark/conf/spark-properties.conf"
 CONTAINER = "spark-history-server"
 CONTAINER_LAYER = "spark-history-server"
-CONFIG_KEY_S3_ENDPOINT = "s3-endpoint"
-CONFIG_KEY_S3_ACCESS_KEY = "s3-access-key"
-CONFIG_KEY_S3_SECRET_KEY = "s3-secret-key"
-CONFIG_KEY_S3_LOGS_DIR = "spark-logs-s3-dir"
-CONFIG_KEY_S3_CREDS_PROVIDER="s3-credentials-provider"
+CONFIG_KEY_S3_ENDPOINT = "s3_endpoint"
+CONFIG_KEY_S3_ACCESS_KEY = "s3_access_key"
+CONFIG_KEY_S3_SECRET_KEY = "s3_secret_key"
+CONFIG_KEY_S3_LOGS_DIR = "spark_logs_s3_dir"
+CONFIG_KEY_S3_CREDS_PROVIDER = "s3_credentials_provider"
 SPARK_USER = "spark"
 SPARK_USER_GROUP = "spark"
 SPARK_USER_UID = 185

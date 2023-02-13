@@ -8,12 +8,9 @@
 
 import logging
 
+from config import SparkHistoryServerConfigModel
 from constants import (
-    CONFIG_KEY_S3_CREDS_PROVIDER,
-    CONFIG_KEY_S3_ACCESS_KEY,
-    CONFIG_KEY_S3_ENDPOINT,
     CONFIG_KEY_S3_LOGS_DIR,
-    CONFIG_KEY_S3_SECRET_KEY,
     CONTAINER,
     CONTAINER_LAYER,
     SPARK_HISTORY_SERVER_LAUNCH_CMD,
@@ -47,7 +44,7 @@ class SparkHistoryServerCharm(CharmBase):
         )
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.install, self._on_install)
-        self.spark_config = None
+        self.spark_config = SparkHistoryServerConfigModel()
 
     def _on_spark_history_server_pebble_ready(self, event):
         """Define and start a workload using the Pebble API.
@@ -59,15 +56,16 @@ class SparkHistoryServerCharm(CharmBase):
         """
         # Get a reference the container attribute on the PebbleReadyEvent
         container = event.workload
-        contents = f"spark.eventLog.enabled=false"
-        container.push(SPARK_PROPERTIES_FILE, contents, make_dirs=True)
+        container.push(
+            SPARK_PROPERTIES_FILE, self.spark_config.contents_before_init(), make_dirs=True
+        )
         # Add initial Pebble config layer using the Pebble API
         container.add_layer(CONTAINER, self._spark_history_server_layer, combine=True)
         # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
         container.replan()
         # Learn more about statuses in the SDK docs:
         # https://juju.is/docs/sdk/constructs#heading--statuses
-        self.unit.status = WaitingStatus("Pebble ready, waiting for Spark Configuration")
+        self.unit.status = BlockedStatus("Pebble ready, waiting for Spark Configuration")
 
     def _on_config_changed(self, event):
         """Handle changed configuration.
@@ -81,35 +79,10 @@ class SparkHistoryServerCharm(CharmBase):
         container = self.unit.get_container(CONTAINER)
         # Verify that we can connect to the Pebble API in the workload container
         if container.can_connect():
-            s3_endpoint = self.model.config[CONFIG_KEY_S3_ENDPOINT]
-            s3_access_key = self.model.config[CONFIG_KEY_S3_ACCESS_KEY]
-            s3_secret_key = self.model.config[CONFIG_KEY_S3_SECRET_KEY]
-            spark_logs_dir = self.model.config[CONFIG_KEY_S3_LOGS_DIR]
-            s3_creds_provider = self.model.config[CONFIG_KEY_S3_CREDS_PROVIDER]
-
-            self.spark_config = f"spark.hadoop.fs.s3a.endpoint={s3_endpoint}"
-            self.spark_config += "\n"
-            self.spark_config += f"spark.hadoop.fs.s3a.access.key={s3_access_key}"
-            self.spark_config += "\n"
-            self.spark_config += f"spark.hadoop.fs.s3a.secret.key={s3_secret_key}"
-            self.spark_config += "\n"
-            self.spark_config += f"spark.eventLog.dir={spark_logs_dir}"
-            self.spark_config += "\n"
-            self.spark_config += f"spark.history.fs.logDirectory={spark_logs_dir}"
-            self.spark_config += "\n"
-            self.spark_config += (
-                f"spark.hadoop.fs.s3a.aws.credentials.provider={s3_creds_provider}"
-            )
-            self.spark_config += "\n"
-            self.spark_config += "spark.hadoop.fs.s3a.connection.ssl.enabled=false"
-            self.spark_config += "\n"
-            self.spark_config += "spark.hadoop.fs.s3a.path.style.access=true"
-            self.spark_config += "\n"
-            self.spark_config += "spark.eventLog.enabled=true"
-
+            self.spark_config.populate(self.model.config)
             container.push(
                 SPARK_PROPERTIES_FILE,
-                self.spark_config,
+                self.spark_config.contents(),
                 user_id=SPARK_USER_UID,
                 group_id=SPARK_USER_GID,
                 make_dirs=True,
@@ -117,17 +90,20 @@ class SparkHistoryServerCharm(CharmBase):
 
             if not container.exists(SPARK_PROPERTIES_FILE):
                 logger.error(f"{SPARK_PROPERTIES_FILE} not found")
-                self.unit.status = BlockedStatus(
-                    "Missing service configuration"
-                )
+                self.unit.status = BlockedStatus("Missing service configuration")
                 return
 
             # Push an updated layer with the new config
             container.add_layer(CONTAINER_LAYER, self._spark_history_server_layer, combine=True)
             container.replan()
 
-            logger.debug("Spark configuration changed to '%s'", spark_logs_dir)
-            self.unit.status = ActiveStatus(f"{spark_logs_dir}")
+            logger.debug(
+                "Spark configuration changed to '%s'",
+                self.spark_config.get()[CONFIG_KEY_S3_LOGS_DIR],
+            )
+            self.unit.status = ActiveStatus(
+                f"Spark log directory: {self.spark_config.get()[CONFIG_KEY_S3_LOGS_DIR]}"
+            )
         else:
             # We were unable to connect to the Pebble API, so we defer this event
             event.defer()

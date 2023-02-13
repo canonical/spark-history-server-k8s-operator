@@ -8,15 +8,15 @@ from unittest.mock import patch
 
 import ops.testing
 from charm import SparkHistoryServerCharm
-from ops.model import ActiveStatus, WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus
 from ops.testing import Harness
 
 from src.constants import (
     CONFIG_KEY_S3_ACCESS_KEY,
+    CONFIG_KEY_S3_CREDS_PROVIDER,
     CONFIG_KEY_S3_ENDPOINT,
     CONFIG_KEY_S3_LOGS_DIR,
     CONFIG_KEY_S3_SECRET_KEY,
-    CONFIG_KEY_S3_CREDS_PROVIDER,
     CONTAINER,
     SPARK_HISTORY_SERVER_LAUNCH_CMD,
 )
@@ -60,7 +60,7 @@ class TestCharm(unittest.TestCase):
         # Ensure we set an ActiveStatus with no message
         self.assertEqual(
             self.harness.model.unit.status,
-            WaitingStatus("Pebble ready, waiting for Spark Configuration"),
+            BlockedStatus("Pebble ready, waiting for Spark Configuration"),
         )
 
     def test_config_changed(self):
@@ -70,16 +70,14 @@ class TestCharm(unittest.TestCase):
             # Trigger a config-changed event with an updated value
             self.harness.update_config({CONFIG_KEY_S3_ENDPOINT: "http://S3_SERVER:S3_PORT"})
             self.harness.update_config({CONFIG_KEY_S3_ACCESS_KEY: "S3_ACCESS_KEY"})
+            self.harness.update_config({CONFIG_KEY_S3_SECRET_KEY: "S3_SECRET_KEY"})
+            self.harness.update_config({CONFIG_KEY_S3_LOGS_DIR: "S3_LOGS_DIR"})
             self.harness.update_config(
-                {CONFIG_KEY_S3_SECRET_KEY: "S3_SECRET_KEY"}
-            )
-            self.harness.update_config(
-                {CONFIG_KEY_S3_LOGS_DIR: "S3_LOGS_DIR"}
-            )
-            self.harness.update_config(
-                {CONFIG_KEY_S3_CREDS_PROVIDER: "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"}
+                {
+                    CONFIG_KEY_S3_CREDS_PROVIDER: "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"
+                }
             )
 
             self.assertEqual(
-                self.harness.model.unit.status, ActiveStatus("S3_LOGS_DIR")
+                self.harness.model.unit.status, ActiveStatus("Spark log directory: S3_LOGS_DIR")
             )
