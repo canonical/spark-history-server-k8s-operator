@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Limited
 # See LICENSE file for licensing details.
-#
-# Learn more at: https://juju.is/docs/sdk
 
 """Charmed Kubernetes Operator for Apache Spark History Server."""
 
@@ -47,13 +45,7 @@ class SparkHistoryServerCharm(CharmBase):
         self.spark_config = SparkHistoryServerConfigModel()
 
     def _on_spark_history_server_pebble_ready(self, event):
-        """Define and start a workload using the Pebble API.
-
-        Change this example to suit your needs. You'll need to specify the right entrypoint and
-        environment configuration for your specific workload.
-
-        Learn more about interacting with Pebble at at https://juju.is/docs/sdk/pebble.
-        """
+        """Define and start a workload using the Pebble API."""
         # Get a reference the container attribute on the PebbleReadyEvent
         container = event.workload
         container.push(
@@ -63,18 +55,10 @@ class SparkHistoryServerCharm(CharmBase):
         container.add_layer(CONTAINER, self._spark_history_server_layer, combine=True)
         # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
         container.replan()
-        # Learn more about statuses in the SDK docs:
-        # https://juju.is/docs/sdk/constructs#heading--statuses
         self.unit.status = BlockedStatus("Pebble ready, waiting for Spark Configuration")
 
     def _on_config_changed(self, event):
-        """Handle changed configuration.
-
-        Change this example to suit your needs. If you don't need to handle config, you can remove
-        this method.
-
-        Learn more about config at https://juju.is/docs/sdk/config
-        """
+        """Handle changed configuration."""
         # The config is good, so update the configuration of the workload
         container = self.unit.get_container(CONTAINER)
         # Verify that we can connect to the Pebble API in the workload container
