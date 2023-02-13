@@ -19,10 +19,7 @@ from constants import (
     SPARK_USER_UID,
     SPARK_USER_WORKDIR,
 )
-from ops.charm import (
-    CharmBase,
-    InstallEvent,
-)
+from ops.charm import CharmBase, InstallEvent
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 
