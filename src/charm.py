@@ -4,13 +4,12 @@
 
 """Charmed Kubernetes Operator for Apache Spark History Server."""
 
-import logging
 
 from ops.charm import CharmBase, InstallEvent
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 
-from config import SparkHistoryServerConfigModel
+from config import SparkHistoryServerConfig
 from constants import (
     CONFIG_KEY_S3_LOGS_DIR,
     CONTAINER,
@@ -23,14 +22,10 @@ from constants import (
     SPARK_USER_UID,
     SPARK_USER_WORKDIR,
 )
-
-# Log messages can be retrieved using juju debug-log
-logger = logging.getLogger(__name__)
-
-VALID_LOG_LEVELS = ["info", "debug", "warning", "error", "critical"]
+from utils import WithLogging
 
 
-class SparkHistoryServerCharm(CharmBase):
+class SparkHistoryServerCharm(CharmBase, WithLogging):
     """Charm the service."""
 
     def __init__(self, *args):
@@ -40,15 +35,13 @@ class SparkHistoryServerCharm(CharmBase):
         )
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.install, self._on_install)
-        self.spark_config = SparkHistoryServerConfigModel()
+        self.spark_config = SparkHistoryServerConfig(self.model.config)
 
     def _on_spark_history_server_pebble_ready(self, event):
         """Define and start a workload using the Pebble API."""
         # Get a reference the container attribute on the PebbleReadyEvent
         container = event.workload
-        container.push(
-            SPARK_PROPERTIES_FILE, self.spark_config.contents_before_init(), make_dirs=True
-        )
+        container.push(SPARK_PROPERTIES_FILE, self.spark_config.contents(), make_dirs=True)
         # Add initial Pebble config layer using the Pebble API
         container.add_layer(CONTAINER, self._spark_history_server_layer, combine=True)
         # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
@@ -61,7 +54,6 @@ class SparkHistoryServerCharm(CharmBase):
         container = self.unit.get_container(CONTAINER)
         # Verify that we can connect to the Pebble API in the workload container
         if container.can_connect():
-            self.spark_config.populate(self.model.config)
             container.push(
                 SPARK_PROPERTIES_FILE,
                 self.spark_config.contents(),
@@ -71,7 +63,7 @@ class SparkHistoryServerCharm(CharmBase):
             )
 
             if not container.exists(SPARK_PROPERTIES_FILE):
-                logger.error(f"{SPARK_PROPERTIES_FILE} not found")
+                self.logger.error(f"{SPARK_PROPERTIES_FILE} not found")
                 self.unit.status = BlockedStatus("Missing service configuration")
                 return
 
@@ -79,12 +71,12 @@ class SparkHistoryServerCharm(CharmBase):
             container.add_layer(CONTAINER_LAYER, self._spark_history_server_layer, combine=True)
             container.replan()
 
-            logger.debug(
+            self.logger.debug(
                 "Spark configuration changed to '%s'",
-                self.spark_config.get()[CONFIG_KEY_S3_LOGS_DIR],
+                self.spark_config.config[CONFIG_KEY_S3_LOGS_DIR],
             )
             self.unit.status = ActiveStatus(
-                f"Spark log directory: {self.spark_config.get()[CONFIG_KEY_S3_LOGS_DIR]}"
+                f"Spark log directory: {self.spark_config.config[CONFIG_KEY_S3_LOGS_DIR]}"
             )
         else:
             # We were unable to connect to the Pebble API, so we defer this event

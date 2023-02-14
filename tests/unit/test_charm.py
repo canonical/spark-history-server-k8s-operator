@@ -1,7 +1,5 @@
 # Copyright 2023 Canonical Limited
 # See LICENSE file for licensing details.
-#
-# Learn more about testing at: https://juju.is/docs/sdk/testing
 
 import unittest
 from unittest.mock import patch
