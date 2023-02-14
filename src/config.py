@@ -8,11 +8,11 @@ from typing import Any, Dict
 
 from constants import (
     CONFIG_KEY_S3_ACCESS_KEY,
+    CONFIG_KEY_S3_CREDS_PROVIDER,
     CONFIG_KEY_S3_ENDPOINT,
     CONFIG_KEY_S3_LOGS_DIR,
     CONFIG_KEY_S3_SECRET_KEY,
     CONFIG_KEY_S3_SSL_ENABLED,
-    CONFIG_KEY_S3_CREDS_PROVIDER
 )
 from utils import WithLogging
 
