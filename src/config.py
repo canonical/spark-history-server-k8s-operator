@@ -22,11 +22,11 @@ class SparkHistoryServerConfig(WithLogging):
 
     def __init__(self, config: Dict[str, Any]):
         self.config = config
-        self.spark_conf = {}
 
-    def contents(self) -> str:
-        """Return configuration contents formatted to be consumed by pebble layer."""
-        self.spark_conf = {
+    @property
+    def spark_conf(self):
+        """Return the dict representation of the configuration file."""
+        return {
             "spark.hadoop.fs.s3a.endpoint": self.config[CONFIG_KEY_S3_ENDPOINT],
             "spark.hadoop.fs.s3a.access.key": self.config[CONFIG_KEY_S3_ACCESS_KEY],
             "spark.hadoop.fs.s3a.secret.key": self.config[CONFIG_KEY_S3_SECRET_KEY],
@@ -40,6 +40,10 @@ class SparkHistoryServerConfig(WithLogging):
             "spark.hadoop.fs.s3a.path.style.access": "true",
             "spark.eventLog.enabled": "true",
         }
+
+    @property
+    def contents(self) -> str:
+        """Return configuration contents formatted to be consumed by pebble layer."""
         return "\n".join(
             [f"{key}={value}" for key, value in self.spark_conf.items() if value is not None]
         )
