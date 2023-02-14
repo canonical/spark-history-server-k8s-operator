@@ -55,7 +55,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
             CONFIG_KEY_S3_SECRET_KEY: "S3_SECRET_KEY",
             CONFIG_KEY_S3_LOGS_DIR: "S3_LOGS_DIR",
             CONFIG_KEY_S3_CREDS_PROVIDER: "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-            CONFIG_KEY_S3_SSL_ENABLED: False,
+            CONFIG_KEY_S3_SSL_ENABLED: "false",
         }
     )
 
