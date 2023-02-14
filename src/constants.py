@@ -14,6 +14,7 @@ CONFIG_KEY_S3_ACCESS_KEY = "s3_access_key"
 CONFIG_KEY_S3_SECRET_KEY = "s3_secret_key"
 CONFIG_KEY_S3_LOGS_DIR = "spark_logs_s3_dir"
 CONFIG_KEY_S3_CREDS_PROVIDER = "s3_credentials_provider"
+CONFIG_KEY_S3_SSL_ENABLED = "s3_ssl_enabled"
 SPARK_USER = "spark"
 SPARK_USER_GROUP = "spark"
 SPARK_USER_UID = 185

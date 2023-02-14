@@ -34,3 +34,8 @@ options:
       S3 credentials provider class to be used
     default: "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"
     type: string
+  s3_ssl_enabled:
+    description: |
+      Boolean to indicate if SSL is enabled for the S3 connection
+    default: False
+    type: boolean

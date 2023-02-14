@@ -13,6 +13,7 @@ from src.constants import (
     CONFIG_KEY_S3_ENDPOINT,
     CONFIG_KEY_S3_LOGS_DIR,
     CONFIG_KEY_S3_SECRET_KEY,
+    CONFIG_KEY_S3_SSL_ENABLED,
     CONTAINER,
     SPARK_HISTORY_SERVER_LAUNCH_CMD,
 )
@@ -75,6 +76,7 @@ class TestCharm(unittest.TestCase):
                     CONFIG_KEY_S3_CREDS_PROVIDER: "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"
                 }
             )
+            self.harness.update_config({CONFIG_KEY_S3_SSL_ENABLED: False})
 
             self.assertEqual(
                 self.harness.model.unit.status, ActiveStatus("Spark log directory: S3_LOGS_DIR")
