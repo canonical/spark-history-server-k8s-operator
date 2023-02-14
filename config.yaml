@@ -1,0 +1,41 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+options:
+  log-level:
+    description: |
+      Configures the log level. 
+
+      Acceptable values are: "info", "debug", "warning", "error" and "critical"
+    default: "info"
+    type: string
+  s3-access-key:
+    description: |
+      S3 access key
+    default: ""
+    type: string
+  s3-secret-key:
+    description: |
+      S3 secret key
+    default: ""
+    type: string
+  s3-endpoint:
+    description: |
+      S3 instance endpoint
+    default: ""
+    type: string
+  spark-logs-s3-dir:
+    description: |
+      S3 directory for Spark logs
+    default: ""
+    type: string
+  s3-credentials-provider:
+    description: |
+      S3 credentials provider class to be used
+    default: "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"
+    type: string
+  s3-ssl-enabled:
+    description: |
+      Boolean to indicate if SSL is enabled for the S3 connection
+    default: false
+    type: boolean
