@@ -41,7 +41,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         """Define and start a workload using the Pebble API."""
         # Get a reference the container attribute on the PebbleReadyEvent
         container = event.workload
-        container.push(SPARK_PROPERTIES_FILE, self.spark_config.contents(), make_dirs=True)
+        container.push(SPARK_PROPERTIES_FILE, self.spark_config.contents, make_dirs=True)
         # Add initial Pebble config layer using the Pebble API
         container.add_layer(CONTAINER, self._spark_history_server_layer, combine=True)
         # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
@@ -56,7 +56,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         if container.can_connect():
             container.push(
                 SPARK_PROPERTIES_FILE,
-                self.spark_config.contents(),
+                self.spark_config.contents,
                 user_id=SPARK_USER_UID,
                 group_id=SPARK_USER_GID,
                 make_dirs=True,
