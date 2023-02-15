@@ -10,13 +10,9 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 from src.constants import (
-    CONFIG_KEY_S3_ACCESS_KEY,
-    CONFIG_KEY_S3_CREDS_PROVIDER,
-    CONFIG_KEY_S3_ENDPOINT,
-    CONFIG_KEY_S3_LOGS_DIR,
-    CONFIG_KEY_S3_SECRET_KEY,
-    CONFIG_KEY_S3_SSL_ENABLED,
+    S3_INTEGRATOR_CHARM_NAME,
 )
+from test_helpers import fetch_action_sync_s3_credentials
 
 logger = logging.getLogger(__name__)
 
@@ -41,23 +37,50 @@ async def test_build_and_deploy(ops_test: OpsTest):
     # Deploy the charm and wait for waiting status
     await asyncio.gather(
         ops_test.model.deploy(
+            S3_INTEGRATOR_CHARM_NAME,
+            channel="edge",
+            application_name=S3_INTEGRATOR_CHARM_NAME,
+            num_units=1,
+            series="jammy",
+        ),
+        ops_test.model.deploy(
             charm, resources=resources, application_name=APP_NAME, num_units=1, series="jammy"
         ),
-        ops_test.model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=1000),
     )
 
-    # add config parameters via a file
-    app = ops_test.model.applications.get(APP_NAME)
-    await app.set_config(
-        {
-            CONFIG_KEY_S3_ENDPOINT: "http://S3_SERVER:S3_PORT",
-            CONFIG_KEY_S3_ACCESS_KEY: "S3_ACCESS_KEY",
-            CONFIG_KEY_S3_SECRET_KEY: "S3_SECRET_KEY",
-            CONFIG_KEY_S3_LOGS_DIR: "S3_LOGS_DIR",
-            CONFIG_KEY_S3_CREDS_PROVIDER: "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-            CONFIG_KEY_S3_SSL_ENABLED: "false",
-        }
+    await ops_test.model.wait_for_idle(apps=[APP_NAME, S3_INTEGRATOR_CHARM_NAME], timeout=1000)
+
+    # assert ops_test.model.applications[S3_INTEGRATOR_CHARM_NAME].status == "blocked"
+
+    access_key = "test-access-key"
+    secret_key = "test-secret-key"
+    s3_integrator_unit = ops_test.model.applications[S3_INTEGRATOR_CHARM_NAME].units[0]
+
+    await fetch_action_sync_s3_credentials(
+        s3_integrator_unit, access_key=access_key, secret_key=secret_key
     )
+    async with ops_test.fast_forward():
+        await ops_test.model.wait_for_idle(apps=[S3_INTEGRATOR_CHARM_NAME], status="active")
+
+    configuration_parameters = {
+        "s3-api-version": "1.0",
+        "bucket": "history-server",
+        "path": "spark-events",
+        "region": "us-east-2",
+        "endpoint": "s3.amazonaws.com",
+    }
+    # apply new configuration options
+    await ops_test.model.applications[S3_INTEGRATOR_CHARM_NAME].set_config(
+        configuration_parameters
+    )
+
+    await ops_test.model.add_relation(S3_INTEGRATOR_CHARM_NAME, APP_NAME)
+
+    await ops_test.model.wait_for_idle(apps=[APP_NAME, S3_INTEGRATOR_CHARM_NAME], timeout=1000)
 
     # wait for active status
-    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME],
+        status="active",
+        timeout=1000,
+    )
