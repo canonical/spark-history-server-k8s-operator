@@ -18,10 +18,6 @@ from ops.charm import (
     CharmBase,
     HookEvent,
     InstallEvent,
-    RelationBrokenEvent,
-    RelationChangedEvent,
-    RelationDepartedEvent,
-    RelationJoinedEvent,
 )
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, Relation, WaitingStatus
@@ -55,9 +51,6 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         self.s3_creds_client = S3Requirer(self, S3_INTEGRATOR_REL)
         self.framework.observe(
             self.s3_creds_client.on.credentials_changed, self._on_s3_credential_changed
-        )
-        self.framework.observe(
-            self.on[S3_INTEGRATOR_REL].relation_joined, self._on_s3_credential_relation_joined
         )
         self.framework.observe(
             self.s3_creds_client.on.credentials_gone, self._on_s3_credential_gone
@@ -161,14 +154,6 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
     def _on_s3_credential_changed(self, event: CredentialsChangedEvent):
         """Handle the `CredentialsChangedEvent` event from S3 integrator."""
         self.refresh_cached_s3_credentials(event)
-
-    def _on_s3_credential_relation_joined(self, event: RelationJoinedEvent):
-        """Handle the `RelationJoinedEvent` event for S3 integrator."""
-        if not self.verify_s3_credentials_in_relation():
-            self.logger.warning("S3 credentials not yet populated!")
-            return
-        else:
-            self.refresh_cached_s3_credentials(event)
 
     def _on_s3_credential_gone(self, event: CredentialsGoneEvent):
         """Handle the `CredentialsGoneEvent` event for S3 integrator."""
