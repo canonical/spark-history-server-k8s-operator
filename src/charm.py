@@ -52,25 +52,22 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
             self.on.spark_history_server_pebble_ready, self._on_spark_history_server_pebble_ready
         )
         self.framework.observe(self.on.install, self._on_install)
-        self.spark_config = SparkHistoryServerConfig(self.app_peer_data, self.model.config)
-
         self.s3_creds_client = S3Requirer(self, S3_INTEGRATOR_REL)
         self.framework.observe(
             self.s3_creds_client.on.credentials_changed, self._on_s3_credential_changed
         )
         self.framework.observe(
-            self.s3_creds_client.on.credentials_gone, self._on_s3_credential_gone
-        )
-        self.framework.observe(
             self.on[S3_INTEGRATOR_REL].relation_joined, self._on_s3_credential_relation_joined
         )
         self.framework.observe(
-            self.on[S3_INTEGRATOR_REL].relation_departed, self._on_s3_credential_relation_departed
+            self.on[S3_INTEGRATOR_REL].relation_broken, self._on_s3_credential_relation_broken
         )
         self.framework.observe(self.on[PEER].relation_changed, self._on_peer_relation_changed)
         self.framework.observe(self.on[PEER].relation_departed, self._on_peer_relation_departed)
         self.framework.observe(self.on[PEER].relation_broken, self._on_peer_relation_broken)
         self.framework.observe(self.on.config_changed, self._on_model_config_changed)
+
+        self.spark_config = SparkHistoryServerConfig(self.s3_creds_client, self.model.config)
 
     def _on_spark_history_server_pebble_ready(self, event):
         """Define and start a workload using the Pebble API."""
@@ -86,6 +83,12 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
     def apply_s3_credentials(self) -> None:
         """Apply s3 credentials to container."""
         container = self.unit.get_container(CONTAINER)
+
+        self.logger.debug(
+            "Changing spark configuration to '%s'",
+            self.spark_config.contents,
+        )
+
         container.push(
             SPARK_PROPERTIES_FILE,
             self.spark_config.contents,
@@ -102,10 +105,6 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         container.add_layer(CONTAINER_LAYER, self._spark_history_server_layer, combine=True)
         container.restart(CONTAINER)
 
-        self.logger.debug(
-            "Spark configuration changed to '%s'",
-            self.spark_config.contents,
-        )
 
     def push_s3_credentials_to_container(self, event: HookEvent) -> None:
         """Apply s3 credentials to container if pebble is ready."""
@@ -123,35 +122,17 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
             event.defer()
             self.unit.status = WaitingStatus("Waiting for Pebble API")
 
-    def refresh_cached_s3_credentials(self) -> None:
+    def refresh_cached_s3_credentials(self, event: HookEvent) -> None:
         """Refresh cached credentials."""
-        if not self.unit.is_leader():
-            return
-
-        credentials = self.s3_creds_client.get_s3_connection_info()
-        if not self.peers:
-            return
-        self.spark_config.update_conn_config(credentials)
-        self.logger.debug(f"Updated s3 relation credentials: {self.spark_config.spark_conf}")
-
-    def purge_cached_s3_credentials(self) -> None:
-        """Purge cached credentials."""
-        if not self.unit.is_leader():
-            return
-
-        if not self.peers:
-            return
-        self.spark_config.purge_conn_config()
-        self.logger.debug(f"Purged s3 relation credentials: {self.spark_config.contents}")
+        self.push_s3_credentials_to_container(event)
+        self.logger.debug(f"Updated s3 relation credentials: {self.spark_config.contents}")
 
     def verify_s3_credentials_in_relation(self) -> bool:
         """Verify cached credentials coming from relation."""
-        credentials = self.s3_creds_client.get_s3_connection_info()
-
-        if not self.peers:
+        if not self.s3_relation:
             return False
 
-        return self.spark_config.verify_conn_config(credentials)
+        return self.spark_config.verify_conn_config()
 
     @property
     def _spark_history_server_layer(self):
@@ -179,21 +160,11 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
 
     def _on_model_config_changed(self, event: HookEvent) -> None:
         """Handle the `on_config_changed` event."""
-        self.logger.info("===============================================")
-        self.logger.info(self.spark_config.contents)
-        self.logger.info("===============================================")
+        self.refresh_cached_s3_credentials(event)
 
     def _on_peer_relation_changed(self, event: RelationChangedEvent):
         """Handle the `RelationChangedEvent` event for History Server peers."""
-        if not self.verify_s3_credentials_in_relation():
-            self.logger.warning("Configuration change received but incomplete...")
-
-        self.push_s3_credentials_to_container(event)
-
-        if not self.s3_relation:
-            self.logger.debug(self.spark_config.contents)
-            self.unit.status = BlockedStatus("Pebble ready, waiting for Spark Configuration")
-            return
+        pass
 
     def _on_peer_relation_departed(self, event: RelationDepartedEvent):
         """Handle the `RelationDepartedEvent` event for History Server peers."""
@@ -205,11 +176,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
 
     def _on_s3_credential_changed(self, event: CredentialsChangedEvent):
         """Handle the `CredentialsChangedEvent` event from S3 integrator."""
-        self.refresh_cached_s3_credentials()
-
-    def _on_s3_credential_gone(self, event: CredentialsGoneEvent):
-        """Handle the `CredentialsGoneEvent` event from S3 integrator."""
-        self.purge_cached_s3_credentials()
+        self.refresh_cached_s3_credentials(event)
 
     def _on_s3_credential_relation_joined(self, event: RelationJoinedEvent):
         """Handle the `RelationJoinedEvent` event for S3 integrator."""
@@ -217,11 +184,12 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
             self.logger.warning("S3 credentials not yet populated!")
             return
         else:
-            self.refresh_cached_s3_credentials()
+            self.refresh_cached_s3_credentials(event)
 
-    def _on_s3_credential_relation_departed(self, event: RelationDepartedEvent):
-        """Handle the `RelationDepartedEvent` event for S3 integrator."""
-        self.purge_cached_s3_credentials()
+    def _on_s3_credential_relation_broken(self, event: RelationBrokenEvent):
+        """Handle the `RelationBrokenEvent` event for S3 integrator."""
+        self.refresh_cached_s3_credentials(event)
+        self.unit.status = BlockedStatus("Pebble ready, waiting for Spark Configuration")
 
     @property
     def peers(self) -> Optional[Relation]:

@@ -4,30 +4,8 @@
 options:
   log-level:
     description: |
-      Configures the log level. 
-
-      Acceptable values are: "info", "debug", "warning", "error" and "critical"
+      Configures the log level.
     default: "info"
-    type: string
-  s3-access-key:
-    description: |
-      S3 access key
-    default: ""
-    type: string
-  s3-secret-key:
-    description: |
-      S3 secret key
-    default: ""
-    type: string
-  s3-endpoint:
-    description: |
-      S3 instance endpoint
-    default: ""
-    type: string
-  spark-logs-s3-dir:
-    description: |
-      S3 directory for Spark logs
-    default: ""
     type: string
   s3-credentials-provider:
     description: |

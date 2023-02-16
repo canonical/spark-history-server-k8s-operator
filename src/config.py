@@ -17,47 +17,22 @@ from constants import (
 )
 from utils import WithLogging
 
+from charms.data_platform_libs.v0.s3 import (
+    S3Requirer,
+)
 
 class SparkHistoryServerConfig(WithLogging):
     """Spark History Server Configuration."""
 
-    def __init__(self, conn_config: Dict[str, Any], model_config: Dict[str, Any]):
-        self.conn_config = conn_config
+    def __init__(self, s3_creds_client: S3Requirer, model_config: Dict[str, Any]):
+        self.s3_creds_client = s3_creds_client
         self.model_config = model_config
 
-    def update_conn_config(self, s3_integrator_conf: Dict[str, str]):
-        """Update credentials in config cache."""
-        # self.config.update(conf)
-
-        # update incoming credentials if present
-        if CONFIG_KEY_S3_ENDPOINT in s3_integrator_conf:
-            self.conn_config[CONFIG_KEY_S3_ENDPOINT] = s3_integrator_conf[CONFIG_KEY_S3_ENDPOINT]
-        if CONFIG_KEY_S3_ACCESS_KEY in s3_integrator_conf:
-            self.conn_config[CONFIG_KEY_S3_ACCESS_KEY] = s3_integrator_conf[
-                CONFIG_KEY_S3_ACCESS_KEY
-            ]
-        if CONFIG_KEY_S3_SECRET_KEY in s3_integrator_conf:
-            self.conn_config[CONFIG_KEY_S3_SECRET_KEY] = s3_integrator_conf[
-                CONFIG_KEY_S3_SECRET_KEY
-            ]
-        if CONFIG_KEY_S3_BUCKET in s3_integrator_conf:
-            self.conn_config[CONFIG_KEY_S3_BUCKET] = s3_integrator_conf[CONFIG_KEY_S3_BUCKET]
-        if CONFIG_KEY_S3_LOGS_DIR in s3_integrator_conf:
-            self.conn_config[CONFIG_KEY_S3_LOGS_DIR] = s3_integrator_conf[CONFIG_KEY_S3_LOGS_DIR]
-
-    def purge_conn_config(self):
-        """Purge credentials config cache, not the extra config."""
-        # self.conn_config.clear()
-        self.conn_config[CONFIG_KEY_S3_ENDPOINT] = ""
-        self.conn_config[CONFIG_KEY_S3_ACCESS_KEY] = ""
-        self.conn_config[CONFIG_KEY_S3_SECRET_KEY] = ""
-        self.conn_config[CONFIG_KEY_S3_BUCKET] = ""
-        self.conn_config[CONFIG_KEY_S3_LOGS_DIR] = ""
-
-    def verify_conn_config(self, input: Dict[str, str]) -> bool:
+    def verify_conn_config(self) -> bool:
         """Verify incoming credentials."""
+        conn_config = self.s3_creds_client.get_s3_connection_info()
         return all(
-            x in input and input.get(x, "MISSING") != "MISSING"
+            x in conn_config and conn_config.get(x, "MISSING") != "MISSING"
             for x in [
                 CONFIG_KEY_S3_ENDPOINT,
                 CONFIG_KEY_S3_ACCESS_KEY,
@@ -70,16 +45,18 @@ class SparkHistoryServerConfig(WithLogging):
     @property
     def s3_log_dir(self) -> str:
         """Return the fully constructed S3 path to be used."""
-        return f"s3a://{self.conn_config.get(CONFIG_KEY_S3_BUCKET, '')}/{self.conn_config.get(CONFIG_KEY_S3_LOGS_DIR, '')}"
+        conn_config = self.s3_creds_client.get_s3_connection_info()
+        return f"s3a://{conn_config.get(CONFIG_KEY_S3_BUCKET, '')}/{conn_config.get(CONFIG_KEY_S3_LOGS_DIR, '')}"
 
     @property
     def spark_conf(self):
         """Return the dict representation of the configuration file."""
         s3_log_dir = self.s3_log_dir
+        conn_config = self.s3_creds_client.get_s3_connection_info()
         return {
-            "spark.hadoop.fs.s3a.endpoint": self.conn_config.get(CONFIG_KEY_S3_ENDPOINT, ""),
-            "spark.hadoop.fs.s3a.access.key": self.conn_config.get(CONFIG_KEY_S3_ACCESS_KEY, ""),
-            "spark.hadoop.fs.s3a.secret.key": self.conn_config.get(CONFIG_KEY_S3_SECRET_KEY, ""),
+            "spark.hadoop.fs.s3a.endpoint": conn_config.get(CONFIG_KEY_S3_ENDPOINT, ""),
+            "spark.hadoop.fs.s3a.access.key": conn_config.get(CONFIG_KEY_S3_ACCESS_KEY, ""),
+            "spark.hadoop.fs.s3a.secret.key": conn_config.get(CONFIG_KEY_S3_SECRET_KEY, ""),
             "spark.eventLog.dir": s3_log_dir,
             "spark.history.fs.logDirectory": s3_log_dir,
             "spark.hadoop.fs.s3a.aws.credentials.provider": self.model_config.get(
