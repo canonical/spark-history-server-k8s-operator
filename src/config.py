@@ -6,6 +6,10 @@
 
 from typing import Any, Dict
 
+from charms.data_platform_libs.v0.s3 import (
+    S3Requirer,
+)
+
 from constants import (
     CONFIG_KEY_S3_ACCESS_KEY,
     CONFIG_KEY_S3_BUCKET,
@@ -17,9 +21,6 @@ from constants import (
 )
 from utils import WithLogging
 
-from charms.data_platform_libs.v0.s3 import (
-    S3Requirer,
-)
 
 class SparkHistoryServerConfig(WithLogging):
     """Spark History Server Configuration."""

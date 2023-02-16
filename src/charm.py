@@ -11,7 +11,6 @@ from typing import MutableMapping, Optional
 
 from charms.data_platform_libs.v0.s3 import (
     CredentialsChangedEvent,
-    CredentialsGoneEvent,
     S3Requirer,
 )
 from ops.charm import (
@@ -104,7 +103,6 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         # Push an updated layer with the new config
         container.add_layer(CONTAINER_LAYER, self._spark_history_server_layer, combine=True)
         container.restart(CONTAINER)
-
 
     def push_s3_credentials_to_container(self, event: HookEvent) -> None:
         """Apply s3 credentials to container if pebble is ready."""
