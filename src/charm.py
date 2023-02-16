@@ -11,6 +11,7 @@ from typing import MutableMapping, Optional
 
 from charms.data_platform_libs.v0.s3 import (
     CredentialsChangedEvent,
+    CredentialsGoneEvent,
     S3Requirer,
 )
 from ops.charm import (
@@ -59,11 +60,8 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
             self.on[S3_INTEGRATOR_REL].relation_joined, self._on_s3_credential_relation_joined
         )
         self.framework.observe(
-            self.on[S3_INTEGRATOR_REL].relation_broken, self._on_s3_credential_relation_broken
+            self.s3_creds_client.on.credentials_gone, self._on_s3_credential_gone
         )
-        self.framework.observe(self.on[PEER].relation_changed, self._on_peer_relation_changed)
-        self.framework.observe(self.on[PEER].relation_departed, self._on_peer_relation_departed)
-        self.framework.observe(self.on[PEER].relation_broken, self._on_peer_relation_broken)
         self.framework.observe(self.on.config_changed, self._on_model_config_changed)
 
         self.spark_config = SparkHistoryServerConfig(self.s3_creds_client, self.model.config)
@@ -160,18 +158,6 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         """Handle the `on_config_changed` event."""
         self.refresh_cached_s3_credentials(event)
 
-    def _on_peer_relation_changed(self, event: RelationChangedEvent):
-        """Handle the `RelationChangedEvent` event for History Server peers."""
-        pass
-
-    def _on_peer_relation_departed(self, event: RelationDepartedEvent):
-        """Handle the `RelationDepartedEvent` event for History Server peers."""
-        pass
-
-    def _on_peer_relation_broken(self, event: RelationBrokenEvent):
-        """Handle the `RelationBrokenEvent` event for History Server peers."""
-        pass
-
     def _on_s3_credential_changed(self, event: CredentialsChangedEvent):
         """Handle the `CredentialsChangedEvent` event from S3 integrator."""
         self.refresh_cached_s3_credentials(event)
@@ -184,8 +170,8 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         else:
             self.refresh_cached_s3_credentials(event)
 
-    def _on_s3_credential_relation_broken(self, event: RelationBrokenEvent):
-        """Handle the `RelationBrokenEvent` event for S3 integrator."""
+    def _on_s3_credential_gone(self, event: CredentialsGoneEvent):
+        """Handle the `CredentialsGoneEvent` event for S3 integrator."""
         self.refresh_cached_s3_credentials(event)
         self.unit.status = BlockedStatus("Pebble ready, waiting for Spark Configuration")
 
