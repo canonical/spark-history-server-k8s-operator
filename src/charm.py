@@ -7,7 +7,7 @@
 
 import errno
 import os
-from typing import MutableMapping, Optional
+from typing import Optional
 
 from charms.data_platform_libs.v0.s3 import (
     CredentialsChangedEvent,
@@ -26,7 +26,6 @@ from config import SparkHistoryServerConfig
 from constants import (
     CONTAINER,
     CONTAINER_LAYER,
-    PEER,
     S3_INTEGRATOR_REL,
     SPARK_HISTORY_SERVER_LAUNCH_CMD,
     SPARK_PROPERTIES_FILE,
@@ -74,11 +73,6 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         """Apply s3 credentials to container."""
         container = self.unit.get_container(CONTAINER)
 
-        self.logger.debug(
-            "Changing spark configuration to '%s'",
-            self.spark_config.contents,
-        )
-
         container.push(
             SPARK_PROPERTIES_FILE,
             self.spark_config.contents,
@@ -105,7 +99,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
                 self.unit.status = BlockedStatus("Missing service configuration")
                 return
 
-            self.unit.status = ActiveStatus(f"Spark log directory: {self.spark_config.s3_log_dir}")
+            self.unit.status = ActiveStatus()
         else:
             # We were unable to connect to the Pebble API, so we defer this event
             event.defer()
@@ -114,7 +108,6 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
     def refresh_cached_s3_credentials(self, event: HookEvent) -> None:
         """Refresh cached credentials."""
         self.push_s3_credentials_to_container(event)
-        self.logger.debug(f"Updated s3 relation credentials: {self.spark_config.contents}")
 
     def verify_s3_credentials_in_relation(self) -> bool:
         """Verify cached credentials coming from relation."""
@@ -159,27 +152,6 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         """Handle the `CredentialsGoneEvent` event for S3 integrator."""
         self.refresh_cached_s3_credentials(event)
         self.unit.status = BlockedStatus("Pebble ready, waiting for Spark Configuration")
-
-    @property
-    def peers(self) -> Optional[Relation]:
-        """The cluster peer relation."""
-        return self.model.get_relation(PEER)
-
-    @property
-    def app_peer_data(self) -> MutableMapping[str, str]:
-        """Application peer relation data object."""
-        if not self.peers:
-            return {}
-
-        return self.peers.data[self.app]
-
-    @property
-    def unit_peer_data(self) -> MutableMapping[str, str]:
-        """Unit peer relation data object."""
-        if not self.peers:
-            return {}
-
-        return self.peers.data[self.unit]
 
     @property
     def s3_relation(self) -> Optional[Relation]:

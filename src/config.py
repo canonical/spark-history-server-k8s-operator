@@ -34,20 +34,17 @@ class SparkHistoryServerConfig(WithLogging):
         conn_config = self.s3_creds_client.get_s3_connection_info()
         return all(
             x in conn_config and conn_config.get(x, "MISSING") != "MISSING"
-            for x in [
-                CONFIG_KEY_S3_ENDPOINT,
-                CONFIG_KEY_S3_ACCESS_KEY,
-                CONFIG_KEY_S3_SECRET_KEY,
-                CONFIG_KEY_S3_BUCKET,
-                CONFIG_KEY_S3_LOGS_DIR,
-            ]
+            for x in [CONFIG_KEY_S3_ACCESS_KEY, CONFIG_KEY_S3_SECRET_KEY, CONFIG_KEY_S3_BUCKET]
         )
 
     @property
     def s3_log_dir(self) -> str:
         """Return the fully constructed S3 path to be used."""
         conn_config = self.s3_creds_client.get_s3_connection_info()
-        return f"s3a://{conn_config.get(CONFIG_KEY_S3_BUCKET, '')}/{conn_config.get(CONFIG_KEY_S3_LOGS_DIR, '')}"
+        if CONFIG_KEY_S3_BUCKET not in conn_config:
+            return ""
+        else:
+            return f"s3a://{conn_config[CONFIG_KEY_S3_BUCKET]}/{conn_config.get(CONFIG_KEY_S3_LOGS_DIR, '')}"
 
     @property
     def spark_conf(self):
@@ -55,7 +52,9 @@ class SparkHistoryServerConfig(WithLogging):
         s3_log_dir = self.s3_log_dir
         conn_config = self.s3_creds_client.get_s3_connection_info()
         return {
-            "spark.hadoop.fs.s3a.endpoint": conn_config.get(CONFIG_KEY_S3_ENDPOINT, ""),
+            "spark.hadoop.fs.s3a.endpoint": conn_config.get(
+                CONFIG_KEY_S3_ENDPOINT, "https://s3.amazonaws.com"
+            ),
             "spark.hadoop.fs.s3a.access.key": conn_config.get(CONFIG_KEY_S3_ACCESS_KEY, ""),
             "spark.hadoop.fs.s3a.secret.key": conn_config.get(CONFIG_KEY_S3_SECRET_KEY, ""),
             "spark.eventLog.dir": s3_log_dir,

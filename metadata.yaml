@@ -22,11 +22,6 @@ resources:
     description: OCI image for Spark History Server
     upstream-source: dataplatformoci/spark:3.3.1
 
-
-peers:
-  spark-history-server-peers:
-    interface: spark-history-server-peers
-
 requires:
   s3-credentials:
     interface: s3
