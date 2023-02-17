@@ -8,7 +8,7 @@ from unittest.mock import patch
 import ops.testing
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
-from src.constants import (
+from constants import (
     CONFIG_KEY_S3_ACCESS_KEY,
     CONFIG_KEY_S3_BUCKET,
     CONFIG_KEY_S3_ENDPOINT,
