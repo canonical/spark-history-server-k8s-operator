@@ -14,8 +14,6 @@ CONFIG_KEY_S3_ACCESS_KEY = "access-key"
 CONFIG_KEY_S3_SECRET_KEY = "secret-key"
 CONFIG_KEY_S3_BUCKET = "bucket"
 CONFIG_KEY_S3_LOGS_DIR = "path"
-CONFIG_KEY_S3_CREDS_PROVIDER = "s3-credentials-provider"
-CONFIG_KEY_S3_SSL_ENABLED = "s3-ssl-enabled"
 SPARK_USER = "spark"
 SPARK_USER_GROUP = "spark"
 SPARK_USER_UID = 185
@@ -28,3 +26,6 @@ SPARK_HISTORY_SERVER_LAUNCH_CMD = (
 PEER = "spark-history-server-peers"
 S3_INTEGRATOR_REL = "s3-credentials"
 S3_INTEGRATOR_CHARM_NAME = "s3-integrator"
+
+STATUS_MSG_WAITING_PEBBLE = "Waiting for Pebble"
+STATUS_MSG_MISSING_S3_RELATION = "Missing S3 relation"

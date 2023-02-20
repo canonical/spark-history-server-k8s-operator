@@ -7,13 +7,3 @@ options:
       Configures the log level.
     default: "info"
     type: string
-  s3-credentials-provider:
-    description: |
-      S3 credentials provider class to be used
-    default: "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider"
-    type: string
-  s3-ssl-enabled:
-    description: |
-      Boolean to indicate if SSL is enabled for the S3 connection
-    default: false
-    type: boolean

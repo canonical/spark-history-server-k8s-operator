@@ -34,6 +34,8 @@ from constants import (
     SPARK_USER_GROUP,
     SPARK_USER_UID,
     SPARK_USER_WORKDIR,
+    STATUS_MSG_MISSING_S3_RELATION,
+    STATUS_MSG_WAITING_PEBBLE,
 )
 from utils import WithLogging
 
@@ -67,7 +69,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         container.add_layer(CONTAINER, self._spark_history_server_layer, combine=True)
         # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
         container.replan()
-        self.unit.status = BlockedStatus("Pebble ready, waiting for Spark Configuration")
+        self.unit.status = BlockedStatus(STATUS_MSG_MISSING_S3_RELATION)
 
     def apply_s3_credentials(self) -> None:
         """Apply s3 credentials to container."""
@@ -96,14 +98,14 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
             try:
                 self.apply_s3_credentials()
             except FileNotFoundError:
-                self.unit.status = BlockedStatus("Missing service configuration")
+                self.unit.status = BlockedStatus(STATUS_MSG_MISSING_S3_RELATION)
                 return
 
             self.unit.status = ActiveStatus()
         else:
             # We were unable to connect to the Pebble API, so we defer this event
             event.defer()
-            self.unit.status = WaitingStatus("Waiting for Pebble API")
+            self.unit.status = WaitingStatus(STATUS_MSG_WAITING_PEBBLE)
 
     def refresh_cached_s3_credentials(self, event: HookEvent) -> None:
         """Refresh cached credentials."""
@@ -138,7 +140,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
 
     def _on_install(self, event: InstallEvent) -> None:
         """Handle the `on_install` event."""
-        self.unit.status = WaitingStatus("Waiting for Pebble")
+        self.unit.status = WaitingStatus(STATUS_MSG_WAITING_PEBBLE)
 
     def _on_model_config_changed(self, event: HookEvent) -> None:
         """Handle the `on_config_changed` event."""
@@ -151,7 +153,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
     def _on_s3_credential_gone(self, event: CredentialsGoneEvent):
         """Handle the `CredentialsGoneEvent` event for S3 integrator."""
         self.refresh_cached_s3_credentials(event)
-        self.unit.status = BlockedStatus("Pebble ready, waiting for Spark Configuration")
+        self.unit.status = BlockedStatus(STATUS_MSG_MISSING_S3_RELATION)
 
     @property
     def s3_relation(self) -> Optional[Relation]:
