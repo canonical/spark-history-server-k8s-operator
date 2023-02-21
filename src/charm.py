@@ -34,6 +34,8 @@ from constants import (
     SPARK_USER_GROUP,
     SPARK_USER_UID,
     SPARK_USER_WORKDIR,
+    STATUS_MSG_ACTIVE,
+    STATUS_MSG_INVALID_CREDENTIALS,
     STATUS_MSG_MISSING_S3_RELATION,
     STATUS_MSG_WAITING_PEBBLE,
 )
@@ -71,7 +73,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         container.replan()
         self.unit.status = BlockedStatus(STATUS_MSG_MISSING_S3_RELATION)
 
-    def apply_s3_credentials(self) -> None:
+    def apply_s3_credentials(self) -> str:
         """Apply s3 credentials to container."""
         container = self.unit.get_container(CONTAINER)
 
@@ -90,26 +92,33 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         # Push an updated layer with the new config
         container.add_layer(CONTAINER_LAYER, self._spark_history_server_layer, combine=True)
         container.restart(CONTAINER)
+        return STATUS_MSG_ACTIVE
 
-    def push_s3_credentials_to_container(self, event: HookEvent) -> None:
+    def push_s3_credentials_to_container(self, event: HookEvent) -> str:
         """Apply s3 credentials to container if pebble is ready."""
         container = self.unit.get_container(CONTAINER)
         if container.can_connect():
             try:
-                self.apply_s3_credentials()
+                return self.apply_s3_credentials()
             except FileNotFoundError:
                 self.unit.status = BlockedStatus(STATUS_MSG_MISSING_S3_RELATION)
-                return
-
-            self.unit.status = ActiveStatus()
+                return STATUS_MSG_MISSING_S3_RELATION
         else:
             # We were unable to connect to the Pebble API, so we defer this event
             event.defer()
             self.unit.status = WaitingStatus(STATUS_MSG_WAITING_PEBBLE)
+            return STATUS_MSG_WAITING_PEBBLE
 
-    def refresh_cached_s3_credentials(self, event: HookEvent) -> None:
+    def refresh_cached_s3_credentials(self, event: HookEvent) -> str:
         """Refresh cached credentials."""
-        self.push_s3_credentials_to_container(event)
+        status = self.push_s3_credentials_to_container(event)
+        if status not in [STATUS_MSG_ACTIVE]:
+            return status
+
+        if not self.spark_config.verify_conn_config():
+            return STATUS_MSG_INVALID_CREDENTIALS
+        else:
+            return STATUS_MSG_ACTIVE
 
     def verify_s3_credentials_in_relation(self) -> bool:
         """Verify cached credentials coming from relation."""
@@ -144,16 +153,39 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
 
     def _on_model_config_changed(self, event: HookEvent) -> None:
         """Handle the `on_config_changed` event."""
-        self.refresh_cached_s3_credentials(event)
+        if not self.s3_relation:
+            self.unit.status = BlockedStatus(STATUS_MSG_MISSING_S3_RELATION)
+            return
+
+        status = self.refresh_cached_s3_credentials(event)
+        if status == STATUS_MSG_ACTIVE:
+            self.unit.status = ActiveStatus()
+        elif status == STATUS_MSG_INVALID_CREDENTIALS:
+            self.unit.status = BlockedStatus(STATUS_MSG_INVALID_CREDENTIALS)
+        elif status == STATUS_MSG_WAITING_PEBBLE:
+            self.unit.status = WaitingStatus(STATUS_MSG_WAITING_PEBBLE)
+        elif status == STATUS_MSG_MISSING_S3_RELATION:
+            self.unit.status = BlockedStatus(STATUS_MSG_MISSING_S3_RELATION)
 
     def _on_s3_credential_changed(self, event: CredentialsChangedEvent):
         """Handle the `CredentialsChangedEvent` event from S3 integrator."""
-        self.refresh_cached_s3_credentials(event)
+        status = self.refresh_cached_s3_credentials(event)
+        if status == STATUS_MSG_ACTIVE:
+            self.unit.status = ActiveStatus()
+        elif status == STATUS_MSG_INVALID_CREDENTIALS:
+            self.unit.status = BlockedStatus(STATUS_MSG_INVALID_CREDENTIALS)
+        elif status == STATUS_MSG_WAITING_PEBBLE:
+            self.unit.status = WaitingStatus(STATUS_MSG_WAITING_PEBBLE)
+        elif status == STATUS_MSG_MISSING_S3_RELATION:
+            self.unit.status = BlockedStatus(STATUS_MSG_MISSING_S3_RELATION)
 
     def _on_s3_credential_gone(self, event: CredentialsGoneEvent):
         """Handle the `CredentialsGoneEvent` event for S3 integrator."""
-        self.refresh_cached_s3_credentials(event)
-        self.unit.status = BlockedStatus(STATUS_MSG_MISSING_S3_RELATION)
+        status = self.refresh_cached_s3_credentials(event)
+        if status == STATUS_MSG_WAITING_PEBBLE:
+            self.unit.status = WaitingStatus(STATUS_MSG_WAITING_PEBBLE)
+        else:
+            self.unit.status = BlockedStatus(STATUS_MSG_MISSING_S3_RELATION)
 
     @property
     def s3_relation(self) -> Optional[Relation]:

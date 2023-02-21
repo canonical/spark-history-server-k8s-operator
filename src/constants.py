@@ -29,3 +29,5 @@ S3_INTEGRATOR_CHARM_NAME = "s3-integrator"
 
 STATUS_MSG_WAITING_PEBBLE = "Waiting for Pebble"
 STATUS_MSG_MISSING_S3_RELATION = "Missing S3 relation"
+STATUS_MSG_INVALID_CREDENTIALS = "Invalid S3 credentials"
+STATUS_MSG_ACTIVE = ""

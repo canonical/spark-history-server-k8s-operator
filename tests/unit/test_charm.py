@@ -90,7 +90,7 @@ class TestCharm(unittest.TestCase):
         self.harness.charm.on.config_changed.emit()
         self.assertEqual(
             self.harness.model.unit.status,
-            WaitingStatus(STATUS_MSG_WAITING_PEBBLE),
+            BlockedStatus(STATUS_MSG_MISSING_S3_RELATION),
         )
 
     def test_config(self):
@@ -102,7 +102,7 @@ class TestCharm(unittest.TestCase):
             CONFIG_KEY_S3_LOGS_DIR: "DUMMY_LOG_DIR",
         }
         config = SparkHistoryServerConfig(mock_s3_info, {})
-        self.assertTrue(config.verify_conn_config())
+        self.assertFalse(config.verify_conn_config())
 
         self.assertEqual(config.s3_log_dir, "s3a://DUMMY_BUCKET/DUMMY_LOG_DIR")
         self.assertEqual(
@@ -124,7 +124,6 @@ class TestCharm(unittest.TestCase):
             CONFIG_KEY_S3_SECRET_KEY: "DUMMY_SECRET_KEY",
         }
         config = SparkHistoryServerConfig(mock_s3_info, {})
-        self.assertTrue(config.verify_conn_config())
 
         self.assertEqual(config.s3_log_dir, "s3a://")
         self.assertEqual(
@@ -143,11 +142,20 @@ class TestCharm(unittest.TestCase):
         config = SparkHistoryServerConfig(mock_s3_info, {})
         self.assertFalse(config.verify_conn_config())
 
+    @patch("boto3.session")
+    @patch("boto3.client")
     @patch("charms.data_platform_libs.v0.s3.S3Requirer.get_s3_connection_info")
     @patch("ops.model.Container.list_files")
-    def test_s3_relation_add(self, mock_container_list_files, mock_s3_info):
+    def test_s3_relation_add(
+        self, mock_container_list_files, mock_s3_info, mock_boto_client, mock_boto_session
+    ):
         # mocks
         mock_container_list_files.return_value = None
+
+        mock_boto_session.return_value = mock_boto_client
+        mock_boto_client.return_value = mock_boto_client
+        mock_boto_client.list_buckets.return_value = []
+
         mock_s3_info.return_value = {
             CONFIG_KEY_S3_ACCESS_KEY: "DUMMY_ACCESS_KEY",
             CONFIG_KEY_S3_SECRET_KEY: "DUMMY_SECRET_KEY",
@@ -194,10 +202,17 @@ class TestCharm(unittest.TestCase):
             self.harness.charm.spark_config.s3_log_dir, "s3a://DUMMY_BUCKET/DUMMY_LOG_DIR"
         )
 
+    @patch("boto3.session")
+    @patch("boto3.client")
     @patch("ops.model.Container.list_files")
-    def test_credentials_changed(self, mock_container_list_files):
+    def test_credentials_changed(
+        self, mock_container_list_files, mock_boto_client, mock_boto_session
+    ):
         # mocks
         mock_container_list_files.return_value = None
+        mock_boto_session.return_value = mock_boto_client
+        mock_boto_client.return_value = mock_boto_client
+        mock_boto_client.list_buckets.return_value = []
 
         # Ensure the simulated Pebble API is reachable
         self.harness.set_can_connect(CONTAINER, True)
@@ -256,10 +271,17 @@ class TestCharm(unittest.TestCase):
             self.harness.charm.spark_config.s3_log_dir, "s3a://DUMMY_BUCKET_3/DUMMY_LOG_DIR_3"
         )
 
+    @patch("boto3.session")
+    @patch("boto3.client")
     @patch("ops.model.Container.list_files")
-    def test_credentials_gone(self, mock_container_list_files):
+    def test_credentials_gone(
+        self, mock_container_list_files, mock_boto_client, mock_boto_session
+    ):
         # mocks
         mock_container_list_files.return_value = None
+        mock_boto_session.return_value = mock_boto_client
+        mock_boto_client.return_value = mock_boto_client
+        mock_boto_client.list_buckets.return_value = []
 
         # Ensure the simulated Pebble API is reachable
         self.harness.set_can_connect(CONTAINER, True)
@@ -298,7 +320,7 @@ class TestCharm(unittest.TestCase):
         self.harness.charm.on.config_changed.emit()
         self.assertEqual(
             self.harness.model.unit.status,
-            WaitingStatus(STATUS_MSG_WAITING_PEBBLE),
+            BlockedStatus(STATUS_MSG_MISSING_S3_RELATION),
         )
 
         self.harness.set_can_connect(CONTAINER, True)

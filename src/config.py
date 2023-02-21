@@ -6,6 +6,8 @@
 
 from typing import Any, Dict
 
+import boto3
+from botocore.exceptions import ClientError
 from charms.data_platform_libs.v0.s3 import (
     S3Requirer,
 )
@@ -30,10 +32,28 @@ class SparkHistoryServerConfig(WithLogging):
     def verify_conn_config(self) -> bool:
         """Verify incoming credentials."""
         conn_config = self.s3_creds_client.get_s3_connection_info()
-        return all(
+        if not all(
             x in conn_config and conn_config.get(x, "MISSING") != "MISSING"
-            for x in [CONFIG_KEY_S3_ACCESS_KEY, CONFIG_KEY_S3_SECRET_KEY]
+            for x in [CONFIG_KEY_S3_ACCESS_KEY, CONFIG_KEY_S3_SECRET_KEY, CONFIG_KEY_S3_BUCKET]
+        ):
+            return False
+
+        session = boto3.session.Session(
+            aws_access_key_id=conn_config[CONFIG_KEY_S3_ACCESS_KEY],
+            aws_secret_access_key=conn_config[CONFIG_KEY_S3_SECRET_KEY],
         )
+
+        s3 = session.client(
+            "s3", endpoint_url=conn_config.get(CONFIG_KEY_S3_ENDPOINT, "https://s3.amazonaws.com")
+        )
+
+        try:
+            s3.list_buckets()
+        except ClientError:
+            self.logger.error("Invalid S3 credentials...")
+            return False
+
+        return True
 
     @property
     def s3_log_dir(self) -> str:

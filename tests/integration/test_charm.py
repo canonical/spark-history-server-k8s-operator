@@ -9,9 +9,7 @@ from pathlib import Path
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
-from src.constants import (
-    S3_INTEGRATOR_CHARM_NAME,
-)
+from src.constants import S3_INTEGRATOR_CHARM_NAME, STATUS_MSG_INVALID_CREDENTIALS
 from test_helpers import fetch_action_sync_s3_credentials
 
 logger = logging.getLogger(__name__)
@@ -50,8 +48,6 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
     await ops_test.model.wait_for_idle(apps=[APP_NAME, S3_INTEGRATOR_CHARM_NAME], timeout=1000)
 
-    # assert ops_test.model.applications[S3_INTEGRATOR_CHARM_NAME].status == "blocked"
-
     access_key = "test-access-key"
     secret_key = "test-secret-key"
     s3_integrator_unit = ops_test.model.applications[S3_INTEGRATOR_CHARM_NAME].units[0]
@@ -78,9 +74,16 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
     await ops_test.model.wait_for_idle(apps=[APP_NAME, S3_INTEGRATOR_CHARM_NAME], timeout=1000)
 
-    # wait for active status
+    # # wait for active status
+    # await ops_test.model.wait_for_idle(
+    #     apps=[APP_NAME],
+    #     status="active",
+    #     timeout=1000,
+    # )
+
     await ops_test.model.wait_for_idle(
         apps=[APP_NAME],
-        status="active",
+        status="blocked",
+        message=STATUS_MSG_INVALID_CREDENTIALS,
         timeout=1000,
     )
