@@ -48,8 +48,8 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
     await ops_test.model.wait_for_idle(apps=[APP_NAME, S3_INTEGRATOR_CHARM_NAME], timeout=1000)
 
-    access_key = "test-access-key"
-    secret_key = "test-secret-key"
+    access_key = "minioadmin"
+    secret_key = "minioadmin"
     s3_integrator_unit = ops_test.model.applications[S3_INTEGRATOR_CHARM_NAME].units[0]
 
     await fetch_action_sync_s3_credentials(
@@ -59,11 +59,9 @@ async def test_build_and_deploy(ops_test: OpsTest):
         await ops_test.model.wait_for_idle(apps=[S3_INTEGRATOR_CHARM_NAME], status="active")
 
     configuration_parameters = {
-        "s3-api-version": "1.0",
         "bucket": "history-server",
         "path": "spark-events",
-        "region": "us-east-2",
-        "endpoint": "https://s3.amazonaws.com",
+        "endpoint": "http://127.0.0.1:9000",
     }
     # apply new configuration options
     await ops_test.model.applications[S3_INTEGRATOR_CHARM_NAME].set_config(
@@ -74,15 +72,9 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
     await ops_test.model.wait_for_idle(apps=[APP_NAME, S3_INTEGRATOR_CHARM_NAME], timeout=1000)
 
-    # # wait for active status
-    # await ops_test.model.wait_for_idle(
-    #     apps=[APP_NAME],
-    #     status="active",
-    #     timeout=1000,
-    # )
-
+    # wait for active status
     await ops_test.model.wait_for_idle(
         apps=[APP_NAME],
-        status="blocked",
+        status="active",
         timeout=1000,
     )
