@@ -63,7 +63,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
         "bucket": "history-server",
         "path": "spark-events",
         "region": "us-east-2",
-        "endpoint": "s3.amazonaws.com",
+        "endpoint": "https://s3.amazonaws.com",
     }
     # apply new configuration options
     await ops_test.model.applications[S3_INTEGRATOR_CHARM_NAME].set_config(
