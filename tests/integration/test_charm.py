@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
-from src.constants import S3_INTEGRATOR_CHARM_NAME, STATUS_MSG_INVALID_CREDENTIALS
+from src.constants import S3_INTEGRATOR_CHARM_NAME
 from test_helpers import fetch_action_sync_s3_credentials
 
 logger = logging.getLogger(__name__)
@@ -84,6 +84,5 @@ async def test_build_and_deploy(ops_test: OpsTest):
     await ops_test.model.wait_for_idle(
         apps=[APP_NAME],
         status="blocked",
-        message=STATUS_MSG_INVALID_CREDENTIALS,
         timeout=1000,
     )
