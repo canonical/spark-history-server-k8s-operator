@@ -4,6 +4,7 @@
 
 import asyncio
 import logging
+import os
 from pathlib import Path
 
 import pytest
@@ -61,7 +62,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
     configuration_parameters = {
         "bucket": "history-server",
         "path": "spark-events",
-        "endpoint": "http://127.0.0.1:9000",
+        "endpoint": f"http://{os.getenv('MINIO_CONTAINER_IP', default='127.0.0.1')}:9000",
     }
     # apply new configuration options
     await ops_test.model.applications[S3_INTEGRATOR_CHARM_NAME].set_config(
