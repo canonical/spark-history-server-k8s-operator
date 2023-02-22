@@ -34,8 +34,10 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
+        id: checkout
         uses: actions/checkout@v2
       - name: Setup minio
+        id: minio
         run: |
           docker run -d -p 9000:9000 --name minio \
                      -e "MINIO_ACCESS_KEY=minioadmin" \
@@ -54,18 +56,21 @@ jobs:
           ./mc ls myminio
           export CONTAINER_ID=$(docker ps -n 1 | tail -n 1 | cut -d' ' -f1)
           export CONTAINER_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CONTAINER_ID)
-          echo "MINIO_CONTAINER_ID=$CONTAINER_ID" >> $GITHUB_ENV
-          echo "MINIO_CONTAINER_IP=$CONTAINER_IP" >> $GITHUB_ENV
-          echo "minio container ${{ env.MINIO_CONTAINER_ID }} launched with ip ${{ env.MINIO_CONTAINER_IP }}"
+          echo "minio container $CONTAINER_ID launched with ip $CONTAINER_IP"
+          
+          echo "MINIO_CONTAINER_ID=$CONTAINER_ID" >> $GITHUB_OUTPUT
+          echo "MINIO_CONTAINER_IP=$CONTAINER_IP" >> $GITHUB_OUTPUT
 
       - name: Setup operator environment
+        id: operator
         uses: charmed-kubernetes/actions-operator@main
         with:
           provider: microk8s
           # This is needed until https://bugs.launchpad.net/juju/+bug/1977582 is fixed
           bootstrap-options: "--agent-version 2.9.29"
       - name: Run integration tests
+        id: test
         run: tox -e integration
         env:
-          MINIO_CONTAINER_ID : ${{ env.MINIO_CONTAINER_ID }}
-          MINIO_CONTAINER_IP : ${{ env.MINIO_CONTAINER_IP }}
+          MINIO_CONTAINER_ID : ${{ steps.minio.outputs.MINIO_CONTAINER_ID }}
+          MINIO_CONTAINER_IP : ${{ steps.minio.outputs.MINIO_CONTAINER_IP }}
