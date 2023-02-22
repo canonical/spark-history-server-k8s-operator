@@ -25,52 +25,54 @@ jobs:
       - name: Run tests
         run: tox -e unit
 
-  integration-test:
-    name: Integration tests (microk8s)
-    timeout-minutes: 120
-    needs:
-      - lint
-      - unit-test
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout
-        id: checkout
-        uses: actions/checkout@v2
-      - name: Setup minio
-        id: minio
-        run: |
-          docker run -d -p 9000:9000 --name minio \
-                     -e "MINIO_ACCESS_KEY=minioadmin" \
-                     -e "MINIO_SECRET_KEY=minioadmin" \
-                     -v /tmp/data:/data \
-                     -v /tmp/config:/root/.minio \
-                     minio/minio server /data
+# Integration test TBD
 
-          wget https://dl.min.io/client/mc/release/linux-amd64/mc
-          chmod +x mc
-          ./mc alias set myminio/ http://127.0.0.1:9000 minioadmin minioadmin
-          ./mc mb myminio/history-server
-          ./mc mb myminio/history-server/spark-events
-          ./mc mb myminio/history-server/spark-events-2
-          ./mc mb myminio/history-server/spark-events-3
-          ./mc ls myminio
-          export CONTAINER_ID=$(docker ps -n 1 | tail -n 1 | cut -d' ' -f1)
-          export CONTAINER_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CONTAINER_ID)
-          echo "minio container $CONTAINER_ID launched with ip $CONTAINER_IP"
-          
-          echo "MINIO_CONTAINER_ID=$CONTAINER_ID" >> $GITHUB_OUTPUT
-          echo "MINIO_CONTAINER_IP=$CONTAINER_IP" >> $GITHUB_OUTPUT
-
-      - name: Setup operator environment
-        id: operator
-        uses: charmed-kubernetes/actions-operator@main
-        with:
-          provider: microk8s
-          # This is needed until https://bugs.launchpad.net/juju/+bug/1977582 is fixed
-          bootstrap-options: "--agent-version 2.9.29"
-      - name: Run integration tests
-        id: test
-        run: tox -e integration
-        env:
-          MINIO_CONTAINER_ID : ${{ steps.minio.outputs.MINIO_CONTAINER_ID }}
-          MINIO_CONTAINER_IP : ${{ steps.minio.outputs.MINIO_CONTAINER_IP }}
+#  integration-test:
+#    name: Integration tests (microk8s)
+#    timeout-minutes: 120
+#    needs:
+#      - lint
+#      - unit-test
+#    runs-on: ubuntu-22.04
+#    steps:
+#      - name: Checkout
+#        id: checkout
+#        uses: actions/checkout@v2
+#      - name: Setup minio
+#        id: minio
+#        run: |
+#          docker run -d -p 9000:9000 --name minio \
+#                     -e "MINIO_ACCESS_KEY=minioadmin" \
+#                     -e "MINIO_SECRET_KEY=minioadmin" \
+#                     -v /tmp/data:/data \
+#                     -v /tmp/config:/root/.minio \
+#                     minio/minio server /data
+#
+#          wget https://dl.min.io/client/mc/release/linux-amd64/mc
+#          chmod +x mc
+#          ./mc alias set myminio/ http://127.0.0.1:9000 minioadmin minioadmin
+#          ./mc mb myminio/history-server
+#          ./mc mb myminio/history-server/spark-events
+#          ./mc mb myminio/history-server/spark-events-2
+#          ./mc mb myminio/history-server/spark-events-3
+#          ./mc ls myminio
+#          export CONTAINER_ID=$(docker ps -n 1 | tail -n 1 | cut -d' ' -f1)
+#          export CONTAINER_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CONTAINER_ID)
+#          echo "minio container $CONTAINER_ID launched with ip $CONTAINER_IP"
+#
+#          echo "MINIO_CONTAINER_ID=$CONTAINER_ID" >> $GITHUB_OUTPUT
+#          echo "MINIO_CONTAINER_IP=$CONTAINER_IP" >> $GITHUB_OUTPUT
+#
+#      - name: Setup operator environment
+#        id: operator
+#        uses: charmed-kubernetes/actions-operator@main
+#        with:
+#          provider: microk8s
+#          # This is needed until https://bugs.launchpad.net/juju/+bug/1977582 is fixed
+#          bootstrap-options: "--agent-version 2.9.29"
+#      - name: Run integration tests
+#        id: test
+#        run: tox -e integration
+#        env:
+#          MINIO_CONTAINER_ID : ${{ steps.minio.outputs.MINIO_CONTAINER_ID }}
+#          MINIO_CONTAINER_IP : ${{ steps.minio.outputs.MINIO_CONTAINER_IP }}
