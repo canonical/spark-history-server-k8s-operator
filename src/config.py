@@ -30,7 +30,7 @@ class SparkHistoryServerConfig(WithLogging):
         self.model_config = model_config
 
     def verify_conn_config(self) -> bool:
-        """Verify incoming credentials."""
+        """Verify S3 credentials."""
         conn_config = self.s3_creds_client.get_s3_connection_info()
         if not all(
             x in conn_config and conn_config.get(x, "MISSING") != "MISSING"
