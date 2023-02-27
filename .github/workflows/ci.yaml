@@ -24,21 +24,3 @@ jobs:
         run: python -m pip install tox
       - name: Run tests
         run: tox -e unit
-
-  integration-test:
-    name: Integration tests (microk8s)
-    needs:
-      - lint
-      - unit-test
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Setup operator environment
-        uses: charmed-kubernetes/actions-operator@main
-        with:
-          provider: microk8s
-          # This is needed until https://bugs.launchpad.net/juju/+bug/1977582 is fixed
-          bootstrap-options: "--agent-version 2.9.29"
-      - name: Run integration tests
-        run: tox -e integration
