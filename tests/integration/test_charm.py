@@ -5,17 +5,18 @@
 # Integration Tests TBD separately in next pulse
 
 import asyncio
+import json
 import logging
-
-# import os
+import os
+import urllib.request
 from pathlib import Path
+from time import sleep
 
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 from src.constants import S3_INTEGRATOR_CHARM_NAME
-
-# from test_helpers import fetch_action_sync_s3_credentials
+from test_helpers import fetch_action_sync_s3_credentials
 
 logger = logging.getLogger(__name__)
 
@@ -53,34 +54,51 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
     await ops_test.model.wait_for_idle(apps=[APP_NAME, S3_INTEGRATOR_CHARM_NAME], timeout=1000)
 
+    access_key = os.getenv("MINIO_ACCESS_KEY")
+    secret_key = os.getenv("MINIO_SECRET_KEY")
+    s3_integrator_unit = ops_test.model.applications[S3_INTEGRATOR_CHARM_NAME].units[0]
 
-#     access_key = "minioadmin"
-#     secret_key = "minioadmin"
-#     s3_integrator_unit = ops_test.model.applications[S3_INTEGRATOR_CHARM_NAME].units[0]
-#
-#     await fetch_action_sync_s3_credentials(
-#         s3_integrator_unit, access_key=access_key, secret_key=secret_key
-#     )
-#     async with ops_test.fast_forward():
-#         await ops_test.model.wait_for_idle(apps=[S3_INTEGRATOR_CHARM_NAME], status="active")
-#
-#     configuration_parameters = {
-#         "bucket": "history-server",
-#         "path": "spark-events",
-#         "endpoint": f"http://{os.getenv('MINIO_CONTAINER_IP', default='127.0.0.1')}:9000",
-#     }
-#     # apply new configuration options
-#     await ops_test.model.applications[S3_INTEGRATOR_CHARM_NAME].set_config(
-#         configuration_parameters
-#     )
-#
-#     await ops_test.model.add_relation(S3_INTEGRATOR_CHARM_NAME, APP_NAME)
-#
-#     await ops_test.model.wait_for_idle(apps=[APP_NAME, S3_INTEGRATOR_CHARM_NAME], timeout=1000)
-#
-#     # wait for active status
-#     await ops_test.model.wait_for_idle(
-#         apps=[APP_NAME],
-#         status="active",
-#         timeout=1000,
-#     )
+    await fetch_action_sync_s3_credentials(
+        s3_integrator_unit, access_key=access_key, secret_key=secret_key
+    )
+    async with ops_test.fast_forward():
+        await ops_test.model.wait_for_idle(apps=[S3_INTEGRATOR_CHARM_NAME], status="active")
+
+    configuration_parameters = {
+        "bucket": "history-server",
+        "path": "spark-events",
+        "endpoint": os.getenv("MINIO_ENDPOINT", default="http://127.0.0.1:9000"),
+    }
+    # apply new configuration options
+    await ops_test.model.applications[S3_INTEGRATOR_CHARM_NAME].set_config(
+        configuration_parameters
+    )
+
+    await ops_test.model.add_relation(S3_INTEGRATOR_CHARM_NAME, APP_NAME)
+
+    await ops_test.model.wait_for_idle(apps=[APP_NAME, S3_INTEGRATOR_CHARM_NAME], timeout=1000)
+
+    # wait for active status
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME],
+        status="active",
+        timeout=1000,
+    )
+
+    status = await ops_test.model.get_status()
+    address = status["applications"][APP_NAME]["units"][f"{APP_NAME}/0"]["address"]
+
+    for i in range(0, 5):
+        try:
+            apps = json.loads(
+                urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read()
+            )
+        except Exception:
+            apps = []
+
+        if len(apps) > 0:
+            break
+        else:
+            sleep(3)
+
+    assert len(apps) == 1
