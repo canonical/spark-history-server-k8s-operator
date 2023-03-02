@@ -1,0 +1,9 @@
+name: Verify PR
+
+on:
+  pull_request:
+    types: [ assigned, opened, synchronize, reopened ]
+
+jobs:
+  build:
+    uses: ./.github/workflows/ci.yaml

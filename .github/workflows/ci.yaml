@@ -1,6 +1,6 @@
-name: Spark History Server Testing
+name: Build charm and run tests
 on:
-  pull_request:
+  workflow_call:
 
 jobs:
   lint:
