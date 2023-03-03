@@ -17,8 +17,10 @@ import pytest
 import yaml
 from botocore.client import Config
 from pytest_operator.plugin import OpsTest
-from src.constants import S3_INTEGRATOR_CHARM_NAME
-from test_helpers import fetch_action_sync_s3_credentials
+
+from constants import S3_INTEGRATOR_CHARM_NAME
+
+from .test_helpers import fetch_action_sync_s3_credentials
 
 logger = logging.getLogger(__name__)
 
