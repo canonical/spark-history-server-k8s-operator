@@ -8,6 +8,9 @@ from unittest.mock import patch
 import ops.testing
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
+
+from charm import SparkHistoryServerCharm
+from config import SparkHistoryServerConfig
 from constants import (
     CONFIG_KEY_S3_ACCESS_KEY,
     CONFIG_KEY_S3_BUCKET,
@@ -20,9 +23,6 @@ from constants import (
     STATUS_MSG_MISSING_S3_RELATION,
     STATUS_MSG_WAITING_PEBBLE,
 )
-
-from charm import SparkHistoryServerCharm
-from config import SparkHistoryServerConfig
 
 
 class TestCharm(unittest.TestCase):
