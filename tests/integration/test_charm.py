@@ -10,6 +10,7 @@ import logging
 import subprocess
 import urllib.request
 from pathlib import Path
+from time import sleep
 
 import boto3
 import pytest
@@ -34,7 +35,19 @@ def setup_s3_bucket_for_history_server(
     )
     s3 = session.client("s3", endpoint_url=endpoint_url, config=config)
     logger.info("create bucket in minio")
-    s3.create_bucket(Bucket="history-server")
+    for i in range(0, 30):
+        try:
+            s3.create_bucket(Bucket="history-server")
+            break
+        except Exception as e:
+            if i >= 30:
+                logger.error(f"create bucket failed....exiting....\n{str(e)}")
+                raise
+            else:
+                logger.error(f"create bucket failed....retrying in 10 secs.....\n{str(e)}")
+                sleep(10)
+                continue
+
     s3.put_object(Bucket="history-server", Key=("spark-events/"))
     logger.debug(s3.list_buckets())
 
