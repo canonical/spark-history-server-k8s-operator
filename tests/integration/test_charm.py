@@ -7,13 +7,14 @@
 import asyncio
 import json
 import logging
-import os
+import subprocess
 import urllib.request
 from pathlib import Path
-from time import sleep
 
+import boto3
 import pytest
 import yaml
+from botocore.client import Config
 from pytest_operator.plugin import OpsTest
 from src.constants import S3_INTEGRATOR_CHARM_NAME
 from test_helpers import fetch_action_sync_s3_credentials
@@ -24,19 +25,62 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
 
 
+def setup_s3_bucket_for_history_server(
+    endpoint_url: str, aws_access_key: str, aws_secret_key: str
+):
+    config = Config(connect_timeout=60, retries={"max_attempts": 0})
+    session = boto3.session.Session(
+        aws_access_key_id=aws_access_key, aws_secret_access_key=aws_secret_key
+    )
+    s3 = session.client("s3", endpoint_url=endpoint_url, config=config)
+    logger.info("create bucket in minio")
+    s3.create_bucket(Bucket="history-server")
+    s3.put_object(Bucket="history-server", Key=("spark-events/"))
+    logger.debug(s3.list_buckets())
+
+
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
     """
+    logger.info("Setting up minio.....")
+
+    setup_minio_output = (
+        subprocess.check_output(
+            "./tests/integration/setup/setup_minio.sh | tail -n 1", shell=True, stderr=None
+        )
+        .decode("utf-8")
+        .strip()
+    )
+
+    logger.info(f"Minio output:\n{setup_minio_output}")
+
+    s3_params = setup_minio_output.strip().split(",")
+    endpoint_url = s3_params[0]
+    access_key = s3_params[1]
+    secret_key = s3_params[2]
+
+    logger.info(
+        f"Setting up s3 bucket with endpoint_url={endpoint_url}, access_key={access_key}, secret_key={secret_key}"
+    )
+
+    setup_s3_bucket_for_history_server(endpoint_url, access_key, secret_key)
+
+    logger.info("Bucket setup complete")
+
+    logger.info("Building charm")
     # Build and deploy charm from local source folder
+
     charm = await ops_test.build_charm(".")
     resources = {
         "spark-history-server-image": METADATA["resources"]["spark-history-server-image"][
             "upstream-source"
         ]
     }
+
+    logger.info("Deploying charm")
 
     # Deploy the charm and wait for waiting status
     await asyncio.gather(
@@ -54,9 +98,9 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
     await ops_test.model.wait_for_idle(apps=[APP_NAME, S3_INTEGRATOR_CHARM_NAME], timeout=1000)
 
-    access_key = os.getenv("MINIO_ACCESS_KEY")
-    secret_key = os.getenv("MINIO_SECRET_KEY")
     s3_integrator_unit = ops_test.model.applications[S3_INTEGRATOR_CHARM_NAME].units[0]
+
+    logger.info("Setting up s3 credentials in s3-integrator charm")
 
     await fetch_action_sync_s3_credentials(
         s3_integrator_unit, access_key=access_key, secret_key=secret_key
@@ -67,12 +111,14 @@ async def test_build_and_deploy(ops_test: OpsTest):
     configuration_parameters = {
         "bucket": "history-server",
         "path": "spark-events",
-        "endpoint": os.getenv("MINIO_ENDPOINT", default="http://127.0.0.1:9000"),
+        "endpoint": endpoint_url,
     }
     # apply new configuration options
     await ops_test.model.applications[S3_INTEGRATOR_CHARM_NAME].set_config(
         configuration_parameters
     )
+
+    logger.info("Relating history server charm with s3-integrator charm")
 
     await ops_test.model.add_relation(S3_INTEGRATOR_CHARM_NAME, APP_NAME)
 
@@ -85,20 +131,34 @@ async def test_build_and_deploy(ops_test: OpsTest):
         timeout=1000,
     )
 
+    logger.info("Verifying history server has no app entries")
+
     status = await ops_test.model.get_status()
     address = status["applications"][APP_NAME]["units"][f"{APP_NAME}/0"]["address"]
 
-    for i in range(0, 5):
-        try:
-            apps = json.loads(
-                urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read()
-            )
-        except Exception:
-            apps = []
+    apps = json.loads(urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read())
 
-        if len(apps) > 0:
-            break
-        else:
-            sleep(3)
+    assert len(apps) == 0
 
+    logger.info("Setting up spark")
+
+    setup_spark_output = subprocess.check_output(
+        f"./tests/integration/setup/setup_spark.sh {endpoint_url} {access_key} {secret_key}",
+        shell=True,
+        stderr=None,
+    ).decode("utf-8")
+
+    logger.info(f"Setup spark output:\n{setup_spark_output}")
+
+    logger.info("Executing Spark job")
+
+    run_spark_output = subprocess.check_output(
+        "./tests/integration/setup/run_spark_job.sh", shell=True, stderr=None
+    ).decode("utf-8")
+
+    logger.info(f"Run spark output:\n{run_spark_output}")
+
+    logger.info("Verifying history server has 1 app entry")
+
+    apps = json.loads(urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read())
     assert len(apps) == 1
