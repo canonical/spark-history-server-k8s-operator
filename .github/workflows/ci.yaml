@@ -46,7 +46,3 @@ jobs:
       - name: Run integration tests
         id: test
         run: tox -e integration
-        env:
-          MINIO_ENDPOINT : ${{ steps.minio.outputs.MINIO_ENDPOINT }}
-          MINIO_ACCESS_KEY : ${{ steps.minio.outputs.MINIO_ACCESS_KEY }}
-          MINIO_SECRET_KEY : ${{ steps.minio.outputs.MINIO_SECRET_KEY }}

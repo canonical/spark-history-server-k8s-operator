@@ -44,7 +44,7 @@ def setup_s3_bucket_for_history_server(
                 logger.error(f"create bucket failed....exiting....\n{str(e)}")
                 raise
             else:
-                logger.error(f"create bucket failed....retrying in 10 secs.....\n{str(e)}")
+                logger.warning(f"create bucket failed....retrying in 10 secs.....\n{str(e)}")
                 sleep(10)
                 continue
 
