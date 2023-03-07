@@ -1,6 +1,6 @@
-name: Spark History Server Testing
+name: Build charm and run tests
 on:
-  pull_request:
+  workflow_call:
 
 jobs:
   lint:
@@ -24,3 +24,25 @@ jobs:
         run: python -m pip install tox
       - name: Run tests
         run: tox -e unit
+
+  integration-test:
+    name: Integration tests (microk8s)
+    timeout-minutes: 120
+    needs:
+      - lint
+      - unit-test
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v2
+      - name: Setup operator environment
+        id: operator
+        uses: charmed-kubernetes/actions-operator@main
+        with:
+          provider: microk8s
+          # This is needed until https://bugs.launchpad.net/juju/+bug/1977582 is fixed
+          bootstrap-options: "--agent-version 2.9.29"
+      - name: Run integration tests
+        id: test
+        run: tox -e integration
