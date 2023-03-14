@@ -8,6 +8,9 @@ concurrency:
 
 on:
   workflow_call:
+  pull_request:
+  schedule:
+    - cron: '53 0 * * *' # Daily at 00:53 UTC
 
 jobs:
   lint:
