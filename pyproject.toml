@@ -54,6 +54,7 @@ optional = true
 
 [tool.poetry.group.unit.dependencies]
 pytest = ">=7.2"
+pytest-asyncio = ">0.20.0"
 coverage = {extras = ["toml"], version = ">7.0"}
 
 [tool.poetry.group.integration]
