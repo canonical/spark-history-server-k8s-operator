@@ -7,9 +7,7 @@ concurrency:
   cancel-in-progress: true
 
 on:
-  push:
-    branches:
-      - main
+  workflow_call:
   pull_request:
   schedule:
     - cron: '53 0 * * *' # Daily at 00:53 UTC
