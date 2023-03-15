@@ -23,9 +23,9 @@ target-version = ["py310"]
 profile = "black"
 
 [tool.poetry]
-name = "kafka-operator"
+name = "spark-history-server-k8s-operator"
 version = "1.0"
-description = "kafka-operator"
+description = "spark-history-server-k8s-operator"
 authors = [""]
 
 [tool.poetry.dependencies]
@@ -54,6 +54,7 @@ optional = true
 
 [tool.poetry.group.unit.dependencies]
 pytest = ">=7.2"
+pytest-asyncio = ">0.20.0"
 coverage = {extras = ["toml"], version = ">7.0"}
 
 [tool.poetry.group.integration]
