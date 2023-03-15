@@ -13,7 +13,7 @@ description: |
    This charm packages Apache Spark's History Server for Kubernetes environments."
 
 containers:
-  spark-history-server-k8s:
+  spark-history-server:
     resource: spark-history-server-image
 
 resources:

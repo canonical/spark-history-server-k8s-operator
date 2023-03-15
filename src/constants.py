@@ -7,8 +7,8 @@
 """Literals and constants."""
 
 SPARK_PROPERTIES_FILE = "/opt/spark/conf/spark-properties.conf"
-CONTAINER = "spark-history-server-k8s"
-CONTAINER_LAYER = "spark-history-server-k8s"
+CONTAINER = "spark-history-server"
+CONTAINER_LAYER = "spark-history-server"
 CONFIG_KEY_S3_ENDPOINT = "endpoint"
 CONFIG_KEY_S3_ACCESS_KEY = "access-key"
 CONFIG_KEY_S3_SECRET_KEY = "secret-key"

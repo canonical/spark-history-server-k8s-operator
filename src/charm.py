@@ -48,8 +48,8 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
     def __init__(self, *args):
         super().__init__(*args)
         self.framework.observe(
-            self.on.spark_history_server_k8s_pebble_ready,
-            self._on_spark_history_server_k8s_pebble_ready,
+            self.on.spark_history_server_pebble_ready,
+            self._on_spark_history_server_pebble_ready,
         )
         self.framework.observe(self.on.install, self._on_install)
         self.s3_creds_client = S3Requirer(self, S3_INTEGRATOR_REL)
@@ -63,7 +63,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
 
         self.spark_config = SparkHistoryServerConfig(self.s3_creds_client, self.model.config)
 
-    def _on_spark_history_server_k8s_pebble_ready(self, event):
+    def _on_spark_history_server_pebble_ready(self, event):
         """Define and start a workload using the Pebble API."""
         # Get a reference the container attribute on the PebbleReadyEvent
         container = event.workload
