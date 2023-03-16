@@ -48,7 +48,8 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
     def __init__(self, *args):
         super().__init__(*args)
         self.framework.observe(
-            self.on.spark_history_server_pebble_ready, self._on_spark_history_server_pebble_ready
+            self.on.spark_history_server_pebble_ready,
+            self._on_spark_history_server_pebble_ready,
         )
         self.framework.observe(self.on.install, self._on_install)
         self.s3_creds_client = S3Requirer(self, S3_INTEGRATOR_REL)

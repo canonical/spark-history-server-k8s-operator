@@ -1,7 +1,7 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-name: spark-history-server
+name: spark-history-server-k8s
 display-name: Spark History Server
 summary: Kubernetes based charm for Spark History Server.
 description: |
