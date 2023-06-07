@@ -25,3 +25,6 @@ resources:
 requires:
   s3-credentials:
     interface: s3
+  ingress:
+    interface: ingress
+    limit: 1
