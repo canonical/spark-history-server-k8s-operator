@@ -18,4 +18,4 @@ spark-client.service-account-registry create --username hello \
                 --conf spark.eventLog.dir=s3a://history-server/spark-events/ \
                 --conf spark.history.fs.logDirectory=s3a://history-server/spark-events/
 
-spark-client.service-account-registry get-conf --username hello
+spark-client.service-account-registry get-config --username hello
