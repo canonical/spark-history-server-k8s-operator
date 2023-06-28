@@ -114,7 +114,6 @@ import json
 import logging
 from collections import namedtuple
 from typing import Dict, List, Optional
-import os
 
 import ops.charm
 import ops.framework
@@ -709,9 +708,6 @@ class S3Requirer(Object):
 
     def get_s3_connection_info(self) -> Dict:
         """Return the s3 credentials as a dictionary."""
-        if f"{self.relation_name}-relation-broken" in os.environ.get("JUJU_HOOK_NAME", ""):
-            return {}
-
         relation = self.charm.model.get_relation(self.relation_name)
         if not relation:
             return {}
