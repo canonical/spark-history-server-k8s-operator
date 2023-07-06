@@ -202,7 +202,7 @@ async def test_ingress(ops_test: OpsTest):
         INGRESS_CHARM,
         channel="edge",
         num_units=1,
-        series="jammy",
+        series="focal",
     )
 
     logger.info("Relating history server charm with ingress")
