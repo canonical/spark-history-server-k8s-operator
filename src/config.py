@@ -75,9 +75,11 @@ class SparkHistoryServerConfig(WithLogging):
         s3_log_dir = self.s3_log_dir
         conn_config = self.s3_creds_client.get_s3_connection_info()
 
+        ingress_pattern = re.compile(r"http://.*?/")
+
         ingress_config = {
-            "spark.ui.proxyBase": re.compile("http://.*?/").sub("", self.ingress_url),
-            "spark.ui.proxyRedirectUri": ""
+            "spark.ui.proxyBase": ingress_pattern.sub("/", self.ingress_url),
+            "spark.ui.proxyRedirectUri": ingress_pattern.match(self.ingress_url).group()
         } if self.ingress_url else {}
 
         return {

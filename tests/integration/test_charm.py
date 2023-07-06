@@ -18,7 +18,7 @@ import yaml
 from botocore.client import Config
 from pytest_operator.plugin import OpsTest
 
-from constants import S3_INTEGRATOR_CHARM_NAME
+from constants import S3_INTEGRATOR_CHARM_NAME, INGRESS_CHARM
 
 from .test_helpers import fetch_action_sync_s3_credentials
 
@@ -189,3 +189,39 @@ async def test_build_and_deploy(ops_test: OpsTest):
             sleep(3)
 
     assert len(apps) == 1
+
+@pytest.mark.abort_on_fail
+async def test_ingress(ops_test: OpsTest):
+    """Build the charm-under-test and deploy it together with related charms.
+
+    Assert on the unit status before any relations/configurations take place.
+    """
+
+    # Deploy the charm and wait for waiting status
+    _ = await ops_test.model.deploy(
+        INGRESS_CHARM,
+        channel="edge",
+        num_units=1,
+        series="jammy",
+    )
+
+    logger.info("Relating history server charm with ingress")
+
+    await ops_test.model.add_relation(INGRESS_CHARM, APP_NAME)
+
+    await ops_test.model.wait_for_idle(apps=[APP_NAME, INGRESS_CHARM], timeout=300)
+
+    action = await ops_test.model.units.get(f"{INGRESS_CHARM}/0")\
+        .run_action("show-proxied-endpoints", )
+
+    ingress_endpoint = (await action.wait()).results[INGRESS_CHARM]["url"]
+
+    apps = json.loads(
+        urllib.request.urlopen(f"http://{ingress_endpoint}/api/v1/applications").read()
+    )
+
+    assert len(apps) == 1
+
+
+
+
