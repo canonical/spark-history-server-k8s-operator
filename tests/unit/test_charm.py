@@ -151,7 +151,9 @@ class TestCharm(unittest.TestCase):
         config = SparkHistoryServerConfig(mock_s3_info, {}, "http://my-ingress/path-to-spark")
 
         self.assertTrue("spark.ui.proxyBase=/path-to-spark" in config.contents.split("\n"))
-        self.assertTrue("spark.ui.proxyRedirectUri=http://my-ingress/" in config.contents.split("\n"))
+        self.assertTrue(
+            "spark.ui.proxyRedirectUri=http://my-ingress/" in config.contents.split("\n")
+        )
 
     @patch("boto3.session")
     @patch("boto3.client")
