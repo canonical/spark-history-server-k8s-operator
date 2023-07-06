@@ -215,7 +215,7 @@ async def test_ingress(ops_test: OpsTest):
         "show-proxied-endpoints",
     )
 
-    ingress_endpoint = (await action.wait()).results[INGRESS_CHARM]["url"]
+    ingress_endpoint = (await action.wait()).results[APP_NAME]["url"]
 
     apps = json.loads(
         urllib.request.urlopen(f"http://{ingress_endpoint}/api/v1/applications").read()
