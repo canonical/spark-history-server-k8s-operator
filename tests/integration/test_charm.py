@@ -209,7 +209,9 @@ async def test_ingress(ops_test: OpsTest):
 
     await ops_test.model.add_relation(INGRESS_CHARM, APP_NAME)
 
-    await ops_test.model.wait_for_idle(apps=[APP_NAME, INGRESS_CHARM], status="active", timeout=300)
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME, INGRESS_CHARM], status="active", timeout=300
+    )
 
     action = await ops_test.model.units.get(f"{INGRESS_CHARM}/0").run_action(
         "show-proxied-endpoints",
