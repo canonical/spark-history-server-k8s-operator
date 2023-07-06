@@ -114,8 +114,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         # Push an updated layer with the new config
         container.add_layer(CONTAINER_LAYER, self._spark_history_server_layer, combine=True)
         container.restart(CONTAINER)
-        p = container.get_plan()
-        self.logger.info(p)
+        self.logger.debug(container.get_plan())
         return STATUS_MSG_ACTIVE
 
     def push_s3_credentials_to_container(self, event: HookEvent) -> str:
