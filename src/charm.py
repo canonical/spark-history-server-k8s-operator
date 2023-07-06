@@ -15,9 +15,9 @@ from charms.data_platform_libs.v0.s3 import (
     S3Requirer,
 )
 from charms.traefik_k8s.v1.ingress import (
-    IngressPerAppRequirer,
     IngressPerAppReadyEvent,
-    IngressPerAppRevokedEvent
+    IngressPerAppRequirer,
+    IngressPerAppRevokedEvent,
 )
 from ops.charm import (
     CharmBase,
@@ -67,12 +67,8 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         self.framework.observe(self.on.config_changed, self._on_model_config_changed)
 
         self.ingress = IngressPerAppRequirer(self, port=18080, strip_prefix=True)
-        self.framework.observe(
-            self.ingress.on.ready, self._on_ingress_ready
-        )
-        self.framework.observe(
-            self.ingress.on.revoked, self._on_ingress_revoked
-        )
+        self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
+        self.framework.observe(self.ingress.on.revoked, self._on_ingress_revoked)
 
         self.spark_config = SparkHistoryServerConfig(
             self.s3_creds_client, dict(self.model.config), self.ingress.url
@@ -170,9 +166,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
                     "group": SPARK_USER_GROUP,
                     "working_dir": SPARK_USER_WORKDIR,
                     "startup": "enabled",
-                    "environment": {
-                        "SPARK_NO_DAEMONIZE": "true"
-                    },
+                    "environment": {"SPARK_NO_DAEMONIZE": "true"},
                 }
             },
         }

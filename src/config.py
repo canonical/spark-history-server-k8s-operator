@@ -4,8 +4,8 @@
 
 """Spark History Server configuration."""
 
-from typing import Any, Dict, Optional
 import re
+from typing import Any, Dict, Optional
 
 import boto3
 from botocore.exceptions import ClientError
@@ -27,9 +27,8 @@ class SparkHistoryServerConfig(WithLogging):
     """Spark History Server Configuration."""
 
     def __init__(
-            self,
-            s3_creds_client: S3Requirer, model_config: Dict[str, Any], ingress_url: Optional[str]
-        ):
+        self, s3_creds_client: S3Requirer, model_config: Dict[str, Any], ingress_url: Optional[str]
+    ):
         self.s3_creds_client = s3_creds_client
         self.model_config = model_config
         self.ingress_url = ingress_url
@@ -77,10 +76,14 @@ class SparkHistoryServerConfig(WithLogging):
 
         ingress_pattern = re.compile(r"http://.*?/")
 
-        ingress_config = {
-            "spark.ui.proxyBase": ingress_pattern.sub("/", self.ingress_url),
-            "spark.ui.proxyRedirectUri": ingress_pattern.match(self.ingress_url).group()
-        } if self.ingress_url else {}
+        ingress_config = (
+            {
+                "spark.ui.proxyBase": ingress_pattern.sub("/", self.ingress_url),
+                "spark.ui.proxyRedirectUri": ingress_pattern.match(self.ingress_url).group(),
+            }
+            if self.ingress_url
+            else {}
+        )
 
         return {
             "spark.hadoop.fs.s3a.endpoint": conn_config.get(
