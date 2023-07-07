@@ -1,13 +1,12 @@
 #!/bin/bash
 
-sudo microk8s disable minio
-sudo microk8s enable minio
+# sudo microk8s disable minio
+# sudo microk8s enable minio
 
 # Enable MetalLB for Ingress
-IPADDR=$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc')
-sudo microk8s enable metallb:$IPADDR-$IPADDR
-
-sudo microk8s status --wait-ready
+# IPADDR=$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc')
+# sudo microk8s enable metallb:$IPADDR-$IPADDR
+# sudo microk8s status --wait-ready
 
 pip install boto3
 
