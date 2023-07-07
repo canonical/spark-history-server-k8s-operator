@@ -225,8 +225,6 @@ async def test_ingress(ops_test: OpsTest):
 
     print(url)
 
-    apps = json.loads(
-        urllib.request.urlopen(f"{ingress_endpoint}/api/v1/applications").read()
-    )
+    apps = json.loads(urllib.request.urlopen(f"{ingress_endpoint}/api/v1/applications").read())
 
     assert len(apps) == 1
