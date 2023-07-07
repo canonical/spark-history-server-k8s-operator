@@ -8,7 +8,7 @@ from models import User
 from utils import WithLogging
 
 
-class IOMode(Enum, str):
+class IOMode(str, Enum):
     READ = "r"
     WRITE = "w"
 

@@ -4,7 +4,7 @@ from functools import cached_property
 
 import boto3
 from botocore.exceptions import ClientError
-from ops import MaintenanceStatus, BlockedStatus, ActiveStatus, StatusBase
+from ops.model import MaintenanceStatus, BlockedStatus, ActiveStatus, StatusBase
 
 from src.utils import WithLogging
 
@@ -50,7 +50,7 @@ class S3ConnectionInfo(WithLogging):
         return True
 
 
-class Status(Enum, StatusBase):
+class Status(Enum):
     WAITING_PEBBLE = MaintenanceStatus("Waiting for Pebble")
     MISSING_S3_RELATION = BlockedStatus("Missing S3 relation")
     INVALID_CREDENTIALS = BlockedStatus("Invalid S3 credentials")

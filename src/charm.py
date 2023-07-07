@@ -27,9 +27,10 @@ from constants import (
     CONTAINER,
     S3_INTEGRATOR_REL,
 )
+from ops.model import StatusBase
 from models import S3ConnectionInfo, User, Status
 from utils import WithLogging
-from workload import SparkHistoryServer
+from workload import SparkHistoryServer, IOMode
 
 
 class SparkHistoryServerCharm(CharmBase, WithLogging):
@@ -74,17 +75,17 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
     def spark_config(self):
         return SparkHistoryServerConfig(self.s3_connection_info, self.ingress.url)
 
-    def get_status(self):
+    def get_status(self) -> StatusBase:
         if not self.workload.ready():
-            return Status.WAITING_PEBBLE
+            return Status.WAITING_PEBBLE.value
 
         if not self.s3_connection_info:
-            return Status.MISSING_S3_RELATION
+            return Status.MISSING_S3_RELATION.value
 
         if not self.s3_connection_info.verify():
-            return Status.INVALID_CREDENTIALS
+            return Status.INVALID_CREDENTIALS.value
 
-        return Status.ACTIVE
+        return Status.ACTIVE.value
 
     def update_service(self) -> bool:
         status = self.get_status()
@@ -93,7 +94,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
             self.logger.info(f"Cannot start service because of status {status}")
             return False
 
-        with self.workload.spark_configuration_file as fid:
+        with self.workload.get_spark_configuration_file(IOMode.WRITE) as fid:
             fid.write(self.spark_config.contents)
 
         self.workload.start()
@@ -115,7 +116,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
 
     def _on_install(self, event: InstallEvent) -> None:
         """Handle the `on_install` event."""
-        self.unit.status = Status.WAITING_PEBBLE
+        self.unit.status = Status.WAITING_PEBBLE.value
 
     def _on_s3_credential_changed(self, event: CredentialsChangedEvent):
         """Handle the `CredentialsChangedEvent` event from S3 integrator."""
