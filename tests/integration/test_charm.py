@@ -205,12 +205,16 @@ async def test_ingress(ops_test: OpsTest):
         series="focal",
     )
 
+    await ops_test.model.wait_for_idle(
+        apps=[INGRESS_CHARM], status="active", timeout=300, idle_period=30
+    )
+
     logger.info("Relating history server charm with ingress")
 
     await ops_test.model.add_relation(INGRESS_CHARM, APP_NAME)
 
     await ops_test.model.wait_for_idle(
-        apps=[APP_NAME, INGRESS_CHARM], status="active", timeout=300
+        apps=[APP_NAME, INGRESS_CHARM], status="active", timeout=300, idle_period=30
     )
 
     action = await ops_test.model.units.get(f"{INGRESS_CHARM}/0").run_action(
