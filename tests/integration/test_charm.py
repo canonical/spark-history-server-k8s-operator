@@ -223,6 +223,10 @@ async def test_ingress(ops_test: OpsTest):
 
     ingress_endpoint = json.loads(output["proxied-endpoints"])[APP_NAME]["url"]
 
+    url = f"http://{ingress_endpoint}/api/v1/applications"
+
+    print(url)
+
     apps = json.loads(
         urllib.request.urlopen(f"http://{ingress_endpoint}/api/v1/applications").read()
     )
