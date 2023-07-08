@@ -221,14 +221,14 @@ async def test_ingress(ops_test: OpsTest):
         "show-proxied-endpoints",
     )
 
-    output = (await action.wait()).results
+    ingress_endpoint = json.loads((await action.wait()).results["proxied-endpoints"])[APP_NAME][
+        "url"
+    ]
 
-    ingress_endpoint = json.loads(output["proxied-endpoints"])[APP_NAME]["url"]
-
-    url = f"{ingress_endpoint}/api/v1/applications"
-
-    print(url)
+    logger.info(f"Querying endpoint: {ingress_endpoint}/api/v1/applications")
 
     apps = json.loads(urllib.request.urlopen(f"{ingress_endpoint}/api/v1/applications").read())
 
     assert len(apps) == 1
+
+    logger.info(f"Number of apps: {len(apps)}")
