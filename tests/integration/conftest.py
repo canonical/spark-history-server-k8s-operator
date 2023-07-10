@@ -69,11 +69,11 @@ def ops_test(ops_test: OpsTest) -> OpsTest:
 def charm_versions() -> IntegrationTestsCharms:
     return IntegrationTestsCharms(
         s3=CharmVersion(
-            **{"entity_url": "s3-integrator", "channel": "edge", "series": "jammy", "alias": "s3"}
+            **{"name": "s3-integrator", "channel": "edge", "series": "jammy", "alias": "s3"}
         ),
         ingress=CharmVersion(
             **{
-                "entity_url": "traefik-k8s",
+                "name": "traefik-k8s",
                 "channel": "edge",
                 "series": "focal",
             }
