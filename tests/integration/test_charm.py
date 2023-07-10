@@ -18,8 +18,6 @@ import yaml
 from botocore.client import Config
 from pytest_operator.plugin import OpsTest
 
-from constants import INGRESS_CHARM, S3_INTEGRATOR_CHARM_NAME
-
 from .test_helpers import fetch_action_sync_s3_credentials
 
 logger = logging.getLogger(__name__)
@@ -55,7 +53,7 @@ def setup_s3_bucket_for_history_server(
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest):
+async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
@@ -99,21 +97,17 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
     # Deploy the charm and wait for waiting status
     await asyncio.gather(
-        ops_test.model.deploy(
-            S3_INTEGRATOR_CHARM_NAME,
-            channel="edge",
-            application_name=S3_INTEGRATOR_CHARM_NAME,
-            num_units=1,
-            series="jammy",
-        ),
+        ops_test.model.deploy(**charm_versions.s3.deploy_dict()),
         ops_test.model.deploy(
             charm, resources=resources, application_name=APP_NAME, num_units=1, series="jammy"
         ),
     )
 
-    await ops_test.model.wait_for_idle(apps=[APP_NAME, S3_INTEGRATOR_CHARM_NAME], timeout=1000)
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME, charm_versions.s3.application_name], timeout=1000
+    )
 
-    s3_integrator_unit = ops_test.model.applications[S3_INTEGRATOR_CHARM_NAME].units[0]
+    s3_integrator_unit = ops_test.model.applications[charm_versions.s3.application_name].units[0]
 
     logger.info("Setting up s3 credentials in s3-integrator charm")
 
@@ -121,7 +115,9 @@ async def test_build_and_deploy(ops_test: OpsTest):
         s3_integrator_unit, access_key=access_key, secret_key=secret_key
     )
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(apps=[S3_INTEGRATOR_CHARM_NAME], status="active")
+        await ops_test.model.wait_for_idle(
+            apps=[charm_versions.s3.application_name], status="active"
+        )
 
     configuration_parameters = {
         "bucket": "history-server",
@@ -129,15 +125,17 @@ async def test_build_and_deploy(ops_test: OpsTest):
         "endpoint": endpoint_url,
     }
     # apply new configuration options
-    await ops_test.model.applications[S3_INTEGRATOR_CHARM_NAME].set_config(
+    await ops_test.model.applications[charm_versions.s3.application_name].set_config(
         configuration_parameters
     )
 
     logger.info("Relating history server charm with s3-integrator charm")
 
-    await ops_test.model.add_relation(S3_INTEGRATOR_CHARM_NAME, APP_NAME)
+    await ops_test.model.add_relation(charm_versions.s3.application_name, APP_NAME)
 
-    await ops_test.model.wait_for_idle(apps=[APP_NAME, S3_INTEGRATOR_CHARM_NAME], timeout=1000)
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME, charm_versions.s3.application_name], timeout=1000
+    )
 
     # wait for active status
     await ops_test.model.wait_for_idle(
@@ -192,32 +190,35 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
 
 @pytest.mark.abort_on_fail
-async def test_ingress(ops_test: OpsTest):
+async def test_ingress(ops_test: OpsTest, charm_versions):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
     """
     # Deploy the charm and wait for waiting status
-    _ = await ops_test.model.deploy(
-        INGRESS_CHARM,
-        channel="edge",
-        num_units=1,
-        series="focal",
-    )
+    _ = await ops_test.model.deploy(**charm_versions.ingress.deploy_dict())
 
     await ops_test.model.wait_for_idle(
-        apps=[INGRESS_CHARM], status="active", timeout=300, idle_period=30
+        apps=[charm_versions.ingress.application_name],
+        status="active",
+        timeout=300,
+        idle_period=30,
     )
 
     logger.info("Relating history server charm with ingress")
 
-    await ops_test.model.add_relation(INGRESS_CHARM, APP_NAME)
+    await ops_test.model.add_relation(charm_versions.ingress.application_name, APP_NAME)
 
     await ops_test.model.wait_for_idle(
-        apps=[APP_NAME, INGRESS_CHARM], status="active", timeout=300, idle_period=30
+        apps=[APP_NAME, charm_versions.ingress.application_name],
+        status="active",
+        timeout=300,
+        idle_period=30,
     )
 
-    action = await ops_test.model.units.get(f"{INGRESS_CHARM}/0").run_action(
+    action = await ops_test.model.units.get(
+        f"{charm_versions.ingress.application_name}/0"
+    ).run_action(
         "show-proxied-endpoints",
     )
 

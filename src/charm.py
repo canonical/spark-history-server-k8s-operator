@@ -97,8 +97,6 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         """Apply s3 credentials to container."""
         container = self.unit.get_container(CONTAINER)
 
-        self.logger.info(f"Configuration file: {self.spark_config.contents}")
-
         container.push(
             SPARK_PROPERTIES_FILE,
             self.spark_config.contents,
