@@ -65,6 +65,7 @@ pytest = ">=7.2"
 juju = "==2.9.42.4"
 coverage = {extras = ["toml"], version = ">7.0"}
 pytest-operator = ">0.20"
+boto3 = ">=1.28.0"
 
 [tool.ruff]
 line-length = 99
