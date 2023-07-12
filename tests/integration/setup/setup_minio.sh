@@ -1,12 +1,5 @@
 #!/bin/bash
 
-sudo microk8s disable minio
-sudo microk8s enable minio
-
-sudo microk8s status --wait-ready
-
-pip install boto3
-
 attempt=1
 while [ $attempt -le 10 ]
 do

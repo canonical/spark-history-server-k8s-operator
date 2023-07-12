@@ -4,7 +4,8 @@
 
 """Spark History Server configuration."""
 
-from typing import Any, Dict
+import re
+from typing import Any, Dict, Optional
 
 import boto3
 from botocore.exceptions import ClientError
@@ -25,9 +26,12 @@ from utils import WithLogging
 class SparkHistoryServerConfig(WithLogging):
     """Spark History Server Configuration."""
 
-    def __init__(self, s3_creds_client: S3Requirer, model_config: Dict[str, Any]):
+    def __init__(
+        self, s3_creds_client: S3Requirer, model_config: Dict[str, Any], ingress_url: Optional[str]
+    ):
         self.s3_creds_client = s3_creds_client
         self.model_config = model_config
+        self.ingress_url = ingress_url
 
     def verify_conn_config(self) -> bool:
         """Verify S3 credentials."""
@@ -69,6 +73,18 @@ class SparkHistoryServerConfig(WithLogging):
         """Return the dict representation of the configuration file."""
         s3_log_dir = self.s3_log_dir
         conn_config = self.s3_creds_client.get_s3_connection_info()
+
+        ingress_pattern = re.compile(r"http://.*?/")
+
+        ingress_config = (
+            {
+                "spark.ui.proxyBase": ingress_pattern.sub("/", self.ingress_url),
+                "spark.ui.proxyRedirectUri": ingress_pattern.match(self.ingress_url).group(),
+            }
+            if self.ingress_url
+            else {}
+        )
+
         return {
             "spark.hadoop.fs.s3a.endpoint": conn_config.get(
                 CONFIG_KEY_S3_ENDPOINT, "https://s3.amazonaws.com"
@@ -82,7 +98,7 @@ class SparkHistoryServerConfig(WithLogging):
             "spark.hadoop.fs.s3a.connection.ssl.enabled": "false",
             "spark.hadoop.fs.s3a.path.style.access": "true",
             "spark.eventLog.enabled": "true",
-        }
+        } | ingress_config
 
     @property
     def contents(self) -> str:

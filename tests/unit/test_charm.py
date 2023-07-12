@@ -101,7 +101,7 @@ class TestCharm(unittest.TestCase):
             CONFIG_KEY_S3_BUCKET: "DUMMY_BUCKET",
             CONFIG_KEY_S3_LOGS_DIR: "DUMMY_LOG_DIR",
         }
-        config = SparkHistoryServerConfig(mock_s3_info, {})
+        config = SparkHistoryServerConfig(mock_s3_info, {}, None)
         self.assertFalse(config.verify_conn_config())
 
         self.assertEqual(config.s3_log_dir, "s3a://DUMMY_BUCKET/DUMMY_LOG_DIR")
@@ -123,7 +123,7 @@ class TestCharm(unittest.TestCase):
             CONFIG_KEY_S3_ACCESS_KEY: "DUMMY_ACCESS_KEY",
             CONFIG_KEY_S3_SECRET_KEY: "DUMMY_SECRET_KEY",
         }
-        config = SparkHistoryServerConfig(mock_s3_info, {})
+        config = SparkHistoryServerConfig(mock_s3_info, {}, None)
 
         self.assertEqual(config.s3_log_dir, "s3a://")
         self.assertEqual(
@@ -139,8 +139,21 @@ class TestCharm(unittest.TestCase):
             CONFIG_KEY_S3_BUCKET: "DUMMY_BUCKET",
             CONFIG_KEY_S3_LOGS_DIR: "DUMMY_LOG_DIR",
         }
-        config = SparkHistoryServerConfig(mock_s3_info, {})
+        config = SparkHistoryServerConfig(mock_s3_info, {}, None)
         self.assertFalse(config.verify_conn_config())
+
+    def test_config_ingress(self):
+        mock_s3_info = mock.Mock()
+        mock_s3_info.get_s3_connection_info.return_value = {
+            CONFIG_KEY_S3_BUCKET: "DUMMY_BUCKET",
+            CONFIG_KEY_S3_LOGS_DIR: "DUMMY_LOG_DIR",
+        }
+        config = SparkHistoryServerConfig(mock_s3_info, {}, "http://my-ingress/path-to-spark")
+
+        self.assertTrue("spark.ui.proxyBase=/path-to-spark" in config.contents.split("\n"))
+        self.assertTrue(
+            "spark.ui.proxyRedirectUri=http://my-ingress/" in config.contents.split("\n")
+        )
 
     @patch("boto3.session")
     @patch("boto3.client")

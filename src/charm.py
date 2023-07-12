@@ -14,6 +14,11 @@ from charms.data_platform_libs.v0.s3 import (
     CredentialsGoneEvent,
     S3Requirer,
 )
+from charms.traefik_k8s.v1.ingress import (
+    IngressPerAppReadyEvent,
+    IngressPerAppRequirer,
+    IngressPerAppRevokedEvent,
+)
 from ops.charm import (
     CharmBase,
     HookEvent,
@@ -61,7 +66,21 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         )
         self.framework.observe(self.on.config_changed, self._on_model_config_changed)
 
-        self.spark_config = SparkHistoryServerConfig(self.s3_creds_client, self.model.config)
+        self.ingress = IngressPerAppRequirer(self, port=18080, strip_prefix=True)
+        self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
+        self.framework.observe(self.ingress.on.revoked, self._on_ingress_revoked)
+
+        self.spark_config = SparkHistoryServerConfig(
+            self.s3_creds_client, dict(self.model.config), self.ingress.url
+        )
+
+    def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
+        self.logger.info("This app's ingress URL: %s", event.url)
+        self.apply_s3_credentials()
+
+    def _on_ingress_revoked(self, event: IngressPerAppRevokedEvent):
+        self.logger.info("This app no longer has ingress")
+        self.apply_s3_credentials()
 
     def _on_spark_history_server_pebble_ready(self, event):
         """Define and start a workload using the Pebble API."""
@@ -93,6 +112,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         # Push an updated layer with the new config
         container.add_layer(CONTAINER_LAYER, self._spark_history_server_layer, combine=True)
         container.restart(CONTAINER)
+        self.logger.debug(container.get_plan())
         return STATUS_MSG_ACTIVE
 
     def push_s3_credentials_to_container(self, event: HookEvent) -> str:
