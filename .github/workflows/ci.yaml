@@ -37,7 +37,7 @@ jobs:
         # TODO: Consider replacing with custom image on self-hosted runner OR pinning version
         run: python3 -m pip install tox
       - name: Run tests
-        run: tox run -e fmt
+        run: tox run -e format
       - name: Run tests
         run: tox run -e unit
 
