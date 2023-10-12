@@ -12,15 +12,15 @@ from ops.testing import Harness
 from charm import SparkHistoryServerCharm
 from config import SparkHistoryServerConfig
 from constants import (
-    SPARK_PROPERTIES_FILE,
-    HISTORY_SERVER_SERVICE,
     CONFIG_KEY_S3_ACCESS_KEY,
     CONFIG_KEY_S3_BUCKET,
     CONFIG_KEY_S3_ENDPOINT,
     CONFIG_KEY_S3_LOGS_DIR,
     CONFIG_KEY_S3_SECRET_KEY,
     CONTAINER,
+    HISTORY_SERVER_SERVICE,
     S3_INTEGRATOR_REL,
+    SPARK_PROPERTIES_FILE,
     STATUS_MSG_MISSING_S3_RELATION,
     STATUS_MSG_WAITING_PEBBLE,
 )
@@ -65,9 +65,9 @@ class TestCharm(unittest.TestCase):
         # Check we've got the plan we expected
         self.assertEqual(expected_plan, updated_plan)
         # Check the service was started
-        service = self.harness.model.unit \
-            .get_container(CONTAINER) \
-            .get_service(HISTORY_SERVER_SERVICE)
+        service = self.harness.model.unit.get_container(CONTAINER).get_service(
+            HISTORY_SERVER_SERVICE
+        )
         self.assertTrue(service.is_running())
         # Ensure we set an ActiveStatus with no message
         self.assertEqual(
@@ -78,9 +78,9 @@ class TestCharm(unittest.TestCase):
     def test_pebble_not_ready_during_config_update(self):
         # Check the service was started
         self.harness.container_pebble_ready(CONTAINER)
-        service = self.harness.model.unit\
-            .get_container(CONTAINER)\
-            .get_service(HISTORY_SERVER_SERVICE)
+        service = self.harness.model.unit.get_container(CONTAINER).get_service(
+            HISTORY_SERVER_SERVICE
+        )
         self.assertTrue(service.is_running())
 
         self.assertEqual(
@@ -157,7 +157,6 @@ class TestCharm(unittest.TestCase):
             "spark.ui.proxyRedirectUri=http://my-ingress/" in config.contents.split("\n")
         )
 
-    @unittest.skip
     @patch("boto3.session")
     @patch("boto3.client")
     @patch("charms.data_platform_libs.v0.s3.S3Requirer.get_s3_connection_info")
@@ -182,6 +181,8 @@ class TestCharm(unittest.TestCase):
 
         # Ensure the simulated Pebble API is reachable
         self.harness.set_can_connect(CONTAINER, True)
+
+        self.harness.container_pebble_ready(CONTAINER)
 
         self.harness.charm.s3_creds_client.get_s3_connection_info = mock_s3_info
         relation_id = self.harness.add_relation(S3_INTEGRATOR_REL, "s3-integrator")
@@ -218,7 +219,6 @@ class TestCharm(unittest.TestCase):
             self.harness.charm.spark_config.s3_log_dir, "s3a://DUMMY_BUCKET/DUMMY_LOG_DIR"
         )
 
-    @unittest.skip
     @patch("boto3.session")
     @patch("boto3.client")
     @patch("ops.model.Container.list_files")
@@ -233,6 +233,7 @@ class TestCharm(unittest.TestCase):
 
         # Ensure the simulated Pebble API is reachable
         self.harness.set_can_connect(CONTAINER, True)
+        self.harness.container_pebble_ready(CONTAINER)
 
         relation_id = self.harness.add_relation(S3_INTEGRATOR_REL, "s3-integrator")
         self.harness.add_relation_unit(relation_id, "s3-integrator/0")
@@ -288,7 +289,6 @@ class TestCharm(unittest.TestCase):
             self.harness.charm.spark_config.s3_log_dir, "s3a://DUMMY_BUCKET_3/DUMMY_LOG_DIR_3"
         )
 
-    @unittest.skip
     @patch("boto3.session")
     @patch("boto3.client")
     @patch("ops.model.Container.list_files")
@@ -303,6 +303,7 @@ class TestCharm(unittest.TestCase):
 
         # Ensure the simulated Pebble API is reachable
         self.harness.set_can_connect(CONTAINER, True)
+        self.harness.container_pebble_ready(CONTAINER)
 
         relation_id = self.harness.add_relation(S3_INTEGRATOR_REL, "s3-integrator")
         self.harness.add_relation_unit(relation_id, "s3-integrator/0")
