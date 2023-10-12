@@ -90,7 +90,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
 
     image_version = METADATA["resources"]["spark-history-server-image"]["upstream-source"]
 
-    logger.info(f"Using image version: {image_version}")
+    logger.info(f"Image version: {image_version}")
 
     resources = {"spark-history-server-image": image_version}
 
