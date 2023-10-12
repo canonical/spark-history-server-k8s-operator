@@ -4,7 +4,6 @@
 
 """Charmed Kubernetes Operator for Apache Spark History Server."""
 
-
 import errno
 import os
 from typing import Optional
@@ -31,14 +30,10 @@ from config import SparkHistoryServerConfig
 from constants import (
     CONTAINER,
     CONTAINER_LAYER,
+    HISTORY_SERVER_SERVICE,
+    PEBBLE_USER,
     S3_INTEGRATOR_REL,
-    SPARK_HISTORY_SERVER_LAUNCH_CMD,
     SPARK_PROPERTIES_FILE,
-    SPARK_USER,
-    SPARK_USER_GID,
-    SPARK_USER_GROUP,
-    SPARK_USER_UID,
-    SPARK_USER_WORKDIR,
     STATUS_MSG_ACTIVE,
     STATUS_MSG_INVALID_CREDENTIALS,
     STATUS_MSG_MISSING_S3_RELATION,
@@ -86,9 +81,16 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         """Define and start a workload using the Pebble API."""
         # Get a reference the container attribute on the PebbleReadyEvent
         container = event.workload
-        container.push(SPARK_PROPERTIES_FILE, self.spark_config.contents, make_dirs=True)
+        container.push(
+            SPARK_PROPERTIES_FILE,
+            self.spark_config.contents,
+            make_dirs=True,
+            permissions=0o640,
+            user=PEBBLE_USER[0],
+            group=PEBBLE_USER[0],
+        )
         # Add initial Pebble config layer using the Pebble API
-        container.add_layer(CONTAINER, self._spark_history_server_layer, combine=True)
+        container.add_layer(CONTAINER_LAYER, self._spark_history_server_layer, combine=True)
         # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
         container.replan()
         self.unit.status = BlockedStatus(STATUS_MSG_MISSING_S3_RELATION)
@@ -100,9 +102,10 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         container.push(
             SPARK_PROPERTIES_FILE,
             self.spark_config.contents,
-            user_id=SPARK_USER_UID,
-            group_id=SPARK_USER_GID,
             make_dirs=True,
+            permissions=0o640,
+            user=PEBBLE_USER[0],
+            group=PEBBLE_USER[0],
         )
 
         if not container.exists(SPARK_PROPERTIES_FILE):
@@ -110,8 +113,8 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), SPARK_PROPERTIES_FILE)
 
         # Push an updated layer with the new config
-        container.add_layer(CONTAINER_LAYER, self._spark_history_server_layer, combine=True)
-        container.restart(CONTAINER)
+        # container.add_layer(CONTAINER_LAYER, self._spark_history_server_layer, combine=True)
+        container.restart(HISTORY_SERVER_SERVICE)
         self.logger.debug(container.get_plan())
         return STATUS_MSG_ACTIVE
 
@@ -155,15 +158,11 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
             "summary": "spark history server layer",
             "description": "pebble config layer for spark history server",
             "services": {
-                CONTAINER: {
-                    "override": "replace",
+                HISTORY_SERVER_SERVICE: {
+                    "override": "merge",
                     "summary": "spark history server",
-                    "command": SPARK_HISTORY_SERVER_LAUNCH_CMD,
-                    "user": SPARK_USER,
-                    "group": SPARK_USER_GROUP,
-                    "working_dir": SPARK_USER_WORKDIR,
                     "startup": "enabled",
-                    "environment": {"SPARK_NO_DAEMONIZE": "true"},
+                    "environment": {"SPARK_PROPERTIES_FILE": SPARK_PROPERTIES_FILE},
                 }
             },
         }

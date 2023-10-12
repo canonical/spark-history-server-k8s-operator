@@ -87,11 +87,12 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
     # Build and deploy charm from local source folder
 
     charm = await ops_test.build_charm(".")
-    resources = {
-        "spark-history-server-image": METADATA["resources"]["spark-history-server-image"][
-            "upstream-source"
-        ]
-    }
+
+    image_version = METADATA["resources"]["spark-history-server-image"]["upstream-source"]
+
+    logger.info(f"Image version: {image_version}")
+
+    resources = {"spark-history-server-image": image_version}
 
     logger.info("Deploying charm")
 
