@@ -1,7 +1,7 @@
 #!/bin/bash
 
 sudo snap remove --purge spark-client
-sudo snap install spark-client --beta
+sudo snap install spark-client --edge
 mkdir -p ~/.kube
 sudo microk8s config | tee ~/.kube/config
 
