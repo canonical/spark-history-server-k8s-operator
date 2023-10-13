@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-import json
-import os
-from pathlib import Path
 from typing import Optional
 
 import pytest
 from pydantic import BaseModel
-from pytest_operator.plugin import OpsTest
 
 
 class CharmVersion(BaseModel):
@@ -45,6 +41,7 @@ class CharmVersion(BaseModel):
 class IntegrationTestsCharms(BaseModel):
     s3: CharmVersion
     ingress: CharmVersion
+
 
 @pytest.fixture
 def charm_versions() -> IntegrationTestsCharms:
