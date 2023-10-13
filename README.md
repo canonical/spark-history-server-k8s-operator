@@ -13,7 +13,7 @@ It depends on the S3 integrator charm from Canonical for S3 related configuratio
 
 ```bash
 $ juju deploy s3-integrator --channel latest/edge
-$ juju deploy spark-history-server-k8s --channel latest/edge
+$ juju deploy spark-history-server-k8s --channel 3.4/stable
 $ juju relate spark-history-server-k8s s3-integrator
 ```
 
