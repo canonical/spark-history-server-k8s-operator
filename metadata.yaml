@@ -20,7 +20,7 @@ resources:
   spark-history-server-image:
     type: oci-image
     description: OCI image for Spark History Server
-    upstream-source: ghcr.io/canonical/charmed-spark:3.4-22.04_edge
+    upstream-source: ghcr.io/canonical/charmed-spark:3.4-22.04_stable
 
 requires:
   s3-credentials:
