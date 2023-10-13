@@ -11,14 +11,14 @@ jobs:
 
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm_without_cache.yaml@v5.1.1
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm_without_cache.yaml@fix-snap-install-args
 
   publish:
     name: Release charm
     needs:
       - ci-tests
       - build
-    uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@v5.1.1
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@fix-snap-install-args
     with:
       channel: 3.4/edge
       artifact-name: ${{ needs.build.outputs.artifact-name }}
