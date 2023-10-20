@@ -23,9 +23,7 @@ class TestCharm(unittest.TestCase):
 
     def test_install(self):
         self.harness.charm.on.install.emit()
-        self.assertEqual(
-            self.harness.model.unit.status, Status.WAITING_PEBBLE.value
-        )
+        self.assertEqual(self.harness.model.unit.status, Status.WAITING_PEBBLE.value)
 
         # self.assertFalse(self.harness.charm.verify_s3_credentials_in_relation())
 
