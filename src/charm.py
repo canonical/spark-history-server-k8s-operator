@@ -26,6 +26,7 @@ from config import SparkHistoryServerConfig
 from constants import (
     CONTAINER,
     S3_INTEGRATOR_REL,
+    PEBBLE_USER
 )
 from ops.model import StatusBase
 from models import S3ConnectionInfo, User, Status
@@ -42,6 +43,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
             self.on.spark_history_server_pebble_ready,
             self._on_spark_history_server_pebble_ready,
         )
+        self.framework.observe(self.on.update_status, self._update_event)
         self.framework.observe(self.on.install, self._on_install)
         self.s3_requirer = S3Requirer(self, S3_INTEGRATOR_REL)
         self.framework.observe(
@@ -57,7 +59,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
 
         self.workload = SparkHistoryServer(
             self.unit.get_container(CONTAINER),
-            User(name="spark", user_id=185, group="spark", group_id=185)
+            User(name=PEBBLE_USER[0], group=PEBBLE_USER[1])
         )
 
     @property
@@ -65,7 +67,13 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         if not self.s3_requirer.relations:
             return None
 
-        connection = S3ConnectionInfo(**self.s3_requirer.get_s3_connection_info())
+        raw = self.s3_requirer.get_s3_connection_info()
+
+        connection = S3ConnectionInfo(**{
+            key.replace("-", "_"): value
+            for key, value in raw.items()
+            if key != "data"
+        })
 
         assert connection.verify()
 
@@ -90,7 +98,9 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
     def update_service(self) -> bool:
         status = self.get_status()
 
-        if status is not Status.ACTIVE:
+        self.unit.status = status
+
+        if status is not Status.ACTIVE.value:
             self.logger.info(f"Cannot start service because of status {status}")
             return False
 
@@ -127,8 +137,16 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
     def _on_s3_credential_gone(self, event: CredentialsGoneEvent):
         """Handle the `CredentialsGoneEvent` event for S3 integrator."""
         self.logger.info("S3 Credentials gone")
-        self.update_service()
 
+        with self.workload.get_spark_configuration_file(IOMode.WRITE) as fid:
+            fid.write("")
+
+        self.workload.stop()
+
+        self.unit.status = Status.MISSING_S3_RELATION.value
+
+    def _update_event(self, _):
+        self.unit.status = self.get_status()
 
 if __name__ == "__main__":  # pragma: nocover
     main(SparkHistoryServerCharm)

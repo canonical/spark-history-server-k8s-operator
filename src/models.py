@@ -6,15 +6,13 @@ import boto3
 from botocore.exceptions import ClientError
 from ops.model import MaintenanceStatus, BlockedStatus, ActiveStatus, StatusBase
 
-from src.utils import WithLogging
+from utils import WithLogging
 
 
 @dataclass
 class User:
     name: str = "spark"
-    user_id: int = 185
     group: str = "spark"
-    group_id: int = 185
 
 
 @dataclass
