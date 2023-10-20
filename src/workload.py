@@ -100,11 +100,23 @@ class SparkHistoryServer(AbstractWorkload, WithLogging):
     def start(self):
         services = self.container.get_plan().services
 
+        # ===============
+        # THIS IS WORKING
+        # ===============
         if services[self.HISTORY_SERVER_SERVICE].startup != "enabled":
             self.logger.info("Adding layer...")
             self.container.add_layer(
                 self.CONTAINER_LAYER, self._spark_history_server_layer, combine=True
             )
+        # ===============
+
+        # ===============
+        # THIS WOULD NOT BE WORKING
+        # ===============
+        # self.container.add_layer(
+        #     self.CONTAINER_LAYER, self._spark_history_server_layer, combine=True
+        # )
+        # ===============
 
         spark_configuration_file = self.get_spark_configuration_file(IOMode.READ)
 
