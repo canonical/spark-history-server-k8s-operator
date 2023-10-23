@@ -4,6 +4,7 @@
 from pathlib import Path
 from unittest.mock import patch
 
+from ops import ActiveStatus, BlockedStatus, MaintenanceStatus
 from scenario import Container, State
 
 from constants import CONTAINER
@@ -34,8 +35,7 @@ def test_start_history_server(history_server_ctx):
         containers=[Container(name=CONTAINER, can_connect=False)],
     )
     out = history_server_ctx.run("install", state)
-    assert out.unit_status.name == "maintenance"
-    assert out.unit_status.message == "Waiting for Pebble"
+    assert out.unit_status == MaintenanceStatus("Waiting for Pebble")
 
 
 def test_pebble_ready(history_server_ctx, history_server_container):
@@ -43,8 +43,7 @@ def test_pebble_ready(history_server_ctx, history_server_container):
         containers=[history_server_container],
     )
     out = history_server_ctx.run(history_server_container.pebble_ready_event, state)
-    assert out.unit_status.name == "blocked"
-    assert out.unit_status.message == "Missing S3 relation"
+    assert out.unit_status == BlockedStatus("Missing S3 relation")
 
 
 @patch("models.S3ConnectionInfo.verify", return_value=True)
@@ -56,7 +55,7 @@ def test_s3_relation_connection_ok(
         containers=[history_server_container],
     )
     out = history_server_ctx.run(s3_relation.changed_event, state)
-    assert out.unit_status.name == "active"
+    assert out.unit_status == ActiveStatus("")
 
     # Check containers modifications
     assert len(out.get_container(CONTAINER).layers) == 2
@@ -79,25 +78,26 @@ def test_s3_relation_connection_ko(
         containers=[history_server_container],
     )
     out = history_server_ctx.run(s3_relation.changed_event, state)
-    assert out.unit_status.name == "blocked"
-    assert out.unit_status.message == "Invalid S3 credentials"
+    assert out.unit_status == BlockedStatus("Invalid S3 credentials")
 
 
 @patch("models.S3ConnectionInfo.verify", return_value=True)
 def test_s3_relation_broken(
     _, history_server_ctx, history_server_container, s3_relation, tmp_path
 ):
-    state = State(
+    initial_state = State(
         relations=[s3_relation],
         containers=[history_server_container],
     )
-    out = history_server_ctx.run(
-        s3_relation.broken_event, history_server_ctx.run(s3_relation.changed_event, state)
-    )
-    assert out.unit_status.name == "blocked"
-    assert out.unit_status.message == "Missing S3 relation"
 
-    spark_properties = parse_spark_properties(out, tmp_path)
+    state_after_relation_changed = history_server_ctx.run(s3_relation.changed_event, initial_state)
+    state_after_relation_broken = history_server_ctx.run(
+        s3_relation.broken_event, state_after_relation_changed
+    )
+
+    assert state_after_relation_broken.unit_status == BlockedStatus("Missing S3 relation")
+
+    spark_properties = parse_spark_properties(state_after_relation_broken, tmp_path)
 
     # Assert one of the keys
     assert "spark.hadoop.fs.s3a.endpoint" not in spark_properties
@@ -115,8 +115,7 @@ def test_ingress_relation_creation(
         containers=[history_server_container],
     )
     out = history_server_ctx.run(ingress_relation.changed_event, state)
-    assert out.unit_status.name == "blocked"
-    assert out.unit_status.message == "Missing S3 relation"
+    assert out.unit_status == BlockedStatus("Missing S3 relation")
 
 
 @patch("models.S3ConnectionInfo.verify", return_value=True)
@@ -129,7 +128,7 @@ def test_with_ingress(
     )
     out = history_server_ctx.run(ingress_relation.changed_event, state)
 
-    assert out.unit_status.name == "active"
+    assert out.unit_status == ActiveStatus("")
 
     spark_properties = parse_spark_properties(out, tmp_path)
 
@@ -146,7 +145,7 @@ def test_remove_ingress(
     )
     out = history_server_ctx.run(ingress_relation.broken_event, state)
 
-    assert out.unit_status.name == "active"
+    assert out.unit_status == ActiveStatus("")
 
     spark_properties = parse_spark_properties(out, tmp_path)
 
