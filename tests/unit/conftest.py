@@ -1,3 +1,6 @@
+# Copyright 2023 Canonical Limited
+# See LICENSE file for licensing details.
+
 import pytest
 from ops import pebble
 from scenario import Container, Context, Model, Mount, Relation
@@ -9,21 +12,28 @@ from constants import CONTAINER, INGRESS_REL, S3_INTEGRATOR_REL
 
 @pytest.fixture
 def history_server_charm():
+    """Provide fixture for the SparkHistoryServer charm."""
+
     yield SparkHistoryServerCharm
 
 
 @pytest.fixture
 def history_server_ctx(history_server_charm):
+    """Provide fixture for scenario context based on the SparkHistoryServer charm."""
+
     return Context(charm_type=history_server_charm)
 
 
 @pytest.fixture
 def model():
+    """Provide fixture for the testing Juju model."""
     return Model(name="test-model")
 
 
 @pytest.fixture
 def history_server_container(tmp_path):
+    """Provide fixture for the History Server workload container."""
+
     layer = pebble.Layer(
         {
             "summary": "Charmed Spark Layer",
@@ -55,6 +65,8 @@ def history_server_container(tmp_path):
 
 @pytest.fixture
 def s3_relation():
+    """Provide fixture for the S3 relation."""
+
     relation_id = next_relation_id(update=True)
 
     return Relation(
@@ -76,6 +88,8 @@ def s3_relation():
 
 @pytest.fixture
 def ingress_relation():
+    """Provide fixture for the ingress relation."""
+
     relation_id = next_relation_id(update=True)
 
     return Relation(
