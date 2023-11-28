@@ -1,3 +1,7 @@
+#!/usr/bin/env python3
+# Copyright 2023 Canonical Limited
+# See LICENSE file for licensing details.
+
 """Module containing all business logic related to the workload."""
 
 from abc import ABC, abstractmethod

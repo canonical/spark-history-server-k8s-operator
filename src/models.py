@@ -1,3 +1,7 @@
+#!/usr/bin/env python3
+# Copyright 2023 Canonical Limited
+# See LICENSE file for licensing details.
+
 """Module with all domain specific objects used by the charm."""
 
 from dataclasses import dataclass
