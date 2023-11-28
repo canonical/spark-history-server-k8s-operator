@@ -26,7 +26,7 @@ profile = "black"
 name = "spark-history-server-k8s-operator"
 version = "1.0"
 description = "spark-history-server-k8s-operator"
-authors = [""]
+authors = []
 
 [tool.poetry.dependencies]
 python = ">=3.8,<4.0"
