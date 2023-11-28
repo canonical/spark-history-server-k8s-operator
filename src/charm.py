@@ -4,8 +4,6 @@
 
 """Charmed Kubernetes Operator for Apache Spark History Server."""
 
-import errno
-import os
 from typing import Optional
 
 from charms.data_platform_libs.v0.s3 import (
@@ -20,26 +18,16 @@ from charms.traefik_k8s.v2.ingress import (
 )
 from ops.charm import (
     CharmBase,
-    HookEvent,
     InstallEvent,
 )
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, Relation, WaitingStatus
+from ops.model import StatusBase
 
 from config import SparkHistoryServerConfig
-from constants import (
-    CONTAINER,
-    CONTAINER_LAYER,
-    HISTORY_SERVER_SERVICE,
-    PEBBLE_USER,
-    S3_INTEGRATOR_REL,
-    SPARK_PROPERTIES_FILE,
-    STATUS_MSG_ACTIVE,
-    STATUS_MSG_INVALID_CREDENTIALS,
-    STATUS_MSG_MISSING_S3_RELATION,
-    STATUS_MSG_WAITING_PEBBLE,
-)
+from constants import CONTAINER, PEBBLE_USER, S3_INTEGRATOR_REL
+from models import S3ConnectionInfo, Status, User
 from utils import WithLogging
+from workload import IOMode, SparkHistoryServer
 
 
 class SparkHistoryServerCharm(CharmBase, WithLogging):
@@ -51,166 +39,111 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
             self.on.spark_history_server_pebble_ready,
             self._on_spark_history_server_pebble_ready,
         )
+        self.framework.observe(self.on.update_status, self._update_event)
         self.framework.observe(self.on.install, self._on_install)
-        self.s3_creds_client = S3Requirer(self, S3_INTEGRATOR_REL)
+        self.s3_requirer = S3Requirer(self, S3_INTEGRATOR_REL)
         self.framework.observe(
-            self.s3_creds_client.on.credentials_changed, self._on_s3_credential_changed
+            self.s3_requirer.on.credentials_changed, self._on_s3_credential_changed
         )
-        self.framework.observe(
-            self.s3_creds_client.on.credentials_gone, self._on_s3_credential_gone
-        )
-        self.framework.observe(self.on.config_changed, self._on_model_config_changed)
+        self.framework.observe(self.s3_requirer.on.credentials_gone, self._on_s3_credential_gone)
 
         self.ingress = IngressPerAppRequirer(self, port=18080, strip_prefix=True)
         self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
         self.framework.observe(self.ingress.on.revoked, self._on_ingress_revoked)
 
-        self.spark_config = SparkHistoryServerConfig(
-            self.s3_creds_client, dict(self.model.config), self.ingress.url
+        self.workload = SparkHistoryServer(
+            self.unit.get_container(CONTAINER), User(name=PEBBLE_USER[0], group=PEBBLE_USER[1])
         )
+
+    @property
+    def s3_connection_info(self) -> Optional[S3ConnectionInfo]:
+        """Parse a S3ConnectionInfo object from relation data."""
+        if not self.s3_requirer.relations:
+            return None
+
+        raw = self.s3_requirer.get_s3_connection_info()
+
+        connection = S3ConnectionInfo(
+            **{key.replace("-", "_"): value for key, value in raw.items() if key != "data"}
+        )
+
+        assert connection.verify()
+
+        return connection
+
+    @property
+    def spark_config(self):
+        """Return object representing the spark configuration object."""
+        return SparkHistoryServerConfig(self.s3_connection_info, self.ingress.url)
+
+    def get_status(self) -> StatusBase:
+        """Compute and return the status of the charm."""
+        if not self.workload.ready():
+            return Status.WAITING_PEBBLE.value
+
+        if not self.s3_connection_info:
+            return Status.MISSING_S3_RELATION.value
+
+        if not self.s3_connection_info.verify():
+            return Status.INVALID_CREDENTIALS.value
+
+        return Status.ACTIVE.value
+
+    def update_service(self) -> bool:
+        """Update the Spark History server service if needed."""
+        status = self.get_status()
+
+        self.unit.status = status
+
+        if status is not Status.ACTIVE.value:
+            self.logger.info(f"Cannot start service because of status {status}")
+            return False
+
+        # TODO: to avoid disruption (although minimal) if you could the logic below
+        # conditionally depending on whether the Spark configuration content had changed
+        with self.workload.get_spark_configuration_file(IOMode.WRITE) as fid:
+            fid.write(self.spark_config.contents)
+
+        self.workload.start()
+        return True
+
+    def _on_spark_history_server_pebble_ready(self, event):
+        self.logger.info("Pebble ready")
+        self.update_service()
 
     def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
         self.logger.info("This app's ingress URL: %s", event.url)
-        self.apply_s3_credentials()
+        if not self.update_service():
+            event.defer()
 
     def _on_ingress_revoked(self, event: IngressPerAppRevokedEvent):
         self.logger.info("This app no longer has ingress")
-        self.apply_s3_credentials()
-
-    def _on_spark_history_server_pebble_ready(self, event):
-        """Define and start a workload using the Pebble API."""
-        # Get a reference the container attribute on the PebbleReadyEvent
-        container = event.workload
-        container.push(
-            SPARK_PROPERTIES_FILE,
-            self.spark_config.contents,
-            make_dirs=True,
-            permissions=0o640,
-            user=PEBBLE_USER[0],
-            group=PEBBLE_USER[0],
-        )
-        # Add initial Pebble config layer using the Pebble API
-        container.add_layer(CONTAINER_LAYER, self._spark_history_server_layer, combine=True)
-        # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
-        container.replan()
-        self.unit.status = BlockedStatus(STATUS_MSG_MISSING_S3_RELATION)
-
-    def apply_s3_credentials(self) -> str:
-        """Apply s3 credentials to container."""
-        container = self.unit.get_container(CONTAINER)
-
-        container.push(
-            SPARK_PROPERTIES_FILE,
-            self.spark_config.contents,
-            make_dirs=True,
-            permissions=0o640,
-            user=PEBBLE_USER[0],
-            group=PEBBLE_USER[0],
-        )
-
-        if not container.exists(SPARK_PROPERTIES_FILE):
-            self.logger.error(f"{SPARK_PROPERTIES_FILE} not found")
-            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), SPARK_PROPERTIES_FILE)
-
-        # Push an updated layer with the new config
-        # container.add_layer(CONTAINER_LAYER, self._spark_history_server_layer, combine=True)
-        container.restart(HISTORY_SERVER_SERVICE)
-        self.logger.debug(container.get_plan())
-        return STATUS_MSG_ACTIVE
-
-    def push_s3_credentials_to_container(self, event: HookEvent) -> str:
-        """Apply s3 credentials to container if pebble is ready."""
-        container = self.unit.get_container(CONTAINER)
-        if container.can_connect():
-            try:
-                return self.apply_s3_credentials()
-            except FileNotFoundError:
-                self.unit.status = BlockedStatus(STATUS_MSG_MISSING_S3_RELATION)
-                return STATUS_MSG_MISSING_S3_RELATION
-        else:
-            # We were unable to connect to the Pebble API, so we defer this event
+        if not self.update_service():
             event.defer()
-            self.unit.status = WaitingStatus(STATUS_MSG_WAITING_PEBBLE)
-            return STATUS_MSG_WAITING_PEBBLE
-
-    def refresh_cached_s3_credentials(self, event: HookEvent) -> str:
-        """Refresh cached credentials."""
-        status = self.push_s3_credentials_to_container(event)
-        if status not in [STATUS_MSG_ACTIVE]:
-            return status
-
-        if not self.spark_config.verify_conn_config():
-            return STATUS_MSG_INVALID_CREDENTIALS
-        else:
-            return STATUS_MSG_ACTIVE
-
-    def verify_s3_credentials_in_relation(self) -> bool:
-        """Verify cached credentials coming from relation."""
-        if not self.s3_relation:
-            return False
-
-        return self.spark_config.verify_conn_config()
-
-    @property
-    def _spark_history_server_layer(self):
-        """Return a dictionary representing a Pebble layer."""
-        return {
-            "summary": "spark history server layer",
-            "description": "pebble config layer for spark history server",
-            "services": {
-                HISTORY_SERVER_SERVICE: {
-                    "override": "merge",
-                    "summary": "spark history server",
-                    "startup": "enabled",
-                    "environment": {"SPARK_PROPERTIES_FILE": SPARK_PROPERTIES_FILE},
-                }
-            },
-        }
 
     def _on_install(self, event: InstallEvent) -> None:
         """Handle the `on_install` event."""
-        self.unit.status = WaitingStatus(STATUS_MSG_WAITING_PEBBLE)
-
-    def _on_model_config_changed(self, event: HookEvent) -> None:
-        """Handle the `on_config_changed` event."""
-        if not self.s3_relation:
-            self.unit.status = BlockedStatus(STATUS_MSG_MISSING_S3_RELATION)
-            return
-
-        status = self.refresh_cached_s3_credentials(event)
-        if status == STATUS_MSG_ACTIVE:
-            self.unit.status = ActiveStatus()
-        elif status == STATUS_MSG_INVALID_CREDENTIALS:
-            self.unit.status = BlockedStatus(STATUS_MSG_INVALID_CREDENTIALS)
-        elif status == STATUS_MSG_WAITING_PEBBLE:
-            self.unit.status = WaitingStatus(STATUS_MSG_WAITING_PEBBLE)
-        elif status == STATUS_MSG_MISSING_S3_RELATION:
-            self.unit.status = BlockedStatus(STATUS_MSG_MISSING_S3_RELATION)
+        self.unit.status = Status.WAITING_PEBBLE.value
 
     def _on_s3_credential_changed(self, event: CredentialsChangedEvent):
         """Handle the `CredentialsChangedEvent` event from S3 integrator."""
-        status = self.refresh_cached_s3_credentials(event)
-        if status == STATUS_MSG_ACTIVE:
-            self.unit.status = ActiveStatus()
-        elif status == STATUS_MSG_INVALID_CREDENTIALS:
-            self.unit.status = BlockedStatus(STATUS_MSG_INVALID_CREDENTIALS)
-        elif status == STATUS_MSG_WAITING_PEBBLE:
-            self.unit.status = WaitingStatus(STATUS_MSG_WAITING_PEBBLE)
-        elif status == STATUS_MSG_MISSING_S3_RELATION:
-            self.unit.status = BlockedStatus(STATUS_MSG_MISSING_S3_RELATION)
+        self.logger.info("S3 Credentials changed")
+        if not self.update_service():
+            event.defer()
 
     def _on_s3_credential_gone(self, event: CredentialsGoneEvent):
         """Handle the `CredentialsGoneEvent` event for S3 integrator."""
-        status = self.refresh_cached_s3_credentials(event)
-        if status == STATUS_MSG_WAITING_PEBBLE:
-            self.unit.status = WaitingStatus(STATUS_MSG_WAITING_PEBBLE)
-        else:
-            self.unit.status = BlockedStatus(STATUS_MSG_MISSING_S3_RELATION)
+        self.logger.info("S3 Credentials gone")
 
-    @property
-    def s3_relation(self) -> Optional[Relation]:
-        """The cluster peer relation."""
-        return self.model.get_relation(S3_INTEGRATOR_REL)
+        with self.workload.get_spark_configuration_file(IOMode.WRITE) as fid:
+            fid.write("")
+
+        self.workload.stop()
+
+        self.unit.status = Status.MISSING_S3_RELATION.value
+
+    def _update_event(self, _):
+        self.unit.status = self.get_status()
 
 
 if __name__ == "__main__":  # pragma: nocover
