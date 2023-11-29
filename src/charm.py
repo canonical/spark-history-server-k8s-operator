@@ -24,7 +24,7 @@ from ops.main import main
 from ops.model import StatusBase
 
 from config import SparkHistoryServerConfig
-from constants import CONTAINER, PEBBLE_USER, S3_INTEGRATOR_REL
+from constants import CONTAINER, INGRESS_REL, PEBBLE_USER, S3_INTEGRATOR_REL
 from models import S3ConnectionInfo, Status, User
 from utils import WithLogging
 from workload import IOMode, SparkHistoryServer
@@ -35,6 +35,9 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
 
     def __init__(self, *args):
         super().__init__(*args)
+
+        self.framework.observe(self.on.install, self._update_event)
+
         self.framework.observe(
             self.on.spark_history_server_pebble_ready,
             self._on_spark_history_server_pebble_ready,
@@ -47,7 +50,9 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         )
         self.framework.observe(self.s3_requirer.on.credentials_gone, self._on_s3_credential_gone)
 
-        self.ingress = IngressPerAppRequirer(self, port=18080, strip_prefix=True)
+        self.ingress = IngressPerAppRequirer(
+            self, relation_name=INGRESS_REL, port=18080, strip_prefix=True
+        )
         self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
         self.framework.observe(self.ingress.on.revoked, self._on_ingress_revoked)
 
@@ -63,63 +68,55 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
 
         raw = self.s3_requirer.get_s3_connection_info()
 
-        connection = S3ConnectionInfo(
+        return S3ConnectionInfo(
             **{key.replace("-", "_"): value for key, value in raw.items() if key != "data"}
         )
 
-        assert connection.verify()
-
-        return connection
-
-    @property
-    def spark_config(self):
-        """Return object representing the spark configuration object."""
-        return SparkHistoryServerConfig(self.s3_connection_info, self.ingress.url)
-
-    def get_status(self) -> StatusBase:
+    def get_status(self, s3: Optional[S3ConnectionInfo]) -> StatusBase:
         """Compute and return the status of the charm."""
         if not self.workload.ready():
             return Status.WAITING_PEBBLE.value
 
-        if not self.s3_connection_info:
+        if not s3:
             return Status.MISSING_S3_RELATION.value
 
-        if not self.s3_connection_info.verify():
+        if not s3.verify():
             return Status.INVALID_CREDENTIALS.value
 
         return Status.ACTIVE.value
 
-    def update_service(self) -> bool:
+    def update_service(self, s3: Optional[S3ConnectionInfo], ingress_url: Optional[str]) -> bool:
         """Update the Spark History server service if needed."""
-        status = self.get_status()
+        status = self.log_result(lambda _: f"Status: {_}")(self.get_status(s3))
 
         self.unit.status = status
-
-        if status is not Status.ACTIVE.value:
-            self.logger.info(f"Cannot start service because of status {status}")
-            return False
 
         # TODO: to avoid disruption (although minimal) if you could the logic below
         # conditionally depending on whether the Spark configuration content had changed
         with self.workload.get_spark_configuration_file(IOMode.WRITE) as fid:
-            fid.write(self.spark_config.contents)
+            spark_config = SparkHistoryServerConfig(s3, ingress_url)
+            fid.write(spark_config.contents)
+
+        if status is not Status.ACTIVE.value:
+            self.logger.info(f"Cannot start service because of status {status}")
+            self.workload.stop()
+            return False
 
         self.workload.start()
         return True
 
     def _on_spark_history_server_pebble_ready(self, event):
         self.logger.info("Pebble ready")
-        self.update_service()
+        self.update_service(self.s3_connection_info, self.ingress.url)
 
     def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
         self.logger.info("This app's ingress URL: %s", event.url)
-        if not self.update_service():
-            event.defer()
+        self.update_service(self.s3_connection_info, event.url)
 
     def _on_ingress_revoked(self, event: IngressPerAppRevokedEvent):
-        self.logger.info("This app no longer has ingress")
-        if not self.update_service():
-            event.defer()
+        self.log_result("This app no longer has ingress")(
+            self.update_service(self.s3_connection_info, None)
+        )
 
     def _on_install(self, event: InstallEvent) -> None:
         """Handle the `on_install` event."""
@@ -128,22 +125,15 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
     def _on_s3_credential_changed(self, event: CredentialsChangedEvent):
         """Handle the `CredentialsChangedEvent` event from S3 integrator."""
         self.logger.info("S3 Credentials changed")
-        if not self.update_service():
-            event.defer()
+        self.update_service(self.s3_connection_info, self.ingress.url)
 
     def _on_s3_credential_gone(self, event: CredentialsGoneEvent):
         """Handle the `CredentialsGoneEvent` event for S3 integrator."""
         self.logger.info("S3 Credentials gone")
-
-        with self.workload.get_spark_configuration_file(IOMode.WRITE) as fid:
-            fid.write("")
-
-        self.workload.stop()
-
-        self.unit.status = Status.MISSING_S3_RELATION.value
+        self.update_service(None, self.ingress.url)
 
     def _update_event(self, _):
-        self.unit.status = self.get_status()
+        self.unit.status = self.get_status(self.s3_connection_info)
 
 
 if __name__ == "__main__":  # pragma: nocover

@@ -27,27 +27,27 @@ class AbstractWorkload(ABC):
     @abstractmethod
     def start(self):
         """Execute business-logic for starting the workload."""
-        raise NotImplementedError
+        ...
 
     @abstractmethod
     def stop(self):
         """Execute business-logic for stopping the workload."""
-        raise NotImplementedError
+        ...
 
     @abstractmethod
     def health(self) -> bool:
         """Return the health of the service."""
-        raise NotImplementedError
+        ...
 
     @abstractmethod
     def ready(self) -> bool:
         """Check whether the service is ready to be used."""
-        raise NotImplementedError
+        ...
 
     @abstractmethod
     def get_spark_configuration_file(self, mode: IOMode) -> IOBase:
         """Return the configuration file for Spark History server."""
-        raise NotImplementedError
+        ...
 
 
 class ContainerFile(StringIO):
@@ -99,7 +99,7 @@ class SparkHistoryServer(AbstractWorkload, WithLogging):
     """Class representing Workload implementation for Spark History server on K8s."""
 
     SPARK_WORKDIR = "/opt/spark"
-    CONTAINER_LAYER = "charm-layer"
+    CONTAINER_LAYER = "charm"
     HISTORY_SERVER_SERVICE = "history-server"
     SPARK_PROPERTIES = f"{SPARK_WORKDIR}/conf/spark-properties.conf"
 
@@ -169,4 +169,5 @@ class SparkHistoryServer(AbstractWorkload, WithLogging):
 
     def health(self) -> bool:
         """Return the health of the service."""
-        return True  # We could use pebble health checks here
+        return self.container.get_service(self.HISTORY_SERVER_SERVICE).is_running()
+        # We could use pebble health checks here
