@@ -1,5 +1,9 @@
 # Charmed Spark History Server Operator
 
+[![CharmHub Badge](https://charmhub.io/spark-history-server-k8s/badge.svg)](https://charmhub.io/spark-history-server-k8s)
+[![Release](https://github.com/canonical/spark-history-server-k8s-operator/actions/workflows/release.yaml/badge.svg)](https://github.com/canonical/spark-history-server-k8s-operator/actions/workflows/release.yaml)
+[![Tests](https://github.com/canonical/spark-history-server-k8s-operator/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/canonical/spark-history-server-k8s-operator/actions/workflows/ci.yaml?query=branch%3Amain)
+
 ## Overview
 The Charmed Spark History Server Operator delivers automated operations management from day 0 to day 2 on the Apache Spark History Server. 
 It is part of an open source, end-to-end, production ready data platform on top of cloud native technologies provided by Canonical.
