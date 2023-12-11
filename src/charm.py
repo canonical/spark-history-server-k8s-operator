@@ -11,6 +11,7 @@ from charms.data_platform_libs.v0.s3 import (
     CredentialsGoneEvent,
     S3Requirer,
 )
+from charms.oathkeeper.v0.auth_proxy import AuthProxyConfig, AuthProxyRequirer
 from charms.traefik_k8s.v2.ingress import (
     IngressPerAppReadyEvent,
     IngressPerAppRequirer,
@@ -28,6 +29,9 @@ from constants import CONTAINER, INGRESS_REL, PEBBLE_USER, S3_INTEGRATOR_REL
 from models import S3ConnectionInfo, Status, User
 from utils import WithLogging
 from workload import IOMode, SparkHistoryServer
+
+AUTH_PROXY_ALLOWED_ENDPOINTS = ["version"]
+AUTH_PROXY_HEADERS = ["X-User"]
 
 
 class SparkHistoryServerCharm(CharmBase, WithLogging):
@@ -59,6 +63,27 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         self.workload = SparkHistoryServer(
             self.unit.get_container(CONTAINER), User(name=PEBBLE_USER[0], group=PEBBLE_USER[1])
         )
+
+        # oauth
+        self.auth_proxy_relation_name = "auth-proxy"
+
+        self.auth_proxy = AuthProxyRequirer(
+            self, self.auth_proxy_config, self.auth_proxy_relation_name
+        )
+
+    @property
+    def auth_proxy_config(self) -> AuthProxyConfig:
+        """Configure the auth proxy relation."""
+        return AuthProxyConfig(
+            protected_urls=[
+                self.ingress.url if self.ingress.url is not None else "https://some-test-url.com"
+            ],
+            headers=AUTH_PROXY_HEADERS,
+            allowed_endpoints=AUTH_PROXY_ALLOWED_ENDPOINTS,
+        )
+
+    def _configure_auth_proxy(self):
+        self.auth_proxy.update_auth_proxy_config(auth_proxy_config=self.auth_proxy_config)
 
     @property
     def s3_connection_info(self) -> Optional[S3ConnectionInfo]:
@@ -112,6 +137,8 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
     def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
         self.logger.info("This app's ingress URL: %s", event.url)
         self.update_service(self.s3_connection_info, event.url)
+        # auth proxy config
+        self._configure_auth_proxy()
 
     def _on_ingress_revoked(self, event: IngressPerAppRevokedEvent):
         self.log_result("This app no longer has ingress")(
