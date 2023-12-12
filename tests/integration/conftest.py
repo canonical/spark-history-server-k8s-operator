@@ -41,6 +41,7 @@ class CharmVersion(BaseModel):
 class IntegrationTestsCharms(BaseModel):
     s3: CharmVersion
     ingress: CharmVersion
+    oathkeeper: CharmVersion
 
 
 @pytest.fixture
@@ -54,6 +55,13 @@ def charm_versions() -> IntegrationTestsCharms:
                 "name": "traefik-k8s",
                 "channel": "edge",
                 "series": "focal",
+            }
+        ),
+        oathkeeper=CharmVersion(
+            **{
+                "name": "oathkeeper",
+                "channel": "edge",
+                "series": "jammy",
             }
         ),
     )

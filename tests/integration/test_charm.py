@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
+BUCKET_NAME = "history-server"
 
 
 def setup_s3_bucket_for_history_server(
@@ -34,10 +35,21 @@ def setup_s3_bucket_for_history_server(
         aws_access_key_id=aws_access_key, aws_secret_access_key=aws_secret_key
     )
     s3 = session.client("s3", endpoint_url=endpoint_url, config=config)
+    # delete test bucket and its content if it already exist
+    buckets = s3.list_buckets()
+    for bucket in buckets["Buckets"]:
+        bucket_name = bucket["Name"]
+        if bucket_name == BUCKET_NAME:
+            logger.info(f"Deleting bucket: {bucket_name}")
+            objects = s3.list_objects_v2(Bucket=BUCKET_NAME)["Contents"]
+            objs = [{"Key": x["Key"]} for x in objects]
+            s3.delete_objects(Bucket=BUCKET_NAME, Delete={"Objects": objs})
+            s3.delete_bucket(Bucket=BUCKET_NAME)
+
     logger.info("create bucket in minio")
     for i in range(0, 30):
         try:
-            s3.create_bucket(Bucket="history-server")
+            s3.create_bucket(Bucket=BUCKET_NAME)
             break
         except Exception as e:
             if i >= 30:
@@ -48,7 +60,7 @@ def setup_s3_bucket_for_history_server(
                 sleep(10)
                 continue
 
-    s3.put_object(Bucket="history-server", Key=("spark-events/"))
+    s3.put_object(Bucket=BUCKET_NAME, Key=("spark-events/"))
     logger.debug(s3.list_buckets())
 
 
@@ -234,3 +246,98 @@ async def test_ingress(ops_test: OpsTest, charm_versions):
     assert len(apps) == 1
 
     logger.info(f"Number of apps: {len(apps)}")
+
+
+@pytest.mark.abort_on_fail
+async def test_oathkeeper(ops_test: OpsTest, charm_versions):
+    """Test the integration of the spark history server with Oathkeeper.
+
+    Assert that the proxied-enpoints of the ingress are protected (err code 401).
+    """
+    # Deploy the oathkeeper charm and wait for waiting status
+    _ = await ops_test.model.deploy(**charm_versions.oathkeeper.deploy_dict(), trust=True)
+
+    await ops_test.model.wait_for_idle(
+        apps=[charm_versions.oathkeeper.application_name],
+        status="active",
+        timeout=300,
+        idle_period=30,
+    )
+
+    # configure Oathkeeper charm
+    oathkeeper_configuration_parameters = {"dev": "True"}
+    await ops_test.model.applications[charm_versions.oathkeeper.application_name].set_config(
+        oathkeeper_configuration_parameters
+    )
+
+    await ops_test.model.wait_for_idle(
+        apps=[charm_versions.oathkeeper.application_name],
+        status="active",
+        timeout=300,
+        idle_period=30,
+    )
+
+    # configure ingress to work with Oathkeeper
+    ingress_configuration_parameters = {"enable_experimental_forward_auth": "True"}
+    # apply new configuration options
+    await ops_test.model.applications[charm_versions.ingress.application_name].set_config(
+        ingress_configuration_parameters
+    )
+
+    await ops_test.model.wait_for_idle(
+        apps=[charm_versions.ingress.application_name],
+        status="active",
+        timeout=300,
+        idle_period=30,
+    )
+
+    # Relate Oathkeeper with the Spark history server charm
+    logger.info("Relating the spark history server charm with oathkeeper.")
+    await ops_test.model.add_relation(charm_versions.oathkeeper.application_name, APP_NAME)
+
+    await ops_test.model.wait_for_idle(
+        apps=[charm_versions.ingress.application_name, APP_NAME],
+        status="active",
+        timeout=300,
+        idle_period=30,
+    )
+
+    # Relate Oathkeeper with the Ingress charm
+    logger.info("Relating the oathkeeper charm with the ingress.")
+    await ops_test.model.add_relation(
+        f"{charm_versions.ingress.application_name}:experimental-forward-auth",
+        charm_versions.oathkeeper.application_name,
+    )
+
+    await ops_test.model.wait_for_idle(
+        apps=[charm_versions.oathkeeper.application_name, charm_versions.ingress.application_name],
+        status="active",
+        timeout=300,
+        idle_period=30,
+    )
+
+    # get proxied endpoint
+    action = await ops_test.model.units.get(
+        f"{charm_versions.ingress.application_name}/0"
+    ).run_action(
+        "show-proxied-endpoints",
+    )
+
+    ingress_endpoint = json.loads((await action.wait()).results["proxied-endpoints"])[APP_NAME][
+        "url"
+    ]
+
+    # check that the ingress endpoint is not authorized!
+    logger.info(f"Querying endpoint: {ingress_endpoint}")
+    try:
+        _ = urllib.request.urlopen(ingress_endpoint)
+        raise Exception(
+            "Successful request.... something is wrong with the protection of the endpoints."
+        )
+    except urllib.error.HTTPError as e:  # type: ignore
+        # Return code error (e.g. 404, 501, ...)
+        logger.info("HTTPError: {}".format(e.code))
+        # check that the endopoint respond with code 401
+        assert e.code == 401
+
+    logger.info(f"Endpoint: {ingress_endpoint} successfully protected.")
