@@ -12,7 +12,7 @@ applications:
     trust: true
   kratos:
     charm: kratos
-    revision: 353
+    revision: 390
     channel: edge
     scale: 1
     series: jammy
