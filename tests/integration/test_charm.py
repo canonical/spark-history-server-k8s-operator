@@ -254,6 +254,18 @@ async def test_oathkeeper(ops_test: OpsTest, charm_versions):
 
     Assert that the proxied-enpoints of the ingress are protected (err code 401).
     """
+    # remove relation between ingress and spark-history server
+    await ops_test.model.applications[APP_NAME].remove_relation(
+        f"{APP_NAME}:ingress", f"{charm_versions.ingress.application_name}:ingress"
+    )
+
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME, charm_versions.ingress.application_name],
+        status="active",
+        timeout=300,
+        idle_period=30,
+    )
+
     # Deploy the oathkeeper charm and wait for waiting status
     _ = await ops_test.model.deploy(**charm_versions.oathkeeper.deploy_dict(), trust=True)
 
@@ -276,7 +288,7 @@ async def test_oathkeeper(ops_test: OpsTest, charm_versions):
         timeout=300,
         idle_period=30,
     )
-
+    logger.info("HERE 0")
     # configure ingress to work with Oathkeeper
     ingress_configuration_parameters = {"enable_experimental_forward_auth": "True"}
     # apply new configuration options
@@ -291,12 +303,24 @@ async def test_oathkeeper(ops_test: OpsTest, charm_versions):
         idle_period=30,
     )
 
+    logger.info("HERE 1")
     # Relate Oathkeeper with the Spark history server charm
     logger.info("Relating the spark history server charm with oathkeeper.")
     await ops_test.model.add_relation(charm_versions.oathkeeper.application_name, APP_NAME)
 
     await ops_test.model.wait_for_idle(
-        apps=[charm_versions.ingress.application_name, APP_NAME],
+        apps=[APP_NAME],
+        status="blocked",
+        timeout=300,
+        idle_period=30,
+    )
+
+    logger.info("HERE 2")
+    # relate spark-history-server and ingress
+    await ops_test.model.add_relation(charm_versions.ingress.application_name, APP_NAME)
+
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME, charm_versions.ingress.application_name],
         status="active",
         timeout=300,
         idle_period=30,
@@ -341,3 +365,5 @@ async def test_oathkeeper(ops_test: OpsTest, charm_versions):
         assert e.code == 401
 
     logger.info(f"Endpoint: {ingress_endpoint} successfully protected.")
+
+    # the removal of the relation between oathkeeper and spark-history server is not working due to this issue: https://github.com/canonical/oathkeeper-operator/issues/44

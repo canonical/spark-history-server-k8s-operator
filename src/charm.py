@@ -11,7 +11,11 @@ from charms.data_platform_libs.v0.s3 import (
     CredentialsGoneEvent,
     S3Requirer,
 )
-from charms.oathkeeper.v0.auth_proxy import AuthProxyConfig, AuthProxyRequirer
+from charms.oathkeeper.v0.auth_proxy import (
+    AuthProxyConfig,
+    AuthProxyRelationRemovedEvent,
+    AuthProxyRequirer,
+)
 from charms.traefik_k8s.v2.ingress import (
     IngressPerAppReadyEvent,
     IngressPerAppRequirer,
@@ -25,7 +29,7 @@ from ops.main import main
 from ops.model import StatusBase
 
 from config import SparkHistoryServerConfig
-from constants import CONTAINER, INGRESS_REL, PEBBLE_USER, S3_INTEGRATOR_REL
+from constants import CONTAINER, INGRESS_REL, OATHKEEPER_REL, PEBBLE_USER, S3_INTEGRATOR_REL
 from models import S3ConnectionInfo, Status, User
 from utils import WithLogging
 from workload import IOMode, SparkHistoryServer
@@ -64,26 +68,31 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
             self.unit.get_container(CONTAINER), User(name=PEBBLE_USER[0], group=PEBBLE_USER[1])
         )
 
-        # oauth
-        self.auth_proxy_relation_name = "auth-proxy"
-
-        self.auth_proxy = AuthProxyRequirer(
-            self, self.auth_proxy_config, self.auth_proxy_relation_name
+        self.auth_proxy = AuthProxyRequirer(self, self.auth_proxy_config, OATHKEEPER_REL)
+        self.framework.observe(
+            self.auth_proxy.on.auth_proxy_relation_removed, self._on_auth_proxy_removed
         )
 
     @property
-    def auth_proxy_config(self) -> AuthProxyConfig:
+    def auth_proxy_config(self) -> Optional[AuthProxyConfig]:
         """Configure the auth proxy relation."""
-        return AuthProxyConfig(
-            protected_urls=[
-                self.ingress.url if self.ingress.url is not None else "https://some-test-url.com"
-            ],
-            headers=AUTH_PROXY_HEADERS,
-            allowed_endpoints=AUTH_PROXY_ALLOWED_ENDPOINTS,
-        )
+        if self.ingress.url is not None:
+            return AuthProxyConfig(
+                protected_urls=[self.ingress.url],
+                headers=AUTH_PROXY_HEADERS,
+                allowed_endpoints=AUTH_PROXY_ALLOWED_ENDPOINTS,
+            )
+        else:
+            return None
 
-    def _configure_auth_proxy(self):
-        self.auth_proxy.update_auth_proxy_config(auth_proxy_config=self.auth_proxy_config)
+    @property
+    def is_oathkeeper_related(self):
+        """Checks if oathkeeper is related."""
+        relations = list(self.model.relations[OATHKEEPER_REL])
+        assert len(relations) <= 1
+        if len(relations) == 0:
+            return False
+        return True
 
     @property
     def s3_connection_info(self) -> Optional[S3ConnectionInfo]:
@@ -97,7 +106,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
             **{key.replace("-", "_"): value for key, value in raw.items() if key != "data"}
         )
 
-    def get_status(self, s3: Optional[S3ConnectionInfo]) -> StatusBase:
+    def get_status(self, s3: Optional[S3ConnectionInfo], ingress_url: Optional[str]) -> StatusBase:
         """Compute and return the status of the charm."""
         if not self.workload.ready():
             return Status.WAITING_PEBBLE.value
@@ -108,11 +117,15 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         if not s3.verify():
             return Status.INVALID_CREDENTIALS.value
 
+        if self.is_oathkeeper_related:
+            if not ingress_url:
+                return Status.MISSING_INGRESS_RELATION.value
+
         return Status.ACTIVE.value
 
     def update_service(self, s3: Optional[S3ConnectionInfo], ingress_url: Optional[str]) -> bool:
         """Update the Spark History server service if needed."""
-        status = self.log_result(lambda _: f"Status: {_}")(self.get_status(s3))
+        status = self.log_result(lambda _: f"Status: {_}")(self.get_status(s3, ingress_url))
 
         self.unit.status = status
 
@@ -131,16 +144,19 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         return True
 
     def _on_spark_history_server_pebble_ready(self, event):
+        """Handle on Pebble ready event."""
         self.logger.info("Pebble ready")
         self.update_service(self.s3_connection_info, self.ingress.url)
 
     def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
+        """Handle the `IngressPerAppReadyEvent`."""
         self.logger.info("This app's ingress URL: %s", event.url)
         self.update_service(self.s3_connection_info, event.url)
         # auth proxy config
-        self._configure_auth_proxy()
+        self.auth_proxy.update_auth_proxy_config(auth_proxy_config=self.auth_proxy_config)
 
-    def _on_ingress_revoked(self, event: IngressPerAppRevokedEvent):
+    def _on_ingress_revoked(self, _: IngressPerAppRevokedEvent):
+        """Handle the `IngressPerAppRevokedEvent`."""
         self.log_result("This app no longer has ingress")(
             self.update_service(self.s3_connection_info, None)
         )
@@ -149,18 +165,24 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         """Handle the `on_install` event."""
         self.unit.status = Status.WAITING_PEBBLE.value
 
-    def _on_s3_credential_changed(self, event: CredentialsChangedEvent):
+    def _on_s3_credential_changed(self, _: CredentialsChangedEvent):
         """Handle the `CredentialsChangedEvent` event from S3 integrator."""
         self.logger.info("S3 Credentials changed")
         self.update_service(self.s3_connection_info, self.ingress.url)
 
-    def _on_s3_credential_gone(self, event: CredentialsGoneEvent):
+    def _on_s3_credential_gone(self, _: CredentialsGoneEvent):
         """Handle the `CredentialsGoneEvent` event for S3 integrator."""
         self.logger.info("S3 Credentials gone")
         self.update_service(None, self.ingress.url)
 
+    def _on_auth_proxy_removed(self, _: AuthProxyRelationRemovedEvent):
+        """Handle the removal of the AuthProxy."""
+        self.logger.info("AuthProxy configuration gone")
+        self.update_service(self.s3_connection_info, self.ingress.url)
+
     def _update_event(self, _):
-        self.unit.status = self.get_status(self.s3_connection_info)
+        """Handle the update event hook."""
+        self.unit.status = self.get_status(self.s3_connection_info, self.ingress.url)
 
 
 if __name__ == "__main__":  # pragma: nocover
