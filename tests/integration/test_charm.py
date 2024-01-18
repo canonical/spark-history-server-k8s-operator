@@ -17,6 +17,7 @@ import pytest
 import yaml
 from botocore.client import Config
 from pytest_operator.plugin import OpsTest
+from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from .test_helpers import fetch_action_sync_s3_credentials
 
@@ -288,7 +289,6 @@ async def test_oathkeeper(ops_test: OpsTest, charm_versions):
         timeout=300,
         idle_period=30,
     )
-    logger.info("HERE 0")
     # configure ingress to work with Oathkeeper
     ingress_configuration_parameters = {"enable_experimental_forward_auth": "True"}
     # apply new configuration options
@@ -302,8 +302,6 @@ async def test_oathkeeper(ops_test: OpsTest, charm_versions):
         timeout=300,
         idle_period=30,
     )
-
-    logger.info("HERE 1")
     # Relate Oathkeeper with the Spark history server charm
     logger.info("Relating the spark history server charm with oathkeeper.")
     await ops_test.model.add_relation(charm_versions.oathkeeper.application_name, APP_NAME)
@@ -314,8 +312,6 @@ async def test_oathkeeper(ops_test: OpsTest, charm_versions):
         timeout=300,
         idle_period=30,
     )
-
-    logger.info("HERE 2")
     # relate spark-history-server and ingress
     await ops_test.model.add_relation(charm_versions.ingress.application_name, APP_NAME)
 
@@ -366,4 +362,40 @@ async def test_oathkeeper(ops_test: OpsTest, charm_versions):
 
     logger.info(f"Endpoint: {ingress_endpoint} successfully protected.")
 
-    # the removal of the relation between oathkeeper and spark-history server is not working due to this issue: https://github.com/canonical/oathkeeper-operator/issues/44
+    # Remove of the relation between oathkeeper and spark-history server
+
+    await ops_test.model.applications[APP_NAME].remove_relation(
+        f"{APP_NAME}:auth-proxy", f"{charm_versions.oathkeeper.application_name}:auth-proxy"
+    )
+
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME, charm_versions.oathkeeper.application_name],
+        status="active",
+        timeout=300,
+        idle_period=30,
+    )
+
+    try:
+        for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(30)):
+            with attempt:
+                action = await ops_test.model.units.get(
+                    f"{charm_versions.ingress.application_name}/0"
+                ).run_action(
+                    "show-proxied-endpoints",
+                )
+
+                ingress_endpoint = json.loads((await action.wait()).results["proxied-endpoints"])[
+                    APP_NAME
+                ]["url"]
+
+                logger.info(f"Trying to querying endpoint: {ingress_endpoint}/api/v1/applications")
+
+                apps = json.loads(
+                    urllib.request.urlopen(f"{ingress_endpoint}/api/v1/applications").read()
+                )
+
+                assert len(apps) == 1
+
+                logger.info(f"Number of apps: {len(apps)}")
+    except RetryError:
+        raise Exception("Failed to reach the endpoint!")
