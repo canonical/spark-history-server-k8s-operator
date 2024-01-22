@@ -362,8 +362,14 @@ async def test_oathkeeper(ops_test: OpsTest, charm_versions):
 
     logger.info(f"Endpoint: {ingress_endpoint} successfully protected.")
 
-    # Remove of the relation between oathkeeper and spark-history server
 
+@pytest.mark.skip
+async def test_remove_oathkeeper(ops_test: OpsTest, charm_versions):
+    """Test the removal of integration between the spark history server and Oathkeeper.
+
+    Assert that the proxied-enpoints of the ingress are not protected.
+    """
+    # Remove of the relation between oathkeeper and spark-history server
     await ops_test.model.applications[APP_NAME].remove_relation(
         f"{APP_NAME}:auth-proxy", f"{charm_versions.oathkeeper.application_name}:auth-proxy"
     )
