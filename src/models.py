@@ -65,4 +65,5 @@ class Status(Enum):
     WAITING_PEBBLE = MaintenanceStatus("Waiting for Pebble")
     MISSING_S3_RELATION = BlockedStatus("Missing S3 relation")
     INVALID_CREDENTIALS = BlockedStatus("Invalid S3 credentials")
+    MISSING_INGRESS_RELATION = BlockedStatus("Missing INGRESS relation")
     ACTIVE = ActiveStatus("")

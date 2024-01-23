@@ -34,6 +34,7 @@ ops = ">=2.4.1"
 pydantic ="^1.10.7"
 pyyaml = "^6.0.1"
 boto3 = "^1.26.75"
+jsonschema = "^4.19.1"
 
 [tool.poetry.group.format]
 optional = true
@@ -68,6 +69,7 @@ juju = "^3.1.6"
 coverage = {extras = ["toml"], version = ">7.0"}
 pytest-operator = ">0.20"
 boto3 = ">=1.28.0"
+tenacity = "^8.2.2"
 pytest-operator-cache = {git = "https://github.com/canonical/data-platform-workflows", tag = "v6.1.1", subdirectory = "python/pytest_plugins/pytest_operator_cache"}
 # To be enabled if we are using groups on integration tests
 # pytest-operator-groups = {git = "https://github.com/canonical/data-platform-workflows", tag = "v6.1.1", subdirectory = "python/pytest_plugins/pytest_operator_groups"}

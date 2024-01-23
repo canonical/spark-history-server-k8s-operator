@@ -14,7 +14,7 @@ from utils import WithLogging
 class SparkHistoryServerConfig(WithLogging):
     """Spark History Server Configuration."""
 
-    _ingress_pattern = re.compile("http://.*?/")
+    _ingress_pattern = re.compile("http://.*?/|https://.*?/")
 
     def __init__(self, s3_connection_info: Optional[S3ConnectionInfo], ingress_url: Optional[str]):
         self.s3_connection_info = s3_connection_info
