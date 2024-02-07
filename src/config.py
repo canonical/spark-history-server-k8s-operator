@@ -16,9 +16,15 @@ class SparkHistoryServerConfig(WithLogging):
 
     _ingress_pattern = re.compile("http://.*?/|https://.*?/")
 
-    def __init__(self, s3_connection_info: Optional[S3ConnectionInfo], ingress_url: Optional[str]):
+    def __init__(
+        self,
+        s3_connection_info: Optional[S3ConnectionInfo],
+        ingress_url: Optional[str],
+        authorized_users: Optional[str],
+    ):
         self.s3_connection_info = s3_connection_info
         self.ingress_url = ingress_url
+        self.auth = authorized_users
 
     _base_conf: dict[str, str] = {
         "spark.hadoop.fs.s3a.connection.ssl.enabled": "false",
@@ -53,9 +59,20 @@ class SparkHistoryServerConfig(WithLogging):
             else {}
         )
 
+    @property
+    def _auth_conf(self) -> dict[str, str]:
+        return (
+            {
+                "spark.ui.filters": "com.canonical.charmedspark.BasicAuthenticationFilter",
+                "spark.com.canonical.charmedspark.BasicAuthenticationFilter.param.users": self.auth,
+            }
+            if self.auth and self.ingress_url
+            else {}
+        )
+
     def to_dict(self) -> dict[str, str]:
         """Return the dict representation of the configuration file."""
-        return self._base_conf | self._s3_conf | self._ingress_proxy_conf
+        return self._base_conf | self._s3_conf | self._ingress_proxy_conf | self._auth_conf
 
     @property
     def contents(self) -> str:
