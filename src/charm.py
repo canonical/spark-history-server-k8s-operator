@@ -100,9 +100,9 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
             return None
 
         raw = self.s3_requirer.get_s3_connection_info()
-
-        return S3ConnectionInfo(
-            **{key.replace("-", "_"): value for key, value in raw.items() if key != "data"}
+        self.logger.info(f"raw_s3: {raw}")
+        return S3ConnectionInfo.from_dict(
+            {key.replace("-", "_"): value for key, value in raw.items() if key != "data"}
         )
 
     def get_status(
