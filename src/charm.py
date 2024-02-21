@@ -75,6 +75,10 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         self.framework.observe(
             self.on[OATHKEEPER_REL].relation_changed, self._on_auth_proxy_changed
         )
+        
+        self.framework.observe(
+            self.on.config_changed, self._on_config_changed
+        )
 
     @property
     def auth_proxy_config(self) -> Optional[AuthProxyConfig]:
@@ -209,6 +213,10 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         self.unit.status = self.get_status(
             self.s3_connection_info, self.ingress.url, self.authorized_users_info
         )
+        
+    def _on_config_changed(self, _):
+        """Handle the on config changed event."""
+        self.update_service(self.s3_connection_info, self.ingress.url, self.authorized_users_info)
 
 
 if __name__ == "__main__":  # pragma: nocover

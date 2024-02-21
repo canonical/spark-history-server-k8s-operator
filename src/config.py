@@ -6,6 +6,7 @@
 
 import re
 from typing import Optional
+from constants import AUTH_PARAMETER
 
 from models import S3ConnectionInfo
 from utils import WithLogging
@@ -20,11 +21,11 @@ class SparkHistoryServerConfig(WithLogging):
         self,
         s3_connection_info: Optional[S3ConnectionInfo],
         ingress_url: Optional[str],
-        authorized_users: Optional[str],
+        authorized_entities: Optional[str],
     ):
         self.s3_connection_info = s3_connection_info
         self.ingress_url = ingress_url
-        self.auth = authorized_users
+        self.auth = authorized_entities
 
     _base_conf: dict[str, str] = {
         "spark.hadoop.fs.s3a.connection.ssl.enabled": "false",
@@ -64,7 +65,8 @@ class SparkHistoryServerConfig(WithLogging):
         return (
             {
                 "spark.ui.filters": "com.canonical.charmedspark.BasicAuthenticationFilter",
-                "spark.com.canonical.charmedspark.BasicAuthenticationFilter.param.users": self.auth,
+                "spark.com.canonical.charmedspark.BasicAuthenticationFilter.param.authorizedParameter": AUTH_PARAMETER,
+                "spark.com.canonical.charmedspark.BasicAuthenticationFilter.param.authorizedEntities": self.auth,
             }
             if self.auth and self.ingress_url
             else {}

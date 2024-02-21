@@ -9,6 +9,6 @@ options:
     type: string
   authorized-users:
     description: |
-      Comma separated list of authorized users. By default all users are authorized.
+      Comma separated list of authorized users. By default all users (*) are authorized.
     default: "*"
     type: string
