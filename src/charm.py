@@ -94,6 +94,14 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         return True
 
     @property
+    def s3_self_signed_cert_enable(self) -> bool:
+        """Return if self signed certificate is used."""
+        if self.s3_connection_info:
+            if self.s3_connection_info.tls_ca_chain:
+                return True
+        return False
+
+    @property
     def s3_connection_info(self) -> Optional[S3ConnectionInfo]:
         """Parse a S3ConnectionInfo object from relation data."""
         if not self.s3_requirer.relations:
@@ -145,6 +153,13 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         with self.workload.get_spark_configuration_file(IOMode.WRITE) as fid:
             spark_config = SparkHistoryServerConfig(s3, ingress_url)
             fid.write(spark_config.contents)
+
+        if self.s3_self_signed_cert_enable:
+            with self.workload.get_certificate_file(IOMode.WRITE) as fid:
+                if s3.tls_ca_chain:
+                    cert = "\n".join(s3.tls_ca_chain)
+                    fid.write(cert)  # type: ignore
+            self.workload.configure_truststore()
 
         if status is not Status.ACTIVE.value:
             self.logger.info(f"Cannot start service because of status {status}")

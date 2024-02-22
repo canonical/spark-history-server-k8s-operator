@@ -21,7 +21,6 @@ class SparkHistoryServerConfig(WithLogging):
         self.ingress_url = ingress_url
 
     _base_conf: dict[str, str] = {
-        "spark.hadoop.fs.s3a.connection.ssl.enabled": "false",
         "spark.hadoop.fs.s3a.path.style.access": "true",
         "spark.eventLog.enabled": "true",
     }
@@ -39,8 +38,9 @@ class SparkHistoryServerConfig(WithLogging):
 
     @property
     def _s3_conf(self) -> dict[str, str]:
-        return (
-            {
+        conf = {}
+        if self.s3_connection_info:
+            conf = {
                 "spark.hadoop.fs.s3a.endpoint": self.s3_connection_info.endpoint
                 or "https://s3.amazonaws.com",
                 "spark.hadoop.fs.s3a.access.key": self.s3_connection_info.access_key,
@@ -48,10 +48,17 @@ class SparkHistoryServerConfig(WithLogging):
                 "spark.eventLog.dir": self.s3_connection_info.log_dir,
                 "spark.history.fs.logDirectory": self.s3_connection_info.log_dir,
                 "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
+                "spark.hadoop.fs.s3a.connection.ssl.enabled": "false",
             }
-            if self.s3_connection_info
-            else {}
-        )
+            if self.s3_connection_info.tls_ca_chain:
+                conf.update(
+                    {
+                        "spark.executor.extraJavaOptions": "-Djavax.net.ssl.trustStore=/opt/spark/conf/truststore.jks -Djavax.net.ssl.trustStorePassword=changeit",
+                        "spark.driver.extraJavaOptions": "-Djavax.net.ssl.trustStore=/opt/spark/conf/truststore.jks -Djavax.net.ssl.trustStorePassword=changeit",
+                        "spark.hadoop.fs.s3a.connection.ssl.enabled": "true",
+                    }
+                )
+        return conf
 
     def to_dict(self) -> dict[str, str]:
         """Return the dict representation of the configuration file."""
