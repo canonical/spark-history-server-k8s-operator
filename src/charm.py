@@ -156,9 +156,8 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
 
         if self.s3_self_signed_cert_enable:
             with self.workload.get_certificate_file(IOMode.WRITE) as fid:
-                if s3.tls_ca_chain:
-                    cert = "\n".join(s3.tls_ca_chain)
-                    fid.write(cert)  # type: ignore
+                cert = "\n".join(s3.tls_ca_chain)
+                fid.write(cert)  # type: ignore
             self.workload.configure_truststore()
 
         if status is not Status.ACTIVE.value:
