@@ -153,6 +153,19 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
 
     logger.info(f"Run spark output:\n{run_spark_output}")
 
+    run_s3cmd_output = subprocess.check_output(
+        f"s3cmd --no-check-certificate \
+        --host {endpoint_url} \
+        --host-bucket={endpoint_url}/%(bucket) \
+        --access_key={access_key} \
+        --ca-cert={tls_ca_chain_path} \
+        --secret_key={secret_key} ls s3://history-server/spark-events/",
+        shell=True,
+        stderr=None,
+    ).decode("utf-8")
+
+    logger.info(f"Run spark output:\n{run_s3cmd_output}")
+
     logger.info("Verifying history server has 1 app entry")
 
     for i in range(0, 5):
@@ -166,6 +179,6 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
         if len(apps) > 0:
             break
         else:
-            sleep(3)
+            sleep(30)
 
     assert len(apps) == 1
