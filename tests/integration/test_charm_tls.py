@@ -9,7 +9,6 @@ import base64
 import json
 import logging
 import subprocess
-import sys
 import urllib.request
 from pathlib import Path
 from time import sleep
@@ -133,7 +132,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
     apps = json.loads(urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read())
 
     assert len(apps) == 0
-    sys.exit(1)
+
     logger.info("Setting up spark")
 
     setup_spark_output = subprocess.check_output(
@@ -147,7 +146,9 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
     logger.info("Executing Spark job")
 
     run_spark_output = subprocess.check_output(
-        "./tests/integration/setup/run_spark_job.sh", shell=True, stderr=None
+        f"./tests/integration/setup/run_spark_job_tls.sh {tls_ca_chain_path}",
+        shell=True,
+        stderr=None,
     ).decode("utf-8")
 
     logger.info(f"Run spark output:\n{run_spark_output}")
