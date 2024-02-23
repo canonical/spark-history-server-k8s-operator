@@ -38,18 +38,20 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
 
     Assert on the unit status before any relations/configurations take place.
     """
-    logger.info("Setting up minio.....")
+    logger.info("Setting up microceph credentials.....")
 
-    setup_env = (
-        subprocess.check_output("/bin/bash source microceph.source; env", shell=True, stderr=None)
-        .decode("utf-8")
-        .strip()
-    )
-    logger.info(f"Env variable:\n{setup_env}")
-    endpoint_url = os.environ["S3_SERVER_URL"]
-    access_key = os.environ["S3_ACCESS_KEY"]
-    secret_key = os.environ["S3_SECRET_KEY"]
-    tls_ca_chain_path = os.environ["S3_CA_BUNDLE_PATH"]
+    ceph_options = {}
+    with open("microceph.source") as f:
+        lines = f.readlines()
+        for line in lines:
+            if "=" in line:
+                elem = line.split("=")
+                ceph_options[elem[0]]=elem[1]
+    
+    endpoint_url = ceph_options["S3_SERVER_URL"]
+    access_key = ceph_options["S3_ACCESS_KEY"]
+    secret_key = ceph_options["S3_SECRET_KEY"]
+    tls_ca_chain_path = ceph_options["S3_CA_BUNDLE_PATH"]
 
     logger.info(
         f"Setting up s3 bucket with endpoint_url={endpoint_url}, access_key={access_key}, secret_key={secret_key}"
