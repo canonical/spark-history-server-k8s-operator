@@ -53,8 +53,6 @@ class SparkHistoryServerConfig(WithLogging):
             if self.s3_connection_info.tls_ca_chain:
                 conf.update(
                     {
-                        "spark.executor.extraJavaOptions": "-Djavax.net.ssl.trustStore=/opt/spark/conf/truststore.jks -Djavax.net.ssl.trustStorePassword=changeit",
-                        "spark.driver.extraJavaOptions": "-Djavax.net.ssl.trustStore=/opt/spark/conf/truststore.jks -Djavax.net.ssl.trustStorePassword=changeit",
                         "spark.hadoop.fs.s3a.connection.ssl.enabled": "true",
                     }
                 )
