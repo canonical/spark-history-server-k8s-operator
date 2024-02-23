@@ -103,7 +103,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
         "bucket": "history-server",
         "path": "spark-events",
         "endpoint": endpoint_url,
-        "tls_ca_chain": ca_b64,
+        "tls-ca-chain": ca_b64,
     }
     # apply new configuration options
     await ops_test.model.applications[charm_versions.s3.application_name].set_config(
