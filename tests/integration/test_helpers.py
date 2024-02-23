@@ -31,13 +31,13 @@ async def fetch_action_sync_s3_credentials(unit: Unit, access_key: str, secret_k
 
 
 def setup_s3_bucket_for_history_server(
-    endpoint_url: str, aws_access_key: str, aws_secret_key: str, bucket_str: str
+    endpoint_url: str, aws_access_key: str, aws_secret_key: str, bucket_str: str, verify=False
 ):
     config = Config(connect_timeout=60, retries={"max_attempts": 0})
     session = boto3.session.Session(
         aws_access_key_id=aws_access_key, aws_secret_access_key=aws_secret_key
     )
-    s3 = session.client("s3", endpoint_url=endpoint_url, config=config)
+    s3 = session.client("s3", endpoint_url=endpoint_url, config=config, verify=verify)
     # delete test bucket and its content if it already exist
     buckets = s3.list_buckets()
     for bucket in buckets["Buckets"]:
@@ -65,3 +65,10 @@ def setup_s3_bucket_for_history_server(
 
     s3.put_object(Bucket=bucket_str, Key=("spark-events/"))
     logger.debug(s3.list_buckets())
+
+
+def get_certificate_from_file(filename: str) -> str:
+    """Returns the certificate as a string."""
+    with open(filename, "r") as file:
+        certificate = file.read()
+    return certificate

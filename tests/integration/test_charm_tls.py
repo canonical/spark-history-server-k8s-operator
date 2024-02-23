@@ -5,8 +5,10 @@
 # Integration Tests TBD separately in next pulse
 
 import asyncio
+import base64
 import json
 import logging
+import os
 import subprocess
 import sys
 import urllib.request
@@ -17,7 +19,11 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from .test_helpers import fetch_action_sync_s3_credentials, setup_s3_bucket_for_history_server
+from .test_helpers import (
+    fetch_action_sync_s3_credentials,
+    get_certificate_from_file,
+    setup_s3_bucket_for_history_server,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,14 +40,16 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
     """
     logger.info("Setting up minio.....")
 
-    setup_env = subprocess.check_output("env", shell=True, stderr=None).decode("utf-8").strip()
-
+    setup_env = (
+        subprocess.check_output("source microceph.source; env", shell=True, stderr=None)
+        .decode("utf-8")
+        .strip()
+    )
     logger.info(f"Env variable:\n{setup_env}")
-    sys.exit(1)
-    s3_params = ""
-    endpoint_url = s3_params[0]
-    access_key = s3_params[1]
-    secret_key = s3_params[2]
+    endpoint_url = os.environ["S3_SERVER_URL"]
+    access_key = os.environ["S3_ACCESS_KEY"]
+    secret_key = os.environ["S3_SECRET_KEY"]
+    tls_ca_chain_path = os.environ["S3_CA_BUNDLE_PATH"]
 
     logger.info(
         f"Setting up s3 bucket with endpoint_url={endpoint_url}, access_key={access_key}, secret_key={secret_key}"
@@ -88,10 +96,13 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
             apps=[charm_versions.s3.application_name], status="active"
         )
 
+    ca = get_certificate_from_file(tls_ca_chain_path)
+    ca_b64 = base64.b64encode(ca.encode("utf-8")).decode("utf-8")
     configuration_parameters = {
         "bucket": "history-server",
         "path": "spark-events",
         "endpoint": endpoint_url,
+        "tls_ca_chain": ca_b64,
     }
     # apply new configuration options
     await ops_test.model.applications[charm_versions.s3.application_name].set_config(
@@ -121,7 +132,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
     apps = json.loads(urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read())
 
     assert len(apps) == 0
-
+    sys.exit(1)
     logger.info("Setting up spark")
 
     setup_spark_output = subprocess.check_output(
