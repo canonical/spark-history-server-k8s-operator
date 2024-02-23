@@ -41,7 +41,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
     logger.info("Setting up minio.....")
 
     setup_env = (
-        subprocess.check_output("source microceph.source; env", shell=True, stderr=None)
+        subprocess.check_output("/bin/bash source microceph.source; env", shell=True, stderr=None)
         .decode("utf-8")
         .strip()
     )
