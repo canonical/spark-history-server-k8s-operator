@@ -84,6 +84,7 @@ jobs:
       - name: Install Java
         uses: actions/setup-java@v4
         with:
+          distribution: 'temurin'
           java-version: '8'
       - name: Get prefsrc
         run: |
