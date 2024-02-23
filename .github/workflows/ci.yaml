@@ -108,11 +108,6 @@ jobs:
         with:
           artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
           merge-multiple: true
-      - name: Test
-        run: |
-          echo ${{ needs.build.outputs.artifact-name }}
-          ls
-          ls *.charm
       - name: Select tests
         id: select-tests
         run: |
@@ -128,7 +123,3 @@ jobs:
         run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}'
         env:
           CI_PACKED_CHARMS: ${{ needs.build.outputs.charms }}
-          S3_SERVER_URL: ${{ steps.microceph.outputs.S3_SERVER_URL }}
-          S3_ACCESS_KEY: ${{ steps.microceph-test.outputs.S3_ACCESS_KEY }}
-          S3_SECRET_KEY: ${{ steps.microceph-test.outputs.S3_SECRET_KEY }}
-          S3_CA_BUNDLE_PATH: ${{ steps.microceph-test.outputs.S3_CA_BUNDLE_PATH }}
