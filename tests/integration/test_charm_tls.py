@@ -7,7 +7,6 @@
 import asyncio
 import json
 import logging
-import os
 import subprocess
 import sys
 import urllib.request
@@ -17,7 +16,6 @@ from time import sleep
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
-from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from .test_helpers import fetch_action_sync_s3_credentials, setup_s3_bucket_for_history_server
 
@@ -27,6 +25,7 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
 BUCKET_NAME = "history-server"
 
+
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
     """Build the charm-under-test and deploy it together with related charms.
@@ -35,17 +34,11 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
     """
     logger.info("Setting up minio.....")
 
-    setup_env = (
-        subprocess.check_output(
-            "env", shell=True, stderr=None
-        )
-        .decode("utf-8")
-        .strip()
-    )
+    setup_env = subprocess.check_output("env", shell=True, stderr=None).decode("utf-8").strip()
 
     logger.info(f"Env variable:\n{setup_env}")
     sys.exit(1)
-    s3_params = setup_minio_output.strip().split(",")
+    s3_params = ""
     endpoint_url = s3_params[0]
     access_key = s3_params[1]
     secret_key = s3_params[2]

@@ -14,7 +14,6 @@ from time import sleep
 
 import pytest
 import yaml
-
 from pytest_operator.plugin import OpsTest
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 

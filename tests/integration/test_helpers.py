@@ -6,9 +6,8 @@ import logging
 from time import sleep
 from typing import Dict
 
-from botocore.client import Config
 import boto3
-
+from botocore.client import Config
 from juju.unit import Unit
 
 logger = logging.getLogger(__name__)
@@ -29,6 +28,7 @@ async def fetch_action_sync_s3_credentials(unit: Unit, access_key: str, secret_k
     result = await action.wait()
 
     return result.results
+
 
 def setup_s3_bucket_for_history_server(
     endpoint_url: str, aws_access_key: str, aws_secret_key: str, bucket_str: str
