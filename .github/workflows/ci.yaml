@@ -94,6 +94,7 @@ jobs:
           microk8s-group: snap_microk8s
           microk8s-addons: "hostpath-storage dns minio metallb:${{ env.IPADDR }}-${{ env.IPADDR }}"
       - name: Setup microceph
+        id: mi
         if: ${{matrix.tox-environments}} == 'integration-tls'
         uses: canonical/microceph-action@v0.2
         with:
@@ -127,3 +128,7 @@ jobs:
         run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}'
         env:
           CI_PACKED_CHARMS: ${{ needs.build.outputs.charms }}
+          S3_SERVER_URL: ${{ needs.integration-test.outputs.S3_SERVER_URL }}
+          S3_ACCESS_KEY: ${{ needs.integration-test.outputs.S3_ACCESS_KEY }}
+          S3_SECRET_KEY: ${{ needs.integration-test.outputs.S3_SECRET_KEY }}
+          S3_CA_BUNDLE_PATH: ${{ needs.integration-test.outputs.S3_CA_BUNDLE_PATH }}
