@@ -7,7 +7,9 @@
 import asyncio
 import json
 import logging
+import os
 import subprocess
+import sys
 import urllib.request
 from pathlib import Path
 from time import sleep
@@ -33,16 +35,16 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
     """
     logger.info("Setting up minio.....")
 
-    setup_minio_output = (
+    setup_env = (
         subprocess.check_output(
-            "./tests/integration/setup/setup_minio.sh | tail -n 1", shell=True, stderr=None
+            "env", shell=True, stderr=None
         )
         .decode("utf-8")
         .strip()
     )
 
-    logger.info(f"Minio output:\n{setup_minio_output}")
-
+    logger.info(f"Env variable:\n{setup_env}")
+    sys.exit(1)
     s3_params = setup_minio_output.strip().split(",")
     endpoint_url = s3_params[0]
     access_key = s3_params[1]
