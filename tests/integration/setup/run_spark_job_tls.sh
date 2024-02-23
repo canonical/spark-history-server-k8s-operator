@@ -1,5 +1,6 @@
 #!/bin/bash
 set -eux
+sudo apt install s3cmd -y
 echo "Generate truststore"
 keytool -import -alias ceph-cert -file $1 -storetype JKS -keystore cacerts -storepass changeit -noprompt
 mv cacerts spark.truststore
