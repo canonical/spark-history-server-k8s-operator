@@ -160,7 +160,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
         --access_key={access_key} \
         --ca-cert={tls_ca_chain_path} \
         --secret_key={secret_key} ls s3://history-server/spark-events/",
-        shell=True,
+        shell=False,
         stderr=None,
     ).decode("utf-8")
 
