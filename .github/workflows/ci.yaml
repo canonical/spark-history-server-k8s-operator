@@ -105,7 +105,7 @@ jobs:
       - name: Download packed charm(s)
         uses: actions/download-artifact@v4
         with:
-          pattern: ${{ inputs.artifact-prefix }}-*
+          pattern: ${{ needs.build.outputs.artifact-name }}
           merge-multiple: true
       - name: Test
         run: |
