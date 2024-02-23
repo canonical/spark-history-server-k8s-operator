@@ -44,7 +44,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
         lines = f.readlines()
         for line in lines:
             if "=" in line:
-                elem = line.split("=")
+                elem = line.replace("\n", "").strip().split("=")
                 ceph_options[elem[0]] = elem[1]
     logger.info(f"Ceph options: {ceph_options}")
     endpoint_url = ceph_options["S3_SERVER_URL"]
