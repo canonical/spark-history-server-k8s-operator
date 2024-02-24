@@ -1,4 +1,4 @@
-# Copyright 2022 Canonical Ltd.
+# Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 name: Tests
 
@@ -100,7 +100,7 @@ jobs:
           microk8s-addons: "hostpath-storage dns minio metallb:${{ env.IPADDR }}-${{ env.IPADDR }}"
       - name: Setup microceph
         id: microceph
-        if: ${{matrix.tox-environments}} == 'integration-tls'
+        if: ${{ matrix.tox-environments }} == 'integration-tls'
         uses: canonical/microceph-action@v0.2
         with:
           channel: 'latest/edge'

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2023 Canonical Limited
+# Copyright 2024 Canonical Limited
 # See LICENSE file for licensing details.
 
 """Charmed Kubernetes Operator for Apache Spark History Server."""
@@ -108,7 +108,6 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
             return None
 
         raw = self.s3_requirer.get_s3_connection_info()
-        self.logger.info(f"raw_s3: {raw}")
         return S3ConnectionInfo.from_dict(
             {key.replace("-", "_"): value for key, value in raw.items() if key != "data"}
         )
@@ -153,6 +152,9 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         with self.workload.get_spark_configuration_file(IOMode.WRITE) as fid:
             spark_config = SparkHistoryServerConfig(s3, ingress_url)
             fid.write(spark_config.contents)
+        
+        # remove truststore in case of ca chain update
+        self.workload.remove_truststore()
 
         if self.s3_self_signed_cert_enable:
             with self.workload.get_certificate_file(IOMode.WRITE) as fid:

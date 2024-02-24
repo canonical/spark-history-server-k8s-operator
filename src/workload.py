@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2023 Canonical Limited
+# Copyright 2024 Canonical Limited
 # See LICENSE file for licensing details.
 
 """Module containing all business logic related to the workload."""
@@ -148,7 +148,7 @@ class SparkHistoryServer(AbstractWorkload, WithLogging):
     def remove_truststore(self) -> None:
         """Manage the removal of the truststore."""
         try:
-            self.exec(f"rm {self.SPARK_TRUSTSTORE}")
+            self.exec(f"rm -f {self.SPARK_TRUSTSTORE}")
         except (subprocess.CalledProcessError, ExecError) as e:
             # in case this reruns and fails
             if e.stdout and "already exists" in e.stdout:
