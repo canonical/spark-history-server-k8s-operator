@@ -154,7 +154,8 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
             fid.write(spark_config.contents)
 
         # remove truststore in case of ca chain update
-        self.workload.remove_truststore()
+        if self.workload.get_truststore_file(IOMode.READ).exists():
+            self.workload.remove_truststore()
 
         if self.s3_self_signed_cert_enable:
             with self.workload.get_certificate_file(IOMode.WRITE) as fid:

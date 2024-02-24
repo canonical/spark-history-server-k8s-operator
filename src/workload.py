@@ -129,6 +129,10 @@ class SparkHistoryServer(AbstractWorkload, WithLogging):
         """Return the configuration file for Spark History server."""
         return ContainerFile(self.container, self.user, self.SPARK_CERT, mode)
 
+    def get_truststore_file(self, mode: IOMode) -> ContainerFile:
+        """Return the configuration file for Spark History server."""
+        return ContainerFile(self.container, self.user, self.SPARK_TRUSTSTORE, mode)
+
     def configure_truststore(self) -> None:
         """Configure custom JVM truststore."""
         command = f"keytool -import -v -alias ca -file {self.SPARK_CERT} -keystore {self.SPARK_TRUSTSTORE} -storepass changeit -noprompt"
