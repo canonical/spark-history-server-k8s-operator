@@ -152,7 +152,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         with self.workload.get_spark_configuration_file(IOMode.WRITE) as fid:
             spark_config = SparkHistoryServerConfig(s3, ingress_url)
             fid.write(spark_config.contents)
-        
+
         # remove truststore in case of ca chain update
         self.workload.remove_truststore()
 
