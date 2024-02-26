@@ -25,6 +25,20 @@ class SparkHistoryServerConfig(WithLogging):
         "spark.eventLog.enabled": "true",
     }
 
+    def _ssl_enabled(self) -> str:
+        """Check if ssl is enabled."""
+        if self.s3_connection_info:
+            if not self.s3_connection_info.endpoint:
+                return "true"
+            else:
+                if (
+                    self.s3_connection_info.endpoint.startswith("https:")
+                    or ":443" in self.s3_connection_info.endpoint
+                ):
+                    return "true"
+
+        return "false"
+
     @property
     def _ingress_proxy_conf(self) -> dict[str, str]:
         return (
@@ -48,7 +62,7 @@ class SparkHistoryServerConfig(WithLogging):
                 "spark.eventLog.dir": self.s3_connection_info.log_dir,
                 "spark.history.fs.logDirectory": self.s3_connection_info.log_dir,
                 "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-                "spark.hadoop.fs.s3a.connection.ssl.enabled": "false",
+                "spark.hadoop.fs.s3a.connection.ssl.enabled": self._ssl_enabled,
             }
             if self.s3_connection_info.tls_ca_chain:
                 conf.update(
