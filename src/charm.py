@@ -222,7 +222,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
 
     def _on_config_changed(self, event: ConfigChangedEvent):
         """Handle the on config changed event."""
-        if not self.workload.ready:
+        if not self.workload.ready():
             self.logger.info("On config changed event: pebble not ready -> defer")
             event.defer()
             return
