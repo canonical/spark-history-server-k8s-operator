@@ -52,9 +52,8 @@ class SparkHistoryServerConfig(WithLogging):
 
     @property
     def _s3_conf(self) -> dict[str, str]:
-        conf = {}
         if self.s3_connection_info:
-            conf = {
+            return {
                 "spark.hadoop.fs.s3a.endpoint": self.s3_connection_info.endpoint
                 or "https://s3.amazonaws.com",
                 "spark.hadoop.fs.s3a.access.key": self.s3_connection_info.access_key,
@@ -62,15 +61,9 @@ class SparkHistoryServerConfig(WithLogging):
                 "spark.eventLog.dir": self.s3_connection_info.log_dir,
                 "spark.history.fs.logDirectory": self.s3_connection_info.log_dir,
                 "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-                "spark.hadoop.fs.s3a.connection.ssl.enabled": self._ssl_enabled,
+                "spark.hadoop.fs.s3a.connection.ssl.enabled": self._ssl_enabled,  # type: ignore
             }
-            if self.s3_connection_info.tls_ca_chain:
-                conf.update(
-                    {
-                        "spark.hadoop.fs.s3a.connection.ssl.enabled": "true",
-                    }
-                )
-        return conf
+        return {}
 
     def to_dict(self) -> dict[str, str]:
         """Return the dict representation of the configuration file."""
