@@ -22,10 +22,7 @@ from charms.traefik_k8s.v2.ingress import (
     IngressPerAppRevokedEvent,
 )
 from ops import RelationChangedEvent
-from ops.charm import (
-    CharmBase,
-    InstallEvent,
-)
+from ops.charm import CharmBase, ConfigChangedEvent, InstallEvent
 from ops.main import main
 from ops.model import StatusBase
 
@@ -219,8 +216,12 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
             self.s3_connection_info, self.ingress.url, self.authorized_users_info
         )
 
-    def _on_config_changed(self, _):
+    def _on_config_changed(self, event: ConfigChangedEvent):
         """Handle the on config changed event."""
+        if not self.workload.ready:
+            self.logger.info("On config changed event: pebble not ready -> defer")
+            event.defer()
+            return
         self.update_service(self.s3_connection_info, self.ingress.url, self.authorized_users_info)
 
 
