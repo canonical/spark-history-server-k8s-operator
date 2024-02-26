@@ -150,6 +150,9 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
 
         self.unit.status = status
 
+        # tmp
+        self.logger.info(f"Workload ready: {self.workload.ready}")
+
         # TODO: to avoid disruption (although minimal) if you could the logic below
         # conditionally depending on whether the Spark configuration content had changed
         with self.workload.get_spark_configuration_file(IOMode.WRITE) as fid:
