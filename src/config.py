@@ -6,8 +6,8 @@
 
 import re
 from typing import Optional
-from constants import AUTH_PARAMETER
 
+from constants import AUTH_PARAMETER
 from models import S3ConnectionInfo
 from utils import WithLogging
 

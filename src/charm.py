@@ -30,12 +30,19 @@ from ops.main import main
 from ops.model import StatusBase
 
 from config import SparkHistoryServerConfig
-from constants import CONTAINER, INGRESS_REL, OATHKEEPER_REL, PEBBLE_USER, S3_INTEGRATOR_REL
+from constants import (
+    AUTH_PARAMETER,
+    CONTAINER,
+    INGRESS_REL,
+    OATHKEEPER_REL,
+    PEBBLE_USER,
+    S3_INTEGRATOR_REL,
+)
 from models import S3ConnectionInfo, Status, User
 from utils import WithLogging
 from workload import IOMode, SparkHistoryServer
 
-AUTH_PROXY_HEADERS = ["X-User"]
+AUTH_PROXY_HEADERS = ["X-User", AUTH_PARAMETER]
 
 
 class SparkHistoryServerCharm(CharmBase, WithLogging):
@@ -75,10 +82,8 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         self.framework.observe(
             self.on[OATHKEEPER_REL].relation_changed, self._on_auth_proxy_changed
         )
-        
-        self.framework.observe(
-            self.on.config_changed, self._on_config_changed
-        )
+
+        self.framework.observe(self.on.config_changed, self._on_config_changed)
 
     @property
     def auth_proxy_config(self) -> Optional[AuthProxyConfig]:
@@ -213,7 +218,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         self.unit.status = self.get_status(
             self.s3_connection_info, self.ingress.url, self.authorized_users_info
         )
-        
+
     def _on_config_changed(self, _):
         """Handle the on config changed event."""
         self.update_service(self.s3_connection_info, self.ingress.url, self.authorized_users_info)
