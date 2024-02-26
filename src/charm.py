@@ -152,6 +152,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
 
         # tmp
         self.logger.info(f"Workload ready: {self.workload.ready}")
+        self.logger.info(f"Workload READY: {self.workload.container.can_connect()}")
 
         # TODO: to avoid disruption (although minimal) if you could the logic below
         # conditionally depending on whether the Spark configuration content had changed
