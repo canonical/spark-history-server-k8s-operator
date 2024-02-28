@@ -152,11 +152,12 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         if self.workload.get_truststore_file(IOMode.READ).exists():
             self.tls.remove_truststore()
 
-        if tls_ca_chain := s3.tls_ca_chain:
-            with self.workload.get_certificate_file(IOMode.WRITE) as fid:
-                cert = "\n".join(tls_ca_chain)
-                fid.write(cert)  # type: ignore
-            self.tls.configure_truststore()
+        if s3:
+            if tls_ca_chain := s3.tls_ca_chain:
+                with self.workload.get_certificate_file(IOMode.WRITE) as fid:
+                    cert = "\n".join(tls_ca_chain)
+                    fid.write(cert)  # type: ignore
+                self.tls.configure_truststore()
 
         if status is not Status.ACTIVE.value:
             self.logger.info(f"Cannot start service because of status {status}")
