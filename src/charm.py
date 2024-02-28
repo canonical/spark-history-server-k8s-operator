@@ -30,6 +30,7 @@ from ops.model import StatusBase
 
 from config import SparkHistoryServerConfig
 from constants import CONTAINER, INGRESS_REL, OATHKEEPER_REL, PEBBLE_USER, S3_INTEGRATOR_REL
+from managers.tls import TLSManager
 from models import S3ConnectionInfo, Status, User
 from utils import WithLogging
 from workload import IOMode, SparkHistoryServer
@@ -63,14 +64,16 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
         self.framework.observe(self.ingress.on.revoked, self._on_ingress_revoked)
 
-        self.workload = SparkHistoryServer(
-            self.unit.get_container(CONTAINER), User(name=PEBBLE_USER[0], group=PEBBLE_USER[1])
-        )
-
         self.auth_proxy = AuthProxyRequirer(self, self.auth_proxy_config, OATHKEEPER_REL)
         self.framework.observe(
             self.auth_proxy.on.auth_proxy_relation_removed, self._on_auth_proxy_removed
         )
+
+        self.workload = SparkHistoryServer(
+            self.unit.get_container(CONTAINER), User(name=PEBBLE_USER[0], group=PEBBLE_USER[1])
+        )
+
+        self.tls = TLSManager(self, self.workload)
 
     @property
     def auth_proxy_config(self) -> Optional[AuthProxyConfig]:
@@ -92,14 +95,6 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         if len(relations) == 0:
             return False
         return True
-
-    @property
-    def s3_self_signed_cert_enable(self) -> bool:
-        """Return if self signed certificate is used."""
-        if self.s3_connection_info:
-            if self.s3_connection_info.tls_ca_chain:
-                return True
-        return False
 
     @property
     def s3_connection_info(self) -> Optional[S3ConnectionInfo]:
@@ -155,13 +150,13 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
 
         # remove truststore in case of ca chain update
         if self.workload.get_truststore_file(IOMode.READ).exists():
-            self.workload.remove_truststore()
+            self.tls.remove_truststore()
 
-        if self.s3_self_signed_cert_enable:
+        if tls_ca_chain := s3.tls_ca_chain:
             with self.workload.get_certificate_file(IOMode.WRITE) as fid:
-                cert = "\n".join(s3.tls_ca_chain)
+                cert = "\n".join(tls_ca_chain)
                 fid.write(cert)  # type: ignore
-            self.workload.configure_truststore()
+            self.tls.configure_truststore()
 
         if status is not Status.ACTIVE.value:
             self.logger.info(f"Cannot start service because of status {status}")

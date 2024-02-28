@@ -4,7 +4,6 @@
 
 """Module containing all business logic related to the workload."""
 
-import subprocess
 from abc import ABC, abstractmethod
 from enum import Enum
 from io import IOBase, StringIO
@@ -12,7 +11,6 @@ from io import IOBase, StringIO
 from ops.model import Container
 from ops.pebble import ExecError
 
-from constants import PEBBLE_USER
 from models import User
 from utils import WithLogging
 
@@ -115,11 +113,11 @@ class SparkHistoryServer(AbstractWorkload, WithLogging):
     SPARK_CONF = f"{SPARK_WORKDIR}/conf"
     SPARK_CERT = f"{SPARK_CONF}/ca.pem"
     SPARK_TRUSTSTORE = f"{SPARK_CONF}/truststore.jks"
-    SPARK_HISTORY_JAVA_PROPERTIES = ""
 
     def __init__(self, container: Container, user: User = User()):
         self.container = container
         self.user = user
+        self.spark_history_server_java_config = ""
 
     def get_spark_configuration_file(self, mode: IOMode) -> ContainerFile:
         """Return the configuration file for Spark History server."""
@@ -132,34 +130,6 @@ class SparkHistoryServer(AbstractWorkload, WithLogging):
     def get_truststore_file(self, mode: IOMode) -> ContainerFile:
         """Return the configuration file for Spark History server."""
         return ContainerFile(self.container, self.user, self.SPARK_TRUSTSTORE, mode)
-
-    def configure_truststore(self) -> None:
-        """Configure custom JVM truststore."""
-        command = f"keytool -import -v -alias ca -file {self.SPARK_CERT} -keystore {self.SPARK_TRUSTSTORE} -storepass changeit -noprompt"
-
-        try:
-            self.exec(command=command, working_dir=self.SPARK_CONF)
-            self.exec(f"chown -R {PEBBLE_USER[0]}:{PEBBLE_USER[1]} {self.SPARK_TRUSTSTORE}")
-            self.exec(f"chmod -R 770 {self.SPARK_TRUSTSTORE}")
-        except (subprocess.CalledProcessError, ExecError) as e:
-            # in case this reruns and fails
-            if e.stdout and "already exists" in e.stdout:
-                return
-            self.logger.error(e.stdout)
-            raise e
-        self.SPARK_HISTORY_JAVA_PROPERTIES = f"-Djavax.net.ssl.trustStore={self.SPARK_TRUSTSTORE} -Djavax.net.ssl.trustStorePassword=changeit"
-
-    def remove_truststore(self) -> None:
-        """Manage the removal of the truststore."""
-        try:
-            self.exec(f"rm -f {self.SPARK_TRUSTSTORE}")
-        except (subprocess.CalledProcessError, ExecError) as e:
-            # in case this reruns and fails
-            if e.stdout and "already exists" in e.stdout:
-                return
-            self.logger.error(e.stdout)
-            raise e
-        self.SPARK_HISTORY_JAVA_PROPERTIES = ""
 
     @property
     def _spark_history_server_layer(self):
@@ -174,7 +144,7 @@ class SparkHistoryServer(AbstractWorkload, WithLogging):
                     "startup": "enabled",
                     "environment": {
                         "SPARK_PROPERTIES_FILE": self.SPARK_PROPERTIES,
-                        "SPARK_HISTORY_OPTS": self.SPARK_HISTORY_JAVA_PROPERTIES,
+                        "SPARK_HISTORY_OPTS": self.spark_history_server_java_config,
                     },
                 }
             },
