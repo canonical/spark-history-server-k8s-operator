@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2023 Canonical Limited
+# Copyright 2024 Canonical Limited
 # See LICENSE file for licensing details.
 
 # Integration Tests TBD separately in next pulse
@@ -12,57 +12,18 @@ import urllib.request
 from pathlib import Path
 from time import sleep
 
-import boto3
 import pytest
 import yaml
-from botocore.client import Config
 from pytest_operator.plugin import OpsTest
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
-from .test_helpers import fetch_action_sync_s3_credentials
+from .test_helpers import fetch_action_sync_s3_credentials, setup_s3_bucket_for_history_server
 
 logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
 BUCKET_NAME = "history-server"
-
-
-def setup_s3_bucket_for_history_server(
-    endpoint_url: str, aws_access_key: str, aws_secret_key: str
-):
-    config = Config(connect_timeout=60, retries={"max_attempts": 0})
-    session = boto3.session.Session(
-        aws_access_key_id=aws_access_key, aws_secret_access_key=aws_secret_key
-    )
-    s3 = session.client("s3", endpoint_url=endpoint_url, config=config)
-    # delete test bucket and its content if it already exist
-    buckets = s3.list_buckets()
-    for bucket in buckets["Buckets"]:
-        bucket_name = bucket["Name"]
-        if bucket_name == BUCKET_NAME:
-            logger.info(f"Deleting bucket: {bucket_name}")
-            objects = s3.list_objects_v2(Bucket=BUCKET_NAME)["Contents"]
-            objs = [{"Key": x["Key"]} for x in objects]
-            s3.delete_objects(Bucket=BUCKET_NAME, Delete={"Objects": objs})
-            s3.delete_bucket(Bucket=BUCKET_NAME)
-
-    logger.info("create bucket in minio")
-    for i in range(0, 30):
-        try:
-            s3.create_bucket(Bucket=BUCKET_NAME)
-            break
-        except Exception as e:
-            if i >= 30:
-                logger.error(f"create bucket failed....exiting....\n{str(e)}")
-                raise
-            else:
-                logger.warning(f"create bucket failed....retrying in 10 secs.....\n{str(e)}")
-                sleep(10)
-                continue
-
-    s3.put_object(Bucket=BUCKET_NAME, Key=("spark-events/"))
-    logger.debug(s3.list_buckets())
 
 
 @pytest.mark.abort_on_fail
@@ -92,7 +53,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
         f"Setting up s3 bucket with endpoint_url={endpoint_url}, access_key={access_key}, secret_key={secret_key}"
     )
 
-    setup_s3_bucket_for_history_server(endpoint_url, access_key, secret_key)
+    setup_s3_bucket_for_history_server(endpoint_url, access_key, secret_key, BUCKET_NAME)
 
     logger.info("Bucket setup complete")
 

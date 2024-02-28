@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2023 Canonical Limited
+# Copyright 2024 Canonical Limited
 # See LICENSE file for licensing details.
 
 """Module containing all business logic related to the workload."""
@@ -9,6 +9,7 @@ from enum import Enum
 from io import IOBase, StringIO
 
 from ops.model import Container
+from ops.pebble import ExecError
 
 from models import User
 from utils import WithLogging
@@ -47,6 +48,13 @@ class AbstractWorkload(ABC):
     @abstractmethod
     def get_spark_configuration_file(self, mode: IOMode) -> IOBase:
         """Return the configuration file for Spark History server."""
+        ...
+
+    @abstractmethod
+    def exec(
+        self, command: str, env: dict[str, str] | None = None, working_dir: str | None = None
+    ) -> str:
+        """Runs a command on the workload substrate."""
         ...
 
 
@@ -102,14 +110,26 @@ class SparkHistoryServer(AbstractWorkload, WithLogging):
     CONTAINER_LAYER = "charm"
     HISTORY_SERVER_SERVICE = "history-server"
     SPARK_PROPERTIES = f"{SPARK_WORKDIR}/conf/spark-properties.conf"
+    SPARK_CONF = f"{SPARK_WORKDIR}/conf"
+    SPARK_CERT = f"{SPARK_CONF}/ca.pem"
+    SPARK_TRUSTSTORE = f"{SPARK_CONF}/truststore.jks"
 
     def __init__(self, container: Container, user: User = User()):
         self.container = container
         self.user = user
+        self.spark_history_server_java_config = ""
 
     def get_spark_configuration_file(self, mode: IOMode) -> ContainerFile:
         """Return the configuration file for Spark History server."""
         return ContainerFile(self.container, self.user, self.SPARK_PROPERTIES, mode)
+
+    def get_certificate_file(self, mode: IOMode) -> ContainerFile:
+        """Return the configuration file for Spark History server."""
+        return ContainerFile(self.container, self.user, self.SPARK_CERT, mode)
+
+    def get_truststore_file(self, mode: IOMode) -> ContainerFile:
+        """Return the configuration file for Spark History server."""
+        return ContainerFile(self.container, self.user, self.SPARK_TRUSTSTORE, mode)
 
     @property
     def _spark_history_server_layer(self):
@@ -122,7 +142,10 @@ class SparkHistoryServer(AbstractWorkload, WithLogging):
                     "override": "merge",
                     "summary": "spark history server",
                     "startup": "enabled",
-                    "environment": {"SPARK_PROPERTIES_FILE": self.SPARK_PROPERTIES},
+                    "environment": {
+                        "SPARK_PROPERTIES_FILE": self.SPARK_PROPERTIES,
+                        "SPARK_HISTORY_OPTS": self.spark_history_server_java_config,
+                    },
                 }
             },
         }
@@ -158,6 +181,20 @@ class SparkHistoryServer(AbstractWorkload, WithLogging):
         # Push an updated layer with the new config
         # self.container.replan()
         self.container.restart(self.HISTORY_SERVER_SERVICE)
+
+    def exec(
+        self, command: str, env: dict[str, str] | None = None, working_dir: str | None = None
+    ) -> str:
+        """Execute command in the container."""
+        try:
+            process = self.container.exec(
+                command=command.split(), environment=env, working_dir=working_dir
+            )
+            output, _ = process.wait_output()
+            return output
+        except ExecError as e:
+            self.logger.error(str(e.stderr))
+            raise e
 
     def stop(self):
         """Execute business-logic for stopping the workload."""

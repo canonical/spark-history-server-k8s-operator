@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2023 Canonical Limited
+# Copyright 2024 Canonical Limited
 # See LICENSE file for licensing details.
 
 """Spark History Server configuration."""
@@ -21,10 +21,23 @@ class SparkHistoryServerConfig(WithLogging):
         self.ingress_url = ingress_url
 
     _base_conf: dict[str, str] = {
-        "spark.hadoop.fs.s3a.connection.ssl.enabled": "false",
         "spark.hadoop.fs.s3a.path.style.access": "true",
         "spark.eventLog.enabled": "true",
     }
+
+    def _ssl_enabled(self) -> str:
+        """Check if ssl is enabled."""
+        if self.s3_connection_info:
+            if not self.s3_connection_info.endpoint:
+                return "true"
+            else:
+                if (
+                    self.s3_connection_info.endpoint.startswith("https:")
+                    or ":443" in self.s3_connection_info.endpoint
+                ):
+                    return "true"
+
+        return "false"
 
     @property
     def _ingress_proxy_conf(self) -> dict[str, str]:
@@ -39,8 +52,8 @@ class SparkHistoryServerConfig(WithLogging):
 
     @property
     def _s3_conf(self) -> dict[str, str]:
-        return (
-            {
+        if self.s3_connection_info:
+            return {
                 "spark.hadoop.fs.s3a.endpoint": self.s3_connection_info.endpoint
                 or "https://s3.amazonaws.com",
                 "spark.hadoop.fs.s3a.access.key": self.s3_connection_info.access_key,
@@ -48,10 +61,9 @@ class SparkHistoryServerConfig(WithLogging):
                 "spark.eventLog.dir": self.s3_connection_info.log_dir,
                 "spark.history.fs.logDirectory": self.s3_connection_info.log_dir,
                 "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
+                "spark.hadoop.fs.s3a.connection.ssl.enabled": self._ssl_enabled,  # type: ignore
             }
-            if self.s3_connection_info
-            else {}
-        )
+        return {}
 
     def to_dict(self) -> dict[str, str]:
         """Return the dict representation of the configuration file."""

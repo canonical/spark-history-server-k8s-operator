@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-# Copyright 2023 Canonical Limited
+# Copyright 2024 Canonical Limited
 # See LICENSE file for licensing details.
 
 """Module with all domain specific objects used by the charm."""
 
-from dataclasses import dataclass
+import tempfile
+from dataclasses import dataclass, fields
 from enum import Enum
 from functools import cached_property
+from typing import List
 
 import boto3
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, SSLError
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
 from utils import WithLogging
@@ -32,6 +34,17 @@ class S3ConnectionInfo(WithLogging):
     secret_key: str
     path: str
     bucket: str
+    tls_ca_chain: List[str] | None
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "S3ConnectionInfo":
+        """Return the instance of S3ConnectionInfo dataclass from a dictionary."""
+        field_names = {field.name for field in fields(cls)}
+        data = {k: v for k, v in d.items() if k in field_names}
+        missing_fields = field_names.difference(set(data.keys()))
+        for missing_field in missing_fields:
+            data[missing_field] = None
+        return cls(**data)
 
     @property
     def log_dir(self) -> str:
@@ -48,13 +61,34 @@ class S3ConnectionInfo(WithLogging):
 
     def verify(self) -> bool:
         """Verify S3 credentials."""
-        s3 = self.session.client("s3", endpoint_url=self.endpoint or "https://s3.amazonaws.com")
+        tls_ca_chain_file = None
+        if self.tls_ca_chain:
+            ca_file = tempfile.NamedTemporaryFile()
+            ca = "\n".join(self.tls_ca_chain)
+            ca_file.write(ca.encode())
+            ca_file.flush()
+            tls_ca_chain_file = ca_file.name
+
+        s3 = self.session.client(
+            "s3",
+            endpoint_url=self.endpoint or "https://s3.amazonaws.com",
+            verify=tls_ca_chain_file,
+        )
 
         try:
             s3.list_buckets()
         except ClientError:
             self.logger.error("Invalid S3 credentials...")
             return False
+        except SSLError:
+            self.logger.error("SSL validation failed...")
+            return False
+        except Exception as e:
+            self.logger.error(f"S3 related error {e}")
+            return False
+        finally:
+            if self.tls_ca_chain:
+                ca_file.close()
 
         return True
 

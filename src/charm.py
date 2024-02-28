@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2023 Canonical Limited
+# Copyright 2024 Canonical Limited
 # See LICENSE file for licensing details.
 
 """Charmed Kubernetes Operator for Apache Spark History Server."""
@@ -30,6 +30,7 @@ from ops.model import StatusBase
 
 from config import SparkHistoryServerConfig
 from constants import CONTAINER, INGRESS_REL, OATHKEEPER_REL, PEBBLE_USER, S3_INTEGRATOR_REL
+from managers.tls import TLSManager
 from models import S3ConnectionInfo, Status, User
 from utils import WithLogging
 from workload import IOMode, SparkHistoryServer
@@ -63,14 +64,16 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
         self.framework.observe(self.ingress.on.revoked, self._on_ingress_revoked)
 
-        self.workload = SparkHistoryServer(
-            self.unit.get_container(CONTAINER), User(name=PEBBLE_USER[0], group=PEBBLE_USER[1])
-        )
-
         self.auth_proxy = AuthProxyRequirer(self, self.auth_proxy_config, OATHKEEPER_REL)
         self.framework.observe(
             self.auth_proxy.on.auth_proxy_relation_removed, self._on_auth_proxy_removed
         )
+
+        self.workload = SparkHistoryServer(
+            self.unit.get_container(CONTAINER), User(name=PEBBLE_USER[0], group=PEBBLE_USER[1])
+        )
+
+        self.tls = TLSManager(self, self.workload)
 
     @property
     def auth_proxy_config(self) -> Optional[AuthProxyConfig]:
@@ -100,9 +103,8 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
             return None
 
         raw = self.s3_requirer.get_s3_connection_info()
-
-        return S3ConnectionInfo(
-            **{key.replace("-", "_"): value for key, value in raw.items() if key != "data"}
+        return S3ConnectionInfo.from_dict(
+            {key.replace("-", "_"): value for key, value in raw.items() if key != "data"}
         )
 
     def get_status(
@@ -145,6 +147,17 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         with self.workload.get_spark_configuration_file(IOMode.WRITE) as fid:
             spark_config = SparkHistoryServerConfig(s3, ingress_url)
             fid.write(spark_config.contents)
+
+        # remove truststore in case of ca chain update
+        if self.workload.get_truststore_file(IOMode.READ).exists():
+            self.tls.remove_truststore()
+
+        if s3:
+            if tls_ca_chain := s3.tls_ca_chain:
+                with self.workload.get_certificate_file(IOMode.WRITE) as fid:
+                    cert = "\n".join(tls_ca_chain)
+                    fid.write(cert)  # type: ignore
+                self.tls.configure_truststore()
 
         if status is not Status.ACTIVE.value:
             self.logger.info(f"Cannot start service because of status {status}")
