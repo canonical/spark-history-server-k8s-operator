@@ -1,7 +1,7 @@
 from enum import Enum
 
 from ops import (
-    Object, CharmBase, Relation, ModelError,
+    CharmBase, Relation, ModelError,
     MaintenanceStatus, ActiveStatus, BlockedStatus
 )
 
@@ -10,7 +10,6 @@ from charms.oathkeeper.v0.auth_proxy import AuthProxyConfig
 from charms.traefik_k8s.v2.ingress import IngressUrl, IngressProviderAppData
 from common.utils import WithLogging
 from core.domain import S3ConnectionInfo
-from common.models import DataDict
 
 S3 = "s3"
 INGRESS = "ingress"
@@ -27,7 +26,8 @@ class State(WithLogging):
         self.charm = charm
         self.model = charm.model
 
-        self.s3_endpoint = DataRequires(self.charm, S3)
+        self.s3_endpoint = DataRequires(self.charm,
+                                        S3)  # TODO: It would be nice if we had something that is more general (e.g. without extra-user-roles)
 
     # --------------
     # --- CONFIG ---
@@ -68,7 +68,7 @@ class State(WithLogging):
     def s3(self) -> S3ConnectionInfo | None:
         """The server state of the current running Unit."""
         return S3ConnectionInfo.from_dict(
-            DataDict(self.s3_endpoint, _id)
+            self.s3_endpoint.as_dict(_id)
         ) if (_id := self._s3_relation_id) else None
 
     @property

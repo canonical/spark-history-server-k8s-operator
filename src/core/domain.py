@@ -1,6 +1,5 @@
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 from typing import List
-from common.models import DataDict
 
 @dataclass
 class User:
