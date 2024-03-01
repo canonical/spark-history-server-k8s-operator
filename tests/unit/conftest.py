@@ -82,6 +82,7 @@ def s3_relation():
         },
     )
 
+
 @pytest.fixture
 def s3_relation_tls():
     """Provide fixture for the S3 relation."""
@@ -100,10 +101,9 @@ def s3_relation_tls():
             "endpoint": "https://s3.endpoint",
             "path": "spark-events",
             "secret-key": "secret-key",
-            "tls-ca-chain": '["certificate"]'
+            "tls-ca-chain": '["certificate"]',
         },
     )
-
 
 
 @pytest.fixture

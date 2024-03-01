@@ -59,8 +59,8 @@ class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
 
     def start(self):
         """Execute business-logic for starting the workload."""
-        services = self.container.get_plan().services
-
+        # services = self.container.get_plan().services
+        #
         # ===============
         # THIS IS WORKING
         # ===============

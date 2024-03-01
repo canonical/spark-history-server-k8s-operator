@@ -63,13 +63,14 @@ def test_s3_relation_connection_ok(
     assert len(out.get_container(CONTAINER).layers) == 2
 
     # Check that "SPARK_HISTORY_OPTS" is not in the envs
-    envs = out\
-        .get_container(CONTAINER)\
-        .layers["spark-history-server"]\
-        .services["history-server"]\
+    envs = (
+        out.get_container(CONTAINER)
+        .layers["spark-history-server"]
+        .services["history-server"]
         .environment
+    )
 
-    assert "SPARK_HISTORY_OPTS"  in envs
+    assert "SPARK_HISTORY_OPTS" in envs
     assert "SPARK_PROPERTIES_FILE" in envs
 
     spark_properties = parse_spark_properties(out, tmp_path)
@@ -84,8 +85,13 @@ def test_s3_relation_connection_ok(
 @patch("managers.s3.S3Manager.verify", return_value=True)
 @patch("workload.SparkHistoryServer.exec")
 def test_s3_relation_connection_ok_tls(
-        exec_calls, verify_call, tmp_path, history_server_ctx,
-        history_server_container, s3_relation_tls, s3_relation
+    exec_calls,
+    verify_call,
+    tmp_path,
+    history_server_ctx,
+    history_server_container,
+    s3_relation_tls,
+    s3_relation,
 ):
     state = State(
         relations=[s3_relation_tls],
@@ -98,22 +104,23 @@ def test_s3_relation_connection_ok_tls(
     assert len(inter.get_container(CONTAINER).layers) == 2
 
     # Check that "SPARK_HISTORY_OPTS" is not in the envs
-    envs = inter\
-        .get_container(CONTAINER)\
-        .layers["spark-history-server"]\
-        .services["history-server"]\
+    envs = (
+        inter.get_container(CONTAINER)
+        .layers["spark-history-server"]
+        .services["history-server"]
         .environment
+    )
 
     assert "SPARK_HISTORY_OPTS" in envs
-    assert len(envs["SPARK_HISTORY_OPTS"])>0
+    assert len(envs["SPARK_HISTORY_OPTS"]) > 0
 
     spark_properties = parse_spark_properties(inter, tmp_path)
 
     # Assert one of the keys
     assert "spark.hadoop.fs.s3a.endpoint" in spark_properties
     assert (
-        spark_properties["spark.hadoop.fs.s3a.endpoint"] ==
-        s3_relation_tls.remote_app_data["endpoint"]
+        spark_properties["spark.hadoop.fs.s3a.endpoint"]
+        == s3_relation_tls.remote_app_data["endpoint"]
     )
 
     out = history_server_ctx.run(
@@ -123,11 +130,12 @@ def test_s3_relation_connection_ok_tls(
     assert len(out.get_container(CONTAINER).layers) == 2
 
     # Check that "SPARK_HISTORY_OPTS" is not in the envs
-    envs = out\
-        .get_container(CONTAINER)\
-        .layers["spark-history-server"]\
-        .services["history-server"]\
+    envs = (
+        out.get_container(CONTAINER)
+        .layers["spark-history-server"]
+        .services["history-server"]
         .environment
+    )
 
     assert "SPARK_HISTORY_OPTS" in envs
     assert len(envs["SPARK_HISTORY_OPTS"]) == 0
