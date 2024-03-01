@@ -92,6 +92,9 @@ class HistoryServerManager(WithLogging):
         config = HistoryServerConfig(s3, ingress)
 
         self.workload.write(config.contents, str(self.workload.paths.spark_properties))
+        self.workload.set_environment(
+            {"SPARK_PROPERTIES_FILE": str(self.workload.paths.spark_properties)}
+        )
 
         self.tls.reset()
 
@@ -100,5 +103,11 @@ class HistoryServerManager(WithLogging):
 
         if tls_ca_chain := s3.tls_ca_chain:
             self.tls.import_ca("\n".join(tls_ca_chain))
+            self.workload.set_environment(
+                {
+                    "SPARK_HISTORY_OPTS": f"-Djavax.net.ssl.trustStore={self.workload.paths.truststore} "
+                    f"-Djavax.net.ssl.trustStorePassword={self.tls.truststore_password}"
+                }
+            )
 
         self.workload.start()

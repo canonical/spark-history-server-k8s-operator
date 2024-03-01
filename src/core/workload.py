@@ -48,6 +48,11 @@ class SparkHistoryWorkloadBase(AbstractWorkload):
         self.start()
 
     @abstractmethod
+    def set_environment(self, env: dict[str, str]):
+        """Set the environment."""
+        ...
+
+    @abstractmethod
     def active(self) -> bool:
         """Checks that the workload is active."""
         ...

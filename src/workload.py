@@ -13,20 +13,33 @@ from core.workload import HistoryServerPaths, SparkHistoryWorkloadBase
 
 
 class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
-    """Class representing Workload implementation for Spark History server on K8s."""
+    """Class representing Workload implementation for History Server on K8s."""
 
     CONTAINER = "spark-history-server"
     CONTAINER_LAYER = "spark-history-server"
 
     HISTORY_SERVER_SERVICE = "history-server"
 
+    CONFS_PATH = "/etc/spark/conf"
+    ENV_FILE = "/etc/spark/environment"
+
     def __init__(self, container: Container, user: User):
         self.container = container
         self.user = user
 
-        self.paths = HistoryServerPaths("/etc/spark/conf", "keytool")
+        self.paths = HistoryServerPaths(conf_path=self.CONFS_PATH, keytool="keytool")
 
-        self.spark_history_server_java_config = ""
+        self._envs = None
+
+    @property
+    def envs(self):
+        """Return current environment."""
+        if self._envs is not None:
+            return self._envs
+
+        self._envs = self.from_env(self.read(self.ENV_FILE)) if self.exists(self.ENV_FILE) else {}
+
+        return self.envs
 
     @property
     def _spark_history_server_layer(self):
@@ -39,10 +52,7 @@ class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
                     "override": "merge",
                     "summary": "spark history server",
                     "startup": "enabled",
-                    "environment": {
-                        "SPARK_PROPERTIES_FILE": self.paths.spark_properties,
-                        # "SPARK_HISTORY_OPTS": self.spark_history_server_java_config,
-                    },
+                    "environment": self.envs,
                 }
             },
         }
@@ -94,3 +104,11 @@ class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
             return False
 
         return service.is_running()
+
+    def set_environment(self, envs: dict[str, str]):
+        """Set environment for workload."""
+        merged_envs = self.envs | envs
+
+        self._envs = {k: v for k, v in merged_envs.items() if v is not None}
+
+        self.write("\n".join(self.to_env(self.envs)), self.ENV_FILE)
