@@ -48,7 +48,7 @@ class SparkHistoryWorkloadBase(AbstractWorkload):
         self.start()
 
     @abstractmethod
-    def set_environment(self, env: dict[str, str]):
+    def set_environment(self, env: dict[str, str | None]):
         """Set the environment."""
         ...
 

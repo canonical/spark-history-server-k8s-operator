@@ -109,5 +109,7 @@ class HistoryServerManager(WithLogging):
                     f"-Djavax.net.ssl.trustStorePassword={self.tls.truststore_password}"
                 }
             )
+        else:
+            self.workload.set_environment({"SPARK_HISTORY_OPTS": ""})
 
         self.workload.start()

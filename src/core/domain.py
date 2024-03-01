@@ -6,7 +6,7 @@
 
 from dataclasses import dataclass
 from typing import List
-
+import json
 
 @dataclass
 class User:
@@ -50,7 +50,8 @@ class S3ConnectionInfo:
     @property
     def tls_ca_chain(self) -> List[str] | None:
         """Return the CA chain (when applicable)."""
-        return self._data["tls-ca-chain"]
+        return json.loads(ca_chain) \
+            if (ca_chain := self._data.get("tls-ca-chain", "")) else None
 
     @property
     def log_dir(self) -> str:

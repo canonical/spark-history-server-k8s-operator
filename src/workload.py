@@ -49,7 +49,7 @@ class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
             "description": "pebble config layer for spark history server",
             "services": {
                 self.HISTORY_SERVER_SERVICE: {
-                    "override": "merge",
+                    "override": "replace",
                     "summary": "spark history server",
                     "startup": "enabled",
                     "environment": self.envs,
@@ -64,19 +64,19 @@ class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
         # ===============
         # THIS IS WORKING
         # ===============
-        if services[self.HISTORY_SERVER_SERVICE].startup != "enabled":
-            self.logger.info("Adding layer...")
-            self.container.add_layer(
-                self.CONTAINER_LAYER, self._spark_history_server_layer, combine=True
-            )
+        # if services[self.HISTORY_SERVER_SERVICE].startup != "enabled":
+        #     self.logger.info("Adding layer...")
+        #     self.container.add_layer(
+        #         self.CONTAINER_LAYER, self._spark_history_server_layer, combine=True
+        #     )
         # ===============
 
         # ===============
         # THIS WOULD NOT BE WORKING
         # ===============
-        # self.container.add_layer(
-        #     self.CONTAINER_LAYER, self._spark_history_server_layer, combine=True
-        # )
+        self.container.add_layer(
+            self.CONTAINER_LAYER, self._spark_history_server_layer, combine=True
+        )
         # ===============
 
         if not self.exists(str(self.paths.spark_properties)):
@@ -105,7 +105,7 @@ class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
 
         return service.is_running()
 
-    def set_environment(self, envs: dict[str, str]):
+    def set_environment(self, envs: dict[str, str | None]):
         """Set environment for workload."""
         merged_envs = self.envs | envs
 
