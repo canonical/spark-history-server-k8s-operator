@@ -19,13 +19,13 @@ OATHKEEPER = "auth-proxy"
 AUTH_PROXY_HEADERS = ["X-User"]
 
 
-class State(Object, WithLogging):
+class State(WithLogging):
     """Properties and relations of the charm."""
 
     def __init__(self, charm: CharmBase):
-        super().__init__(parent=charm, key="charm_state")
 
         self.charm = charm
+        self.model = charm.model
 
         self.s3_endpoint = DataRequires(self.charm, S3)
 
