@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+# Copyright 2024 Canonical Limited
+# See LICENSE file for licensing details.
+
+"""Domain object of the Spark History Server charm."""
+
 from dataclasses import dataclass
 from typing import List
 
@@ -18,31 +24,37 @@ class S3ConnectionInfo:
 
     @property
     def endpoint(self) -> str | None:
+        """Return endpoint of the S3 bucket."""
         return self._data.get("endpoint", None)
 
     @property
     def access_key(self) -> str:
+        """Return the access key."""
         return self._data["access-key"]
 
     @property
     def secret_key(self) -> str:
+        """Return the secret key."""
         return self._data["secret-key"]
 
     @property
     def path(self) -> str:
+        """Return the path in the S3 bucket."""
         return self._data["path"]
 
     @property
     def bucket(self) -> str:
+        """Return the name of the S3 bucket."""
         return self._data["bucket"]
 
     @property
     def tls_ca_chain(self) -> List[str] | None:
+        """Return the CA chain (when applicable)."""
         return self._data["tls-ca-chain"]
 
     @property
     def log_dir(self) -> str:
-        """Return the path to the bucket."""
+        """Return the full path to the object."""
         return f"s3a://{self.bucket}/{self.path}"
 
     @classmethod

@@ -24,9 +24,7 @@ class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
         self.container = container
         self.user = user
 
-        self.paths = HistoryServerPaths(
-            "/etc/spark/conf", "keytool"
-        )
+        self.paths = HistoryServerPaths("/etc/spark/conf", "keytool")
 
         self.spark_history_server_java_config = ""
 
@@ -59,8 +57,7 @@ class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
         if services[self.HISTORY_SERVER_SERVICE].startup != "enabled":
             self.logger.info("Adding layer...")
             self.container.add_layer(
-                self.CONTAINER_LAYER, self._spark_history_server_layer,
-                combine=True
+                self.CONTAINER_LAYER, self._spark_history_server_layer, combine=True
             )
         # ===============
 

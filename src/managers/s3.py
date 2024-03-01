@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+# Copyright 2024 Canonical Limited
+# See LICENSE file for licensing details.
+
+"""S3 manager."""
+
 import tempfile
 from functools import cached_property
 
@@ -9,6 +15,7 @@ from core.domain import S3ConnectionInfo
 
 
 class S3Manager(WithLogging):
+    """Class exposing business logic for interacting with S3 service."""
 
     def __init__(self, config: S3ConnectionInfo):
         self.config = config

@@ -14,9 +14,9 @@ def parse_spark_properties(out: State, tmp_path: Path) -> dict[str, str]:
 
     spark_properties_path = (
         out.get_container(CONTAINER)
-            .layers["base"]
-            .services["history-server"]
-            .environment["SPARK_PROPERTIES_FILE"]
+        .layers["base"]
+        .services["history-server"]
+        .environment["SPARK_PROPERTIES_FILE"]
     )
 
     file_path = tmp_path / Path(spark_properties_path).relative_to("/etc")
@@ -128,7 +128,13 @@ def test_ingress_relation_creation(
 @patch("managers.s3.S3Manager.verify", return_value=True)
 @patch("workload.SparkHistoryServer.exec")
 def test_with_ingress(
-    exec_calls, verify_call, tmp_path, history_server_ctx, history_server_container, ingress_relation, s3_relation
+    exec_calls,
+    verify_call,
+    tmp_path,
+    history_server_ctx,
+    history_server_container,
+    ingress_relation,
+    s3_relation,
 ):
     state = State(
         relations=[s3_relation, ingress_relation],
@@ -147,7 +153,13 @@ def test_with_ingress(
 @patch("managers.s3.S3Manager.verify", return_value=True)
 @patch("workload.SparkHistoryServer.exec")
 def test_remove_ingress(
-    exec_calls, verify_call, tmp_path, history_server_ctx, history_server_container, ingress_relation, s3_relation
+    exec_calls,
+    verify_call,
+    tmp_path,
+    history_server_ctx,
+    history_server_container,
+    ingress_relation,
+    s3_relation,
 ):
     state = State(
         relations=[s3_relation, ingress_relation],

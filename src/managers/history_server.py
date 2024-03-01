@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+# Copyright 2024 Canonical Limited
+# See LICENSE file for licensing details.
+
+"""History Server manager."""
+
 import re
 
 from common.utils import WithLogging
@@ -7,6 +13,8 @@ from managers.tls import TLSManager
 
 
 class HistoryServerConfig(WithLogging):
+    """Class representing the Spark Properties configuration file."""
+
     _ingress_pattern = re.compile("http://.*?/|https://.*?/")
 
     _base_conf: dict[str, str] = {
@@ -14,20 +22,14 @@ class HistoryServerConfig(WithLogging):
         "spark.eventLog.enabled": "true",
     }
 
-    def __init__(
-            self, s3: S3ConnectionInfo | None, ingress: IngressUrl | None
-    ):
+    def __init__(self, s3: S3ConnectionInfo | None, ingress: IngressUrl | None):
         self.s3 = s3
         self.ingress = ingress
 
     @staticmethod
     def _ssl_enabled(endpoint: str | None) -> str:
         """Check if ssl is enabled."""
-        if (
-                not endpoint or
-                endpoint.startswith("https:") or
-                ":443" in endpoint
-        ):
+        if not endpoint or endpoint.startswith("https:") or ":443" in endpoint:
             return "true"
 
         return "false"
@@ -36,10 +38,8 @@ class HistoryServerConfig(WithLogging):
     def _ingress_proxy_conf(self) -> dict[str, str]:
         return (
             {
-                "spark.ui.proxyBase": self._ingress_pattern.sub("/",
-                                                                ingress.url),
-                "spark.ui.proxyRedirectUri": self._ingress_pattern.match(
-                    ingress.url).group(),
+                "spark.ui.proxyBase": self._ingress_pattern.sub("/", ingress.url),
+                "spark.ui.proxyRedirectUri": self._ingress_pattern.match(ingress.url).group(),
             }
             if (ingress := self.ingress)
             else {}
@@ -55,8 +55,7 @@ class HistoryServerConfig(WithLogging):
                 "spark.eventLog.dir": s3.log_dir,
                 "spark.history.fs.logDirectory": s3.log_dir,
                 "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-                "spark.hadoop.fs.s3a.connection.ssl.enabled": self._ssl_enabled(
-                    s3.endpoint),
+                "spark.hadoop.fs.s3a.connection.ssl.enabled": self._ssl_enabled(s3.endpoint),
             }
         return {}
 
@@ -79,25 +78,20 @@ class HistoryServerConfig(WithLogging):
 
 
 class HistoryServerManager(WithLogging):
+    """Class exposing general functionalities of the SparkHistoryServer workload."""
 
-    def __init__(
-            self, workload: SparkHistoryWorkloadBase
-    ):
+    def __init__(self, workload: SparkHistoryWorkloadBase):
         self.workload = workload
 
         self.tls = TLSManager(workload)
 
-    def update(
-            self, s3: S3ConnectionInfo | None, ingress: IngressUrl | None
-    ) -> None:
+    def update(self, s3: S3ConnectionInfo | None, ingress: IngressUrl | None) -> None:
         """Update the Spark History server service if needed."""
         self.workload.stop()
 
         config = HistoryServerConfig(s3, ingress)
 
-        self.workload.write(
-            config.contents, str(self.workload.paths.spark_properties)
-        )
+        self.workload.write(config.contents, str(self.workload.paths.spark_properties))
 
         self.tls.reset()
 

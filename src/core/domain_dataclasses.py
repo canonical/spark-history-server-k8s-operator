@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+# Copyright 2024 Canonical Limited
+# See LICENSE file for licensing details.
+
+"""Domain object of the Spark History Server charm."""
+
 from dataclasses import dataclass, fields
 from typing import List
 

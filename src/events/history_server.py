@@ -2,7 +2,7 @@
 # Copyright 2024 Canonical Limited
 # See LICENSE file for licensing details.
 
-"""Charmed Kubernetes Operator for Apache Spark History Server."""
+"""Spark History Server workload related event handlers."""
 
 from ops.charm import CharmBase, InstallEvent
 
@@ -14,11 +14,9 @@ from managers.history_server import HistoryServerManager
 
 
 class HistoryServerEvents(BaseEventHandler, WithLogging):
-    """Charm the service."""
+    """Class implementing Spark History Server event hooks."""
 
-    def __init__(self, charm: CharmBase,
-                 state: State, workload: SparkHistoryWorkloadBase
-                 ):
+    def __init__(self, charm: CharmBase, state: State, workload: SparkHistoryWorkloadBase):
         super().__init__(charm, "history-server")
 
         self.charm = charm

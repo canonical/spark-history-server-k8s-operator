@@ -1,7 +1,14 @@
+#!/usr/bin/env python3
+# Copyright 2024 Canonical Limited
+# See LICENSE file for licensing details.
+
+"""Base Abstract classes for the workload."""
+
 from abc import ABC, abstractmethod
 
 
 class AbstractWorkload(ABC):
+    """Base Abstract class representing the workload."""
 
     @abstractmethod
     def start(self) -> None:
@@ -15,8 +22,7 @@ class AbstractWorkload(ABC):
 
     @abstractmethod
     def exec(
-            self, command: str, env: dict[str, str] | None = None,
-            working_dir: str | None = None
+        self, command: str, env: dict[str, str] | None = None, working_dir: str | None = None
     ) -> str:
         """Runs a command on the workload substrate."""
         ...
@@ -49,5 +55,5 @@ class AbstractWorkload(ABC):
         """Check for file existence.
 
         Args:
-            path: the full filepath to write to
+            path: the full filepath to be checked for
         """

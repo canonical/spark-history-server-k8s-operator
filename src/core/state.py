@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+# Copyright 2024 Canonical Limited
+# See LICENSE file for licensing details.
+
+"""Charm State definition and parsing logic."""
+
 from enum import Enum
 
 from charms.data_platform_libs.v0.data_interfaces import DataRequires
@@ -23,13 +29,14 @@ class State(WithLogging):
         self.charm = charm
         self.model = charm.model
 
-        self.s3_endpoint = DataRequires(self.charm,
-                                        S3)  # TODO: It would be nice if we had something that is more general (e.g. without extra-user-roles)
+        self.s3_endpoint = DataRequires(
+            self.charm, S3
+        )  # TODO: It would be nice if we had something that is more general (e.g. without extra-user-roles)
 
     # --------------
     # --- CONFIG ---
     # --------------
-    # We don't have config yet in SHS
+    # We don't have config yet in the Spark History Server charm.
     # --------------
 
     # -----------------
@@ -39,8 +46,7 @@ class State(WithLogging):
     @property
     def _s3_relation_id(self) -> int | None:
         """The S3 relation."""
-        return relation.id if (relation := self.charm.model.get_relation(S3)) \
-            else None
+        return relation.id if (relation := self.charm.model.get_relation(S3)) else None
 
     @property
     def _ingress_relation(self) -> Relation | None:
@@ -64,12 +70,15 @@ class State(WithLogging):
     @property
     def s3(self) -> S3ConnectionInfo | None:
         """The server state of the current running Unit."""
-        return S3ConnectionInfo.from_dict(
-            self.s3_endpoint.as_dict(_id)
-        ) if (_id := self._s3_relation_id) else None
+        return (
+            S3ConnectionInfo.from_dict(self.s3_endpoint.as_dict(_id))
+            if (_id := self._s3_relation_id)
+            else None
+        )
 
     @property
     def ingress(self) -> IngressUrl | None:
+        """Return the Ingress information when available."""
         relation = self._ingress_relation
         if not relation or not relation.app:
             return None

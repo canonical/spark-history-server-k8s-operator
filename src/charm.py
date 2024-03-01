@@ -26,8 +26,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         state = State(self)
 
         workload = SparkHistoryServer(
-            self.unit.get_container(CONTAINER),
-            User(name=PEBBLE_USER[0], group=PEBBLE_USER[1])
+            self.unit.get_container(CONTAINER), User(name=PEBBLE_USER[0], group=PEBBLE_USER[1])
         )
 
         self.ingress = IngressEvents(self, state, workload)
