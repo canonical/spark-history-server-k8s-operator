@@ -1,5 +1,3 @@
-from ops import CharmBase
-
 from charms.oathkeeper.v0.auth_proxy import (
     AuthProxyRelationRemovedEvent,
     AuthProxyRequirer,
@@ -9,8 +7,10 @@ from charms.traefik_k8s.v2.ingress import (
     IngressPerAppRequirer,
     IngressPerAppRevokedEvent,
 )
+from ops import CharmBase
+
 from common.utils import WithLogging
-from core.state import State, INGRESS, OATHKEEPER
+from core.state import INGRESS, OATHKEEPER, State
 from core.workload import SparkHistoryWorkloadBase
 from events.base import BaseEventHandler, compute_status
 from managers.history_server import HistoryServerManager
@@ -62,15 +62,23 @@ class IngressEvents(BaseEventHandler, WithLogging):
             self.history_server.update(self.state.s3, None)
         )
 
-        self.charm.app.status = self.get_app_status(
-            None, self.state.ingress, self.state.auth_proxy_config
+        self.charm.unit.status = self.get_app_status(
+            self.state.s3, None, self.state.auth_proxy_config
         )
+        if self.charm.unit.is_leader():
+            self.charm.app.status = self.get_app_status(
+                self.state.s3, None, self.state.auth_proxy_config
+            )
 
     def _on_auth_proxy_removed(self, _: AuthProxyRelationRemovedEvent):
         """Handle the removal of the AuthProxy."""
         self.logger.info("AuthProxy configuration gone")
         self.history_server.update(self.state.s3, self.state.ingress)
 
-        self.charm.app.status = self.get_app_status(
-            None, self.state.ingress, self.state.auth_proxy_config
+        self.charm.unit.status = self.get_app_status(
+            self.state.s3, self.state.ingress, None
         )
+        if self.charm.unit.is_leader():
+            self.charm.app.status = self.get_app_status(
+                self.state.s3, self.state.ingress, None
+            )

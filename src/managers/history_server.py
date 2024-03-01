@@ -91,11 +91,7 @@ class HistoryServerManager(WithLogging):
             self, s3: S3ConnectionInfo | None, ingress: IngressUrl | None
     ) -> None:
         """Update the Spark History server service if needed."""
-
         self.workload.stop()
-
-        if not s3:
-            return
 
         config = HistoryServerConfig(s3, ingress)
 
@@ -104,6 +100,9 @@ class HistoryServerManager(WithLogging):
         )
 
         self.tls.reset()
+
+        if not s3:
+            return
 
         if tls_ca_chain := s3.tls_ca_chain:
             self.tls.import_ca("\n".join(tls_ca_chain))

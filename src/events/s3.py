@@ -1,10 +1,10 @@
-from ops import CharmBase
-
 from charms.data_platform_libs.v0.s3 import (
     CredentialsChangedEvent,
     CredentialsGoneEvent,
     S3Requirer,
 )
+from ops import CharmBase
+
 from common.utils import WithLogging
 from core.state import State
 from core.workload import SparkHistoryWorkloadBase
@@ -26,7 +26,7 @@ class S3Events(BaseEventHandler, WithLogging):
         self.history_server = HistoryServerManager(self.workload)
 
         self.s3_requirer = S3Requirer(
-            charm, self.state.s3_endpoint.relation_name
+            self.charm, self.state.s3_endpoint.relation_name
         )
         self.framework.observe(
             self.s3_requirer.on.credentials_changed,
@@ -47,6 +47,10 @@ class S3Events(BaseEventHandler, WithLogging):
         self.logger.info("S3 Credentials gone")
         self.history_server.update(None, self.state.ingress)
 
-        self.charm.app.status = self.get_app_status(
+        self.charm.unit.status = self.get_app_status(
             None, self.state.ingress, self.state.auth_proxy_config
         )
+        if self.charm.unit.is_leader():
+            self.charm.app.status = self.get_app_status(
+                None, self.state.ingress, self.state.auth_proxy_config
+            )

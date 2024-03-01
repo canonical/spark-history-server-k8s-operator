@@ -44,6 +44,11 @@ class SparkHistoryWorkloadBase(AbstractWorkload):
         """Checks that the workload is active."""
         ...
 
+    @abstractmethod
+    def ready(self) -> bool:
+        """Checks that the container/snap is ready."""
+        ...
+
     @staticmethod
     def generate_password() -> str:
         """Creates randomized string for use as app passwords.

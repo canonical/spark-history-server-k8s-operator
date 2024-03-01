@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+
+
 class AbstractWorkload(ABC):
 
     @abstractmethod

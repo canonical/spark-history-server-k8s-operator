@@ -14,12 +14,12 @@ def parse_spark_properties(out: State, tmp_path: Path) -> dict[str, str]:
 
     spark_properties_path = (
         out.get_container(CONTAINER)
-        .layers["charm"]
-        .services["history-server"]
-        .environment["SPARK_PROPERTIES_FILE"]
+            .layers["base"]
+            .services["history-server"]
+            .environment["SPARK_PROPERTIES_FILE"]
     )
 
-    file_path = tmp_path / Path(spark_properties_path).relative_to("/opt")
+    file_path = tmp_path / Path(spark_properties_path).relative_to("/etc")
 
     assert file_path.exists()
 
@@ -38,7 +38,8 @@ def test_start_history_server(history_server_ctx):
     assert out.unit_status == MaintenanceStatus("Waiting for Pebble")
 
 
-def test_pebble_ready(history_server_ctx, history_server_container):
+@patch("workload.SparkHistoryServer.exec")
+def test_pebble_ready(exec_calls, history_server_ctx, history_server_container):
     state = State(
         containers=[history_server_container],
     )
@@ -46,9 +47,10 @@ def test_pebble_ready(history_server_ctx, history_server_container):
     assert out.unit_status == BlockedStatus("Missing S3 relation")
 
 
-@patch("models.S3ConnectionInfo.verify", return_value=True)
+@patch("managers.s3.S3Manager.verify", return_value=True)
+@patch("workload.SparkHistoryServer.exec")
 def test_s3_relation_connection_ok(
-    _, tmp_path, history_server_ctx, history_server_container, s3_relation
+    exec_calls, verify_call, tmp_path, history_server_ctx, history_server_container, s3_relation
 ):
     state = State(
         relations=[s3_relation],
@@ -69,9 +71,10 @@ def test_s3_relation_connection_ok(
     )
 
 
-@patch("models.S3ConnectionInfo.verify", return_value=False)
+@patch("managers.s3.S3Manager.verify", return_value=False)
+@patch("workload.SparkHistoryServer.exec")
 def test_s3_relation_connection_ko(
-    _, tmp_path, history_server_ctx, history_server_container, s3_relation
+    exec_calls, verify_call, tmp_path, history_server_ctx, history_server_container, s3_relation
 ):
     state = State(
         relations=[s3_relation],
@@ -81,9 +84,10 @@ def test_s3_relation_connection_ko(
     assert out.unit_status == BlockedStatus("Invalid S3 credentials")
 
 
-@patch("models.S3ConnectionInfo.verify", return_value=True)
+@patch("managers.s3.S3Manager.verify", return_value=True)
+@patch("workload.SparkHistoryServer.exec")
 def test_s3_relation_broken(
-    _, history_server_ctx, history_server_container, s3_relation, tmp_path
+    exec_calls, verify_call, history_server_ctx, history_server_container, s3_relation, tmp_path
 ):
     initial_state = State(
         relations=[s3_relation],
@@ -103,7 +107,9 @@ def test_s3_relation_broken(
     assert "spark.hadoop.fs.s3a.endpoint" not in spark_properties
 
 
+@patch("workload.SparkHistoryServer.exec")
 def test_ingress_relation_creation(
+    exec_calls,
     tmp_path,
     history_server_ctx,
     history_server_container,
@@ -119,9 +125,10 @@ def test_ingress_relation_creation(
     assert out.unit_status == BlockedStatus("Missing S3 relation")
 
 
-@patch("models.S3ConnectionInfo.verify", return_value=True)
+@patch("managers.s3.S3Manager.verify", return_value=True)
+@patch("workload.SparkHistoryServer.exec")
 def test_with_ingress(
-    _, tmp_path, history_server_ctx, history_server_container, ingress_relation, s3_relation
+    exec_calls, verify_call, tmp_path, history_server_ctx, history_server_container, ingress_relation, s3_relation
 ):
     state = State(
         relations=[s3_relation, ingress_relation],
@@ -137,9 +144,10 @@ def test_with_ingress(
     assert "spark.ui.proxyRedirectUri" in spark_properties
 
 
-@patch("models.S3ConnectionInfo.verify", return_value=True)
+@patch("managers.s3.S3Manager.verify", return_value=True)
+@patch("workload.SparkHistoryServer.exec")
 def test_remove_ingress(
-    _, tmp_path, history_server_ctx, history_server_container, ingress_relation, s3_relation
+    exec_calls, verify_call, tmp_path, history_server_ctx, history_server_container, ingress_relation, s3_relation
 ):
     state = State(
         relations=[s3_relation, ingress_relation],

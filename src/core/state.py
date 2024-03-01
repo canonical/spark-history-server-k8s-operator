@@ -1,17 +1,14 @@
 from enum import Enum
 
-from ops import (
-    CharmBase, Relation, ModelError,
-    MaintenanceStatus, ActiveStatus, BlockedStatus
-)
-
 from charms.data_platform_libs.v0.data_interfaces import DataRequires
 from charms.oathkeeper.v0.auth_proxy import AuthProxyConfig
-from charms.traefik_k8s.v2.ingress import IngressUrl, IngressProviderAppData
+from charms.traefik_k8s.v2.ingress import IngressProviderAppData, IngressUrl
+from ops import ActiveStatus, BlockedStatus, CharmBase, MaintenanceStatus, ModelError, Relation
+
 from common.utils import WithLogging
 from core.domain import S3ConnectionInfo
 
-S3 = "s3"
+S3 = "s3-credentials"
 INGRESS = "ingress"
 OATHKEEPER = "auth-proxy"
 
@@ -112,4 +109,5 @@ class Status(Enum):
     MISSING_S3_RELATION = BlockedStatus("Missing S3 relation")
     INVALID_CREDENTIALS = BlockedStatus("Invalid S3 credentials")
     MISSING_INGRESS_RELATION = BlockedStatus("Missing INGRESS relation")
+    NOT_RUNNING = BlockedStatus("History server not running. Please check logs.")
     ACTIVE = ActiveStatus("")

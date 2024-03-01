@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import List
 
+
 @dataclass
 class User:
     """Class representing the user running the Pebble workload services."""

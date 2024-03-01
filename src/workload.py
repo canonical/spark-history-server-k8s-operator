@@ -3,13 +3,13 @@
 # See LICENSE file for licensing details.
 
 """Module containing all business logic related to the workload."""
-
+import ops.pebble
 from ops.model import Container
 
 from common.k8s import K8sWorkload
 from common.utils import WithLogging
 from core.domain import User
-from core.workload import SparkHistoryWorkloadBase, HistoryServerPaths
+from core.workload import HistoryServerPaths, SparkHistoryWorkloadBase
 
 
 class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
@@ -90,6 +90,10 @@ class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
 
     def active(self) -> bool:
         """Return the health of the service."""
-        return self.container.get_service(
-            self.HISTORY_SERVER_SERVICE).is_running()
-        # We could use pebble health checks here
+        try:
+            service = self.container.get_service(self.HISTORY_SERVER_SERVICE)
+        except ops.pebble.ConnectionError:
+            self.logger.debug(f"Service {self.HISTORY_SERVER_SERVICE} not running")
+            return False
+
+        return service.is_running()

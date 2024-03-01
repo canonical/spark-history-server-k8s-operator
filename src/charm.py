@@ -30,9 +30,9 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
             User(name=PEBBLE_USER[0], group=PEBBLE_USER[1])
         )
 
-        IngressEvents(self, state, workload)
-        S3Events(self, state, workload)
-        HistoryServerEvents(self, state, workload)
+        self.ingress = IngressEvents(self, state, workload)
+        self.s3 = S3Events(self, state, workload)
+        self.history_server = HistoryServerEvents(self, state, workload)
 
 
 if __name__ == "__main__":  # pragma: nocover
