@@ -63,19 +63,14 @@ class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
 
     def start(self):
         """Execute business-logic for starting the workload."""
-
         layer = dict(self.container.get_plan().to_dict())
 
         layer["services"][self.HISTORY_SERVER_SERVICE] = (
-            layer["services"][self.HISTORY_SERVER_SERVICE] |
-            self._spark_history_server_layer["services"][
-                self.HISTORY_SERVER_SERVICE
-            ]
+            layer["services"][self.HISTORY_SERVER_SERVICE]
+            | self._spark_history_server_layer["services"][self.HISTORY_SERVER_SERVICE]
         )
 
-        self.container.add_layer(
-            self.CONTAINER_LAYER, layer, combine=True
-        )
+        self.container.add_layer(self.CONTAINER_LAYER, layer, combine=True)
 
         if not self.exists(str(self.paths.spark_properties)):
             self.logger.error(f"{self.paths.spark_properties} not found")

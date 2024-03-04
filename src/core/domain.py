@@ -8,15 +8,13 @@ import json
 from dataclasses import dataclass
 from typing import List, MutableMapping
 
-from ops import Relation, Unit, Application
+from ops import Application, Relation, Unit
 
 
 class StateBase:
     """Base state object."""
 
-    def __init__(
-            self, relation: Relation | None, component: Unit | Application
-    ):
+    def __init__(self, relation: Relation | None, component: Unit | Application):
         self.relation = relation
         self.component = component
 
@@ -78,9 +76,11 @@ class S3ConnectionInfo(StateBase):
     @property
     def tls_ca_chain(self) -> List[str] | None:
         """Return the CA chain (when applicable)."""
-        return json.loads(ca_chain) \
-            if (ca_chain := self.relation_data.get("tls-ca-chain", "")) \
+        return (
+            json.loads(ca_chain)
+            if (ca_chain := self.relation_data.get("tls-ca-chain", ""))
             else None
+        )
 
     @property
     def log_dir(self) -> str:

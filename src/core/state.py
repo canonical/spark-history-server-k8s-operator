@@ -75,10 +75,7 @@ class State(WithLogging):
     @property
     def s3(self) -> S3ConnectionInfo | None:
         """The server state of the current running Unit."""
-        return (
-            S3ConnectionInfo(rel, rel.app) if (rel := self._s3_relation)
-            else None
-        )
+        return S3ConnectionInfo(rel, rel.app) if (rel := self._s3_relation) else None
 
     @property
     def ingress(self) -> IngressUrl | None:
