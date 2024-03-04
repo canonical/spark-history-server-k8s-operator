@@ -6,7 +6,34 @@
 
 import json
 from dataclasses import dataclass
-from typing import List
+from typing import List, MutableMapping
+
+from ops import Relation, Unit, Application
+
+
+class StateBase:
+    """Base state object."""
+
+    def __init__(
+            self, relation: Relation | None, component: Unit | Application
+    ):
+        self.relation = relation
+        self.component = component
+
+    @property
+    def relation_data(self) -> MutableMapping[str, str]:
+        """The raw relation data."""
+        if not self.relation:
+            return {}
+
+        return self.relation.data[self.component]
+
+    def update(self, items: dict[str, str]) -> None:
+        """Writes to relation_data."""
+        if not self.relation:
+            return
+
+        self.relation_data.update(items)
 
 
 @dataclass
@@ -17,48 +44,50 @@ class User:
     group: str
 
 
-class S3ConnectionInfo:
+class S3ConnectionInfo(StateBase):
     """Class representing credentials and endpoints to connect to S3."""
 
-    def __init__(self, data: dict):
-        self._data = data
+    def __init__(self, relation: Relation, component: Application):
+        super().__init__(relation, component)
 
     @property
     def endpoint(self) -> str | None:
         """Return endpoint of the S3 bucket."""
-        return self._data.get("endpoint", None)
+        return self.relation_data.get("endpoint", None)
 
     @property
     def access_key(self) -> str:
         """Return the access key."""
-        return self._data["access-key"]
+        return self.relation_data["access-key"]
 
     @property
     def secret_key(self) -> str:
         """Return the secret key."""
-        return self._data["secret-key"]
+        return self.relation_data["secret-key"]
 
     @property
     def path(self) -> str:
         """Return the path in the S3 bucket."""
-        return self._data["path"]
+        return self.relation_data["path"]
 
     @property
     def bucket(self) -> str:
         """Return the name of the S3 bucket."""
-        return self._data["bucket"]
+        return self.relation_data["bucket"]
 
     @property
     def tls_ca_chain(self) -> List[str] | None:
         """Return the CA chain (when applicable)."""
-        return json.loads(ca_chain) if (ca_chain := self._data.get("tls-ca-chain", "")) else None
+        return json.loads(ca_chain) \
+            if (ca_chain := self.relation_data.get("tls-ca-chain", "")) \
+            else None
 
     @property
     def log_dir(self) -> str:
         """Return the full path to the object."""
         return f"s3a://{self.bucket}/{self.path}"
 
-    @classmethod
-    def from_dict(cls, data_dict: dict) -> "S3ConnectionInfo":
-        """Return instance of S3ConnectionInfo from a dictionary."""
-        return S3ConnectionInfo(data_dict)
+    # @classmethod
+    # def from_dict(cls, data_dict: dict) -> "S3ConnectionInfo":
+    #     """Return instance of S3ConnectionInfo from a dictionary."""
+    #     return S3ConnectionInfo(data_dict)

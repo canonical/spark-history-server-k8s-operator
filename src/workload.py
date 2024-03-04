@@ -3,6 +3,8 @@
 # See LICENSE file for licensing details.
 
 """Module containing all business logic related to the workload."""
+import json
+
 import ops.pebble
 from ops.model import Container
 
@@ -44,40 +46,36 @@ class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
     @property
     def _spark_history_server_layer(self):
         """Return a dictionary representing a Pebble layer."""
-        return {
+        layer = {
             "summary": "spark history server layer",
             "description": "pebble config layer for spark history server",
             "services": {
                 self.HISTORY_SERVER_SERVICE: {
-                    "override": "merge",
-                    "summary": "spark history server",
-                    "startup": "enabled",
+                    # "override": "merge",
+                    # "summary": "spark history server",
+                    # "startup": "enabled",
                     "environment": self.envs,
                 }
             },
         }
+        self.logger.info(f"Layer: {json.dumps(layer)}")
+        return layer
 
     def start(self):
         """Execute business-logic for starting the workload."""
-        # services = self.container.get_plan().services
-        #
-        # ===============
-        # THIS IS WORKING
-        # ===============
-        # if services[self.HISTORY_SERVER_SERVICE].startup != "enabled":
-        #     self.logger.info("Adding layer...")
-        #     self.container.add_layer(
-        #         self.CONTAINER_LAYER, self._spark_history_server_layer, combine=True
-        #     )
-        # ===============
 
-        # ===============
-        # THIS WOULD NOT BE WORKING
-        # ===============
-        self.container.add_layer(
-            self.CONTAINER_LAYER, self._spark_history_server_layer, combine=True
+        layer = dict(self.container.get_plan().to_dict())
+
+        layer["services"][self.HISTORY_SERVER_SERVICE] = (
+            layer["services"][self.HISTORY_SERVER_SERVICE] |
+            self._spark_history_server_layer["services"][
+                self.HISTORY_SERVER_SERVICE
+            ]
         )
-        # ===============
+
+        self.container.add_layer(
+            self.CONTAINER_LAYER, layer, combine=True
+        )
 
         if not self.exists(str(self.paths.spark_properties)):
             self.logger.error(f"{self.paths.spark_properties} not found")

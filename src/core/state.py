@@ -49,6 +49,11 @@ class State(WithLogging):
         return relation.id if (relation := self.charm.model.get_relation(S3)) else None
 
     @property
+    def _s3_relation(self) -> Relation | None:
+        """The S3 relation."""
+        return self.charm.model.get_relation(S3)
+
+    @property
     def _ingress_relation(self) -> Relation | None:
         """The ingress relation."""
         return self.charm.model.get_relation(INGRESS)
@@ -71,8 +76,7 @@ class State(WithLogging):
     def s3(self) -> S3ConnectionInfo | None:
         """The server state of the current running Unit."""
         return (
-            S3ConnectionInfo.from_dict(self.s3_endpoint.as_dict(_id))
-            if (_id := self._s3_relation_id)
+            S3ConnectionInfo(rel, rel.app) if (rel := self._s3_relation)
             else None
         )
 
