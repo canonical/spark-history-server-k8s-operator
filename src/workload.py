@@ -49,7 +49,7 @@ class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
             "description": "pebble config layer for spark history server",
             "services": {
                 self.HISTORY_SERVER_SERVICE: {
-                    "override": "replace",
+                    "override": "merge",
                     "summary": "spark history server",
                     "startup": "enabled",
                     "environment": self.envs,
