@@ -34,6 +34,7 @@ class S3Manager(WithLogging):
 
             if config := self.config.tls_ca_chain:
                 ca_file.write("\n".join(config).encode())
+                ca_file.flush()
 
             s3 = self.session.client(
                 "s3",
