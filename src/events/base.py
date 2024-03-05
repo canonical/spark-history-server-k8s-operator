@@ -9,8 +9,7 @@ from typing import Callable
 
 from ops import CharmBase, EventBase, Object, StatusBase
 
-from core.state import AuthProxyConfig, IngressUrl, S3ConnectionInfo, State, \
-    Status
+from core.state import AuthProxyConfig, IngressUrl, S3ConnectionInfo, State, Status
 from core.workload import SparkHistoryWorkloadBase
 from managers.s3 import S3Manager
 
@@ -23,10 +22,10 @@ class BaseEventHandler(Object):
     state: State
 
     def get_app_status(
-            self,
-            s3: S3ConnectionInfo | None,
-            ingress: IngressUrl | None,
-            oathkeeper: AuthProxyConfig | None,
+        self,
+        s3: S3ConnectionInfo | None,
+        ingress: IngressUrl | None,
+        oathkeeper: AuthProxyConfig | None,
     ) -> StatusBase:
         """Return the status of the charm."""
         if not self.workload.ready():
@@ -51,7 +50,7 @@ class BaseEventHandler(Object):
 
 
 def compute_status(
-        hook: Callable[[BaseEventHandler, EventBase], None]
+    hook: Callable[[BaseEventHandler, EventBase], None]
 ) -> Callable[[BaseEventHandler, EventBase], None]:
     """Decorator to automatically compute statuses at the end of the hook."""
 

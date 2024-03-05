@@ -15,7 +15,6 @@ from time import sleep
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
-from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from .test_helpers import fetch_action_sync_s3_credentials, setup_s3_bucket_for_history_server
 
