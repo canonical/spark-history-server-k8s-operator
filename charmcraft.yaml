@@ -2,6 +2,17 @@
 # See LICENSE file for licensing details.
 
 type: charm
+parts:
+  charm:
+    charm-binary-python-packages:
+      - setuptools
+      - jsonschema
+    build-packages:
+      - libffi-dev
+      - libssl-dev
+      - pkg-config
+      - rustc
+      - cargo
 bases:
   - build-on:
     - name: ubuntu
@@ -9,7 +20,3 @@ bases:
     run-on:
     - name: ubuntu
       channel: "22.04"
-
-parts:
-  charm:
-    charm-binary-python-packages: [jsonschema]
