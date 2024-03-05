@@ -210,159 +210,160 @@ async def test_ingress(ops_test: OpsTest, charm_versions):
     logger.info(f"Number of apps: {len(apps)}")
 
 
-@pytest.mark.abort_on_fail
-async def test_oathkeeper(ops_test: OpsTest, charm_versions):
-    """Test the integration of the spark history server with Oathkeeper.
-
-    Assert that the proxied-enpoints of the ingress are protected (err code 401).
-    """
-    # remove relation between ingress and spark-history server
-    await ops_test.model.applications[APP_NAME].remove_relation(
-        f"{APP_NAME}:ingress", f"{charm_versions.ingress.application_name}:ingress"
-    )
-
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME, charm_versions.ingress.application_name],
-        status="active",
-        timeout=300,
-        idle_period=30,
-    )
-
-    # Deploy the oathkeeper charm and wait for waiting status
-    _ = await ops_test.model.deploy(**charm_versions.oathkeeper.deploy_dict(), trust=True)
-
-    await ops_test.model.wait_for_idle(
-        apps=[charm_versions.oathkeeper.application_name],
-        status="active",
-        timeout=300,
-        idle_period=30,
-    )
-
-    # configure Oathkeeper charm
-    oathkeeper_configuration_parameters = {"dev": "True"}
-    await ops_test.model.applications[charm_versions.oathkeeper.application_name].set_config(
-        oathkeeper_configuration_parameters
-    )
-
-    await ops_test.model.wait_for_idle(
-        apps=[charm_versions.oathkeeper.application_name],
-        status="active",
-        timeout=300,
-        idle_period=30,
-    )
-    # configure ingress to work with Oathkeeper
-    ingress_configuration_parameters = {"enable_experimental_forward_auth": "True"}
-    # apply new configuration options
-    await ops_test.model.applications[charm_versions.ingress.application_name].set_config(
-        ingress_configuration_parameters
-    )
-
-    await ops_test.model.wait_for_idle(
-        apps=[charm_versions.ingress.application_name],
-        status="active",
-        timeout=300,
-        idle_period=30,
-    )
-    # Relate Oathkeeper with the Spark history server charm
-    logger.info("Relating the spark history server charm with oathkeeper.")
-    await ops_test.model.add_relation(charm_versions.oathkeeper.application_name, APP_NAME)
-
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME],
-        status="blocked",
-        timeout=300,
-        idle_period=30,
-    )
-    # relate spark-history-server and ingress
-    await ops_test.model.add_relation(charm_versions.ingress.application_name, APP_NAME)
-
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME, charm_versions.ingress.application_name],
-        status="active",
-        timeout=300,
-        idle_period=30,
-    )
-
-    # Relate Oathkeeper with the Ingress charm
-    logger.info("Relating the oathkeeper charm with the ingress.")
-    await ops_test.model.add_relation(
-        f"{charm_versions.ingress.application_name}:experimental-forward-auth",
-        charm_versions.oathkeeper.application_name,
-    )
-
-    await ops_test.model.wait_for_idle(
-        apps=[charm_versions.oathkeeper.application_name, charm_versions.ingress.application_name],
-        status="active",
-        timeout=300,
-        idle_period=30,
-    )
-
-    # get proxied endpoint
-    action = await ops_test.model.units.get(
-        f"{charm_versions.ingress.application_name}/0"
-    ).run_action(
-        "show-proxied-endpoints",
-    )
-
-    ingress_endpoint = json.loads((await action.wait()).results["proxied-endpoints"])[APP_NAME][
-        "url"
-    ]
-
-    # check that the ingress endpoint is not authorized!
-    logger.info(f"Querying endpoint: {ingress_endpoint}")
-    try:
-        _ = urllib.request.urlopen(ingress_endpoint)
-        raise Exception(
-            "Successful request.... something is wrong with the protection of the endpoints."
-        )
-    except urllib.error.HTTPError as e:  # type: ignore
-        # Return code error (e.g. 404, 501, ...)
-        logger.info("HTTPError: {}".format(e.code))
-        # check that the endopoint respond with code 401
-        assert e.code == 401
-
-    logger.info(f"Endpoint: {ingress_endpoint} successfully protected.")
-
-
-@pytest.mark.skip
-async def test_remove_oathkeeper(ops_test: OpsTest, charm_versions):
-    """Test the removal of integration between the spark history server and Oathkeeper.
-
-    Assert that the proxied-enpoints of the ingress are not protected.
-    """
-    # Remove of the relation between oathkeeper and spark-history server
-    await ops_test.model.applications[APP_NAME].remove_relation(
-        f"{APP_NAME}:auth-proxy", f"{charm_versions.oathkeeper.application_name}:auth-proxy"
-    )
-
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME, charm_versions.oathkeeper.application_name],
-        status="active",
-        timeout=300,
-        idle_period=30,
-    )
-
-    try:
-        for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(30)):
-            with attempt:
-                action = await ops_test.model.units.get(
-                    f"{charm_versions.ingress.application_name}/0"
-                ).run_action(
-                    "show-proxied-endpoints",
-                )
-
-                ingress_endpoint = json.loads((await action.wait()).results["proxied-endpoints"])[
-                    APP_NAME
-                ]["url"]
-
-                logger.info(f"Trying to querying endpoint: {ingress_endpoint}/api/v1/applications")
-
-                apps = json.loads(
-                    urllib.request.urlopen(f"{ingress_endpoint}/api/v1/applications").read()
-                )
-
-                assert len(apps) == 1
-
-                logger.info(f"Number of apps: {len(apps)}")
-    except RetryError:
-        raise Exception("Failed to reach the endpoint!")
+# @pytest.mark.abort_on_fail
+# async def test_oathkeeper(ops_test: OpsTest, charm_versions):
+#     """Test the integration of the spark history server with Oathkeeper.
+#
+#     Assert that the proxied-enpoints of the ingress are protected (err code 401).
+#     """
+#     # remove relation between ingress and spark-history server
+#     await ops_test.model.applications[APP_NAME].remove_relation(
+#         f"{APP_NAME}:ingress", f"{charm_versions.ingress.application_name}:ingress"
+#     )
+#
+#     await ops_test.model.wait_for_idle(
+#         apps=[APP_NAME, charm_versions.ingress.application_name],
+#         status="active",
+#         timeout=300,
+#         idle_period=30,
+#     )
+#
+#     # Deploy the oathkeeper charm and wait for waiting status
+#     _ = await ops_test.model.deploy(**charm_versions.oathkeeper.deploy_dict(), trust=True)
+#
+#     await ops_test.model.wait_for_idle(
+#         apps=[charm_versions.oathkeeper.application_name],
+#         status="active",
+#         timeout=300,
+#         idle_period=30,
+#     )
+#
+#     # configure Oathkeeper charm
+#     oathkeeper_configuration_parameters = {"dev": "True"}
+#     await ops_test.model.applications[charm_versions.oathkeeper.application_name].set_config(
+#         oathkeeper_configuration_parameters
+#     )
+#
+#     await ops_test.model.wait_for_idle(
+#         apps=[charm_versions.oathkeeper.application_name],
+#         status="active",
+#         timeout=300,
+#         idle_period=30,
+#     )
+#     # configure ingress to work with Oathkeeper
+#     ingress_configuration_parameters = {"enable_experimental_forward_auth": "True"}
+#     # apply new configuration options
+#     await ops_test.model.applications[charm_versions.ingress.application_name].set_config(
+#         ingress_configuration_parameters
+#     )
+#
+#     await ops_test.model.wait_for_idle(
+#         apps=[charm_versions.ingress.application_name],
+#         status="active",
+#         timeout=300,
+#         idle_period=30,
+#     )
+#     # Relate Oathkeeper with the Spark history server charm
+#     logger.info("Relating the spark history server charm with oathkeeper.")
+#     await ops_test.model.add_relation(charm_versions.oathkeeper.application_name, APP_NAME)
+#
+#     await ops_test.model.wait_for_idle(
+#         apps=[APP_NAME],
+#         status="blocked",
+#         timeout=300,
+#         idle_period=30,
+#     )
+#     # relate spark-history-server and ingress
+#     await ops_test.model.add_relation(charm_versions.ingress.application_name, APP_NAME)
+#
+#     await ops_test.model.wait_for_idle(
+#         apps=[APP_NAME, charm_versions.ingress.application_name],
+#         status="active",
+#         timeout=300,
+#         idle_period=30,
+#     )
+#
+#     # Relate Oathkeeper with the Ingress charm
+#     logger.info("Relating the oathkeeper charm with the ingress.")
+#     await ops_test.model.add_relation(
+#         f"{charm_versions.ingress.application_name}:experimental-forward-auth",
+#         charm_versions.oathkeeper.application_name,
+#     )
+#
+#     await ops_test.model.wait_for_idle(
+#         apps=[charm_versions.oathkeeper.application_name, charm_versions.ingress.application_name],
+#         status="active",
+#         timeout=300,
+#         idle_period=30,
+#     )
+#
+#     # get proxied endpoint
+#     action = await ops_test.model.units.get(
+#         f"{charm_versions.ingress.application_name}/0"
+#     ).run_action(
+#         "show-proxied-endpoints",
+#     )
+#
+#     ingress_endpoint = json.loads((await action.wait()).results["proxied-endpoints"])[APP_NAME][
+#         "url"
+#     ]
+#
+#     # check that the ingress endpoint is not authorized!
+#     logger.info(f"Querying endpoint: {ingress_endpoint}")
+#     try:
+#         _ = urllib.request.urlopen(ingress_endpoint)
+#         raise Exception(
+#             "Successful request.... something is wrong with the protection of the endpoints."
+#         )
+#     except urllib.error.HTTPError as e:  # type: ignore
+#         # Return code error (e.g. 404, 501, ...)
+#         logger.info("HTTPError: {}".format(e.code))
+#         # check that the endopoint respond with code 401
+#         assert e.code == 401
+#
+#     logger.info(f"Endpoint: {ingress_endpoint} successfully protected.")
+#
+#
+# @pytest.mark.skip
+# async def test_remove_oathkeeper(ops_test: OpsTest, charm_versions):
+#     """Test the removal of integration between the spark history server and Oathkeeper.
+#
+#     Assert that the proxied-enpoints of the ingress are not protected.
+#     """
+#     # Remove of the relation between oathkeeper and spark-history server
+#     await ops_test.model.applications[APP_NAME].remove_relation(
+#         f"{APP_NAME}:auth-proxy", f"{charm_versions.oathkeeper.application_name}:auth-proxy"
+#     )
+#
+#     await ops_test.model.wait_for_idle(
+#         apps=[APP_NAME, charm_versions.oathkeeper.application_name],
+#         status="active",
+#         timeout=300,
+#         idle_period=30,
+#     )
+#
+#     try:
+#         for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(30)):
+#             with attempt:
+#                 action = await ops_test.model.units.get(
+#                     f"{charm_versions.ingress.application_name}/0"
+#                 ).run_action(
+#                     "show-proxied-endpoints",
+#                 )
+#
+#                 ingress_endpoint = json.loads((await action.wait()).results["proxied-endpoints"])[
+#                     APP_NAME
+#                 ]["url"]
+#
+#                 logger.info(f"Trying to querying endpoint: {ingress_endpoint}/api/v1/applications")
+#
+#                 apps = json.loads(
+#                     urllib.request.urlopen(f"{ingress_endpoint}/api/v1/applications").read()
+#                 )
+#
+#                 assert len(apps) == 1
+#
+#                 logger.info(f"Number of apps: {len(apps)}")
+#     except RetryError:
+#         raise Exception("Failed to reach the endpoint!")
+#

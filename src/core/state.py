@@ -102,9 +102,9 @@ class State(WithLogging):
     @property
     def auth_proxy_config(self) -> AuthProxyConfig | None:
         """Configure the auth proxy relation."""
-        if self.ingress and self._oathkeeper_relation:
+        if self._oathkeeper_relation:
             return AuthProxyConfig(
-                protected_urls=[self.ingress.url],
+                protected_urls=[self.ingress.url] if self.ingress else [],
                 headers=AUTH_PROXY_HEADERS,
                 allowed_endpoints=[],
             )
