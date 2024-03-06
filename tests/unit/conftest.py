@@ -8,7 +8,7 @@ from scenario.state import next_relation_id
 
 from charm import SparkHistoryServerCharm
 from constants import CONTAINER
-from core.state import INGRESS, S3
+from core.context import INGRESS, S3
 
 
 @pytest.fixture

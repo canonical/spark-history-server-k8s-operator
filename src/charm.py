@@ -10,7 +10,7 @@ from ops.main import main
 from common.utils import WithLogging
 from constants import CONTAINER, PEBBLE_USER
 from core.domain import User
-from core.state import State
+from core.context import Context
 from events.history_server import HistoryServerEvents
 from events.ingress import IngressEvents
 from events.s3 import S3Events
@@ -23,15 +23,15 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
     def __init__(self, *args):
         super().__init__(*args)
 
-        state = State(self)
+        context = Context(self)
 
         workload = SparkHistoryServer(
             self.unit.get_container(CONTAINER), User(name=PEBBLE_USER[0], group=PEBBLE_USER[1])
         )
 
-        self.ingress = IngressEvents(self, state, workload)
-        self.s3 = S3Events(self, state, workload)
-        self.history_server = HistoryServerEvents(self, state, workload)
+        self.ingress = IngressEvents(self, context, workload)
+        self.s3 = S3Events(self, context, workload)
+        self.history_server = HistoryServerEvents(self, context, workload)
 
 
 if __name__ == "__main__":  # pragma: nocover

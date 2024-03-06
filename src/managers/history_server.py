@@ -7,7 +7,7 @@
 import re
 
 from common.utils import WithLogging
-from core.state import IngressUrl, S3ConnectionInfo
+from core.context import IngressUrl, S3ConnectionInfo
 from core.workload import SparkHistoryWorkloadBase
 from managers.tls import TLSManager
 

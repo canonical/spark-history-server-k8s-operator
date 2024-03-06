@@ -21,7 +21,7 @@ OATHKEEPER = "auth-proxy"
 AUTH_PROXY_HEADERS = ["X-User"]
 
 
-class State(WithLogging):
+class Context(WithLogging):
     """Properties and relations of the charm."""
 
     def __init__(self, charm: CharmBase):

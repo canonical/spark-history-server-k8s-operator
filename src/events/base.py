@@ -9,7 +9,7 @@ from typing import Callable
 
 from ops import CharmBase, EventBase, Object, StatusBase
 
-from core.state import AuthProxyConfig, IngressUrl, S3ConnectionInfo, State, Status
+from core.context import AuthProxyConfig, Context, IngressUrl, S3ConnectionInfo, Status
 from core.workload import SparkHistoryWorkloadBase
 from managers.s3 import S3Manager
 
@@ -19,7 +19,7 @@ class BaseEventHandler(Object):
 
     workload: SparkHistoryWorkloadBase
     charm: CharmBase
-    state: State
+    context: Context
 
     def get_app_status(
         self,
@@ -60,14 +60,14 @@ def compute_status(
         res = hook(event_handler, event)
         if event_handler.charm.unit.is_leader():
             event_handler.charm.app.status = event_handler.get_app_status(
-                event_handler.state.s3,
-                event_handler.state.ingress,
-                event_handler.state.auth_proxy_config,
+                event_handler.context.s3,
+                event_handler.context.ingress,
+                event_handler.context.auth_proxy_config,
             )
         event_handler.charm.unit.status = event_handler.get_app_status(
-            event_handler.state.s3,
-            event_handler.state.ingress,
-            event_handler.state.auth_proxy_config,
+            event_handler.context.s3,
+            event_handler.context.ingress,
+            event_handler.context.auth_proxy_config,
         )
         return res
 
