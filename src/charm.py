@@ -9,8 +9,8 @@ from ops.main import main
 
 from common.utils import WithLogging
 from constants import CONTAINER, PEBBLE_USER
-from core.domain import User
 from core.context import Context
+from core.domain import User
 from events.history_server import HistoryServerEvents
 from events.ingress import IngressEvents
 from events.s3 import S3Events
