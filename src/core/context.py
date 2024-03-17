@@ -6,7 +6,7 @@
 
 from enum import Enum
 
-from charms.data_platform_libs.v0.data_interfaces import DataRequires
+from charms.data_platform_libs.v0.data_interfaces import RequirerData
 from charms.oathkeeper.v0.auth_proxy import AuthProxyConfig
 from charms.traefik_k8s.v2.ingress import IngressProviderAppData, IngressUrl
 from ops import ActiveStatus, BlockedStatus, CharmBase, MaintenanceStatus, ModelError, Relation
@@ -29,8 +29,8 @@ class Context(WithLogging):
         self.charm = charm
         self.model = charm.model
 
-        self.s3_endpoint = DataRequires(
-            self.charm, S3
+        self.s3_endpoint = RequirerData(
+            self.charm.model, S3
         )  # TODO: It would be nice if we had something that is more general (e.g. without extra-user-roles)
 
     # --------------
