@@ -142,6 +142,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
 
         if self.unit.is_leader():
             self.app.status = status
+
         self.unit.status = status
 
         # TODO: to avoid disruption (although minimal) if you could the logic below
@@ -208,9 +209,14 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
 
     def _update_event(self, _):
         """Handle the update event hook."""
-        self.unit.status = self.get_status(
+        status = self.get_status(
             self.s3_connection_info, self.ingress.url, self.is_oathkeeper_related
         )
+
+        self.unit.status = status
+
+        if self.unit.is_leader():
+            self.app.status = status
 
 
 if __name__ == "__main__":  # pragma: nocover
