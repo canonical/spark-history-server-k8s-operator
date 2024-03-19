@@ -2,7 +2,7 @@
 # Copyright 2024 Canonical Limited
 # See LICENSE file for licensing details.
 
-"""Charm State definition and parsing logic."""
+"""Charm Context definition and parsing logic."""
 
 from enum import Enum
 

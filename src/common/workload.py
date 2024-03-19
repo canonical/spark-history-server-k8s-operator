@@ -36,6 +36,9 @@ class AbstractWorkload(ABC):
 
         Returns:
             List of string lines from the specified path
+
+        Raises:
+            FileNotFound if the file does not exist
         """
         ...
 

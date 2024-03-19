@@ -41,7 +41,7 @@ class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
 
         self._envs = self.from_env(self.read(self.ENV_FILE)) if self.exists(self.ENV_FILE) else {}
 
-        return self.envs
+        return self._envs
 
     @property
     def _spark_history_server_layer(self):
@@ -98,9 +98,9 @@ class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
 
         return service.is_running()
 
-    def set_environment(self, envs: dict[str, str | None]):
+    def set_environment(self, env: dict[str, str | None]):
         """Set environment for workload."""
-        merged_envs = self.envs | envs
+        merged_envs = self.envs | env
 
         self._envs = {k: v for k, v in merged_envs.items() if v is not None}
 

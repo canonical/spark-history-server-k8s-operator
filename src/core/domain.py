@@ -86,8 +86,3 @@ class S3ConnectionInfo(StateBase):
     def log_dir(self) -> str:
         """Return the full path to the object."""
         return f"s3a://{self.bucket}/{self.path}"
-
-    # @classmethod
-    # def from_dict(cls, data_dict: dict) -> "S3ConnectionInfo":
-    #     """Return instance of S3ConnectionInfo from a dictionary."""
-    #     return S3ConnectionInfo(data_dict)
