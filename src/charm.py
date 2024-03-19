@@ -140,6 +140,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
             self.get_status(s3, ingress_url, oathkeeper_related)
         )
 
+        self.app.status = status
         self.unit.status = status
 
         # TODO: to avoid disruption (although minimal) if you could the logic below
