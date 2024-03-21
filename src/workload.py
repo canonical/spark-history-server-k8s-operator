@@ -3,198 +3,82 @@
 # See LICENSE file for licensing details.
 
 """Module containing all business logic related to the workload."""
+import json
 
-from abc import ABC, abstractmethod
-from enum import Enum
-from io import IOBase, StringIO
-
+import ops.pebble
 from ops.model import Container
-from ops.pebble import ExecError
 
-from models import User
-from utils import WithLogging
-
-
-class IOMode(str, Enum):
-    """Class representing the modes to open file resources."""
-
-    READ = "r"
-    WRITE = "w"
+from common.k8s import K8sWorkload
+from common.utils import WithLogging
+from core.domain import User
+from core.workload import HistoryServerPaths, SparkHistoryWorkloadBase
 
 
-class AbstractWorkload(ABC):
-    """Abstract class representing general API of a workload, irrespective on the substrate (VM or K8s)."""
+class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
+    """Class representing Workload implementation for History Server on K8s."""
 
-    @abstractmethod
-    def start(self):
-        """Execute business-logic for starting the workload."""
-        ...
+    CONTAINER = "spark-history-server"
+    CONTAINER_LAYER = "spark-history-server"
 
-    @abstractmethod
-    def stop(self):
-        """Execute business-logic for stopping the workload."""
-        ...
-
-    @abstractmethod
-    def health(self) -> bool:
-        """Return the health of the service."""
-        ...
-
-    @abstractmethod
-    def ready(self) -> bool:
-        """Check whether the service is ready to be used."""
-        ...
-
-    @abstractmethod
-    def get_spark_configuration_file(self, mode: IOMode) -> IOBase:
-        """Return the configuration file for Spark History server."""
-        ...
-
-    @abstractmethod
-    def exec(
-        self, command: str, env: dict[str, str] | None = None, working_dir: str | None = None
-    ) -> str:
-        """Runs a command on the workload substrate."""
-        ...
-
-
-class ContainerFile(StringIO):
-    """Class representing a file in the workload container to be read/written.
-
-    The operations will be mediated by Pebble, but this should be abstracted away such
-    that the same API can also be used for files in local file systems. This allows to
-    create some context where handling read/write independently from the substrate:
-
-    ```python
-    file = ContainerFile(container, user, IOMode.READ)
-    # or open("local-file", IOMode.READ)
-
-    with file as fid:
-        fid.read()
-    ```
-    """
-
-    def __init__(self, container: Container, user: User, path: str, mode: IOMode):
-        super().__init__()
-        self.container = container
-        self.user = user
-        self.path = path
-        self._mode = mode
-
-    def exists(self):
-        """Check whether the file exists."""
-        return self.container.exists(self.path)
-
-    def open(self):
-        """Execute business logic on context creation."""
-        if self._mode is IOMode.READ:
-            self.write(self.container.pull(self.path).read().decode("utf-8"))
-
-    def close(self):
-        """Execute business logic on context destruction."""
-        if self._mode is IOMode.WRITE:
-            self.container.push(
-                self.path,
-                self.getvalue(),
-                user=self.user.name,
-                group=self.user.group,
-                make_dirs=True,
-                permissions=0o640,
-            )
-
-
-class SparkHistoryServer(AbstractWorkload, WithLogging):
-    """Class representing Workload implementation for Spark History server on K8s."""
-
-    SPARK_WORKDIR = "/opt/spark"
-    CONTAINER_LAYER = "charm"
     HISTORY_SERVER_SERVICE = "history-server"
-    SPARK_PROPERTIES = f"{SPARK_WORKDIR}/conf/spark-properties.conf"
-    SPARK_CONF = f"{SPARK_WORKDIR}/conf"
-    SPARK_CERT = f"{SPARK_CONF}/ca.pem"
-    SPARK_TRUSTSTORE = f"{SPARK_CONF}/truststore.jks"
 
-    def __init__(self, container: Container, user: User = User()):
+    CONFS_PATH = "/etc/spark/conf"
+    ENV_FILE = "/etc/spark/environment"
+
+    def __init__(self, container: Container, user: User):
         self.container = container
         self.user = user
-        self.spark_history_server_java_config = ""
 
-    def get_spark_configuration_file(self, mode: IOMode) -> ContainerFile:
-        """Return the configuration file for Spark History server."""
-        return ContainerFile(self.container, self.user, self.SPARK_PROPERTIES, mode)
+        self.paths = HistoryServerPaths(conf_path=self.CONFS_PATH, keytool="keytool")
 
-    def get_certificate_file(self, mode: IOMode) -> ContainerFile:
-        """Return the configuration file for Spark History server."""
-        return ContainerFile(self.container, self.user, self.SPARK_CERT, mode)
+        self._envs = None
 
-    def get_truststore_file(self, mode: IOMode) -> ContainerFile:
-        """Return the configuration file for Spark History server."""
-        return ContainerFile(self.container, self.user, self.SPARK_TRUSTSTORE, mode)
+    @property
+    def envs(self):
+        """Return current environment."""
+        if self._envs is not None:
+            return self._envs
+
+        self._envs = self.from_env(self.read(self.ENV_FILE)) if self.exists(self.ENV_FILE) else {}
+
+        return self._envs
 
     @property
     def _spark_history_server_layer(self):
         """Return a dictionary representing a Pebble layer."""
-        return {
+        layer = {
             "summary": "spark history server layer",
             "description": "pebble config layer for spark history server",
             "services": {
                 self.HISTORY_SERVER_SERVICE: {
-                    "override": "merge",
-                    "summary": "spark history server",
-                    "startup": "enabled",
-                    "environment": {
-                        "SPARK_PROPERTIES_FILE": self.SPARK_PROPERTIES,
-                        "SPARK_HISTORY_OPTS": self.spark_history_server_java_config,
-                    },
+                    # "override": "merge",
+                    # "summary": "spark history server",
+                    # "startup": "enabled",
+                    "environment": self.envs,
                 }
             },
         }
+        self.logger.info(f"Layer: {json.dumps(layer)}")
+        return layer
 
     def start(self):
         """Execute business-logic for starting the workload."""
-        services = self.container.get_plan().services
+        layer = dict(self.container.get_plan().to_dict())
 
-        # ===============
-        # THIS IS WORKING
-        # ===============
-        if services[self.HISTORY_SERVER_SERVICE].startup != "enabled":
-            self.logger.info("Adding layer...")
-            self.container.add_layer(
-                self.CONTAINER_LAYER, self._spark_history_server_layer, combine=True
-            )
-        # ===============
+        layer["services"][self.HISTORY_SERVER_SERVICE] = (
+            layer["services"][self.HISTORY_SERVER_SERVICE]
+            | self._spark_history_server_layer["services"][self.HISTORY_SERVER_SERVICE]
+        )
 
-        # ===============
-        # THIS WOULD NOT BE WORKING
-        # ===============
-        # self.container.add_layer(
-        #     self.CONTAINER_LAYER, self._spark_history_server_layer, combine=True
-        # )
-        # ===============
+        self.container.add_layer(self.CONTAINER_LAYER, layer, combine=True)
 
-        spark_configuration_file = self.get_spark_configuration_file(IOMode.READ)
-
-        if not spark_configuration_file.exists():
-            self.logger.error(f"{spark_configuration_file.path} not found")
-            raise FileNotFoundError(spark_configuration_file.path)
+        if not self.exists(str(self.paths.spark_properties)):
+            self.logger.error(f"{self.paths.spark_properties} not found")
+            raise FileNotFoundError(self.paths.spark_properties)
 
         # Push an updated layer with the new config
         # self.container.replan()
         self.container.restart(self.HISTORY_SERVER_SERVICE)
-
-    def exec(
-        self, command: str, env: dict[str, str] | None = None, working_dir: str | None = None
-    ) -> str:
-        """Execute command in the container."""
-        try:
-            process = self.container.exec(
-                command=command.split(), environment=env, working_dir=working_dir
-            )
-            output, _ = process.wait_output()
-            return output
-        except ExecError as e:
-            self.logger.error(str(e.stderr))
-            raise e
 
     def stop(self):
         """Execute business-logic for stopping the workload."""
@@ -204,7 +88,20 @@ class SparkHistoryServer(AbstractWorkload, WithLogging):
         """Check whether the service is ready to be used."""
         return self.container.can_connect()
 
-    def health(self) -> bool:
+    def active(self) -> bool:
         """Return the health of the service."""
-        return self.container.get_service(self.HISTORY_SERVER_SERVICE).is_running()
-        # We could use pebble health checks here
+        try:
+            service = self.container.get_service(self.HISTORY_SERVER_SERVICE)
+        except ops.pebble.ConnectionError:
+            self.logger.debug(f"Service {self.HISTORY_SERVER_SERVICE} not running")
+            return False
+
+        return service.is_running()
+
+    def set_environment(self, env: dict[str, str | None]):
+        """Set environment for workload."""
+        merged_envs = self.envs | env
+
+        self._envs = {k: v for k, v in merged_envs.items() if v is not None}
+
+        self.write("\n".join(self.to_env(self.envs)), self.ENV_FILE)

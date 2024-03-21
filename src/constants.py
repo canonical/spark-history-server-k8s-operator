@@ -7,11 +7,5 @@
 """Literals and constants."""
 
 CONTAINER = "spark-history-server"
-CONTAINER_LAYER = "spark-history-server"
-
-PEER = "spark-history-server-peers"
-S3_INTEGRATOR_REL = "s3-credentials"
-INGRESS_REL = "ingress"
-OATHKEEPER_REL = "auth-proxy"
 
 PEBBLE_USER = ("_daemon_", "_daemon_")

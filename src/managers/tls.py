@@ -2,67 +2,61 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Manager for handling Kafka TLS configuration."""
+"""Manager for handling Spark History Server TLS configuration."""
 
-import logging
-import secrets
-import string
 import subprocess
+from functools import cached_property
 
-from ops import CharmBase
 from ops.pebble import ExecError
 
-from constants import PEBBLE_USER
-from utils import WithLogging
-from workload import SparkHistoryServer
-
-logger = logging.getLogger(__name__)
+from common.utils import WithLogging
+from core.workload import SparkHistoryWorkloadBase
 
 
 class TLSManager(WithLogging):
     """Manager for building necessary files for Java TLS auth."""
 
-    def __init__(self, charm: CharmBase, workload: SparkHistoryServer):
-        self.charm = charm
+    def __init__(self, workload: SparkHistoryWorkloadBase):
         self.workload = workload
 
-    def configure_truststore(self) -> None:
-        """Configure custom JVM truststore."""
-        trustore_password = self.generate_password()
+    # This could eventually go in a peer relation databag when/if it will
+    # be implemented
+    @cached_property
+    def truststore_password(self) -> str:
+        """Return the password of the truststore."""
+        _tmp_file = "/tmp/password"
 
-        command = f"keytool -import -v -alias ca -file {self.workload.SPARK_CERT} -keystore {self.workload.SPARK_TRUSTSTORE} -storepass {trustore_password} -noprompt"
+        if self.workload.exists(_tmp_file):
+            return self.workload.read(_tmp_file)[0]
 
-        try:
-            self.workload.exec(command=command, working_dir=self.workload.SPARK_CONF)
-            self.workload.exec(
-                f"chown -R {PEBBLE_USER[0]}:{PEBBLE_USER[1]} {self.workload.SPARK_TRUSTSTORE}"
-            )
-            self.workload.exec(f"chmod -R 770 {self.workload.SPARK_TRUSTSTORE}")
-        except (subprocess.CalledProcessError, ExecError) as e:
-            # in case this reruns and fails
-            if e.stdout and "already exists" in e.stdout:
-                return
-            self.logger.error(e.stdout)
-            raise e
-        self.workload.spark_history_server_java_config = f"-Djavax.net.ssl.trustStore={self.workload.SPARK_TRUSTSTORE} -Djavax.net.ssl.trustStorePassword={trustore_password}"
+        password = self.workload.generate_password()
+        self.workload.write(password, _tmp_file)
+        return password
 
-    def remove_truststore(self) -> None:
-        """Manage the removal of the truststore."""
-        try:
-            self.workload.exec(f"rm -f {self.workload.SPARK_TRUSTSTORE}")
-        except (subprocess.CalledProcessError, ExecError) as e:
-            # in case this reruns and fails
-            if e.stdout and "already exists" in e.stdout:
-                return
-            self.logger.error(e.stdout)
-            raise e
-        self.SPARK_HISTORY_JAVA_PROPERTIES = ""
+    def import_ca(self, certificate: str):
+        """Import a certificate into the truststore.
 
-    @staticmethod
-    def generate_password() -> str:
-        """Creates randomized string for use as app passwords.
-
-        Returns:
-            String of 32 randomized letter+digit characters
+        Args:
+            certificate: string representing the certificate
         """
-        return "".join([secrets.choice(string.ascii_letters + string.digits) for _ in range(32)])
+        self.workload.write(certificate, self.workload.paths.cert)
+
+        command = f"{self.workload.paths.keytool} -import -v -alias ca -file {self.workload.paths.cert} -keystore {self.workload.paths.truststore} -storepass {self.truststore_password} -noprompt"
+
+        try:
+            self.workload.exec(command=command, working_dir=str(self.workload.paths.conf_path))
+            self.workload.exec(
+                f"chown -R {self.workload.user.name}:{self.workload.user.group} {self.workload.paths.truststore}"
+            )
+            self.workload.exec(f"chmod -R 660 {self.workload.paths.truststore}")
+        except (subprocess.CalledProcessError, ExecError) as e:
+            # in case this reruns and fails
+            if e.stdout and "already exists" in e.stdout:
+                return
+            self.logger.error(e.stdout)
+            raise e
+
+    def reset(self):
+        """Remove all files related to TLS configuration."""
+        self.workload.exec(f"rm -f {self.workload.paths.truststore}")
+        self.workload.exec(f"rm -f {self.workload.paths.cert}")

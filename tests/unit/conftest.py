@@ -7,7 +7,8 @@ from scenario import Container, Context, Model, Mount, Relation
 from scenario.state import next_relation_id
 
 from charm import SparkHistoryServerCharm
-from constants import CONTAINER, INGRESS_REL, S3_INTEGRATOR_REL
+from constants import CONTAINER
+from core.context import INGRESS, S3
 
 
 @pytest.fixture
@@ -42,21 +43,21 @@ def history_server_container(tmp_path):
                     "command": "/bin/bash /opt/pebble/charmed-spark-history-server.sh",
                     "startup": "disabled",
                     "environment": {
-                        "SPARK_PROPERTIES_FILE": "/etc/spark8t/conf/spark-defaults.conf"
+                        "SPARK_PROPERTIES_FILE": "/etc/spark/conf/spark-properties.conf"
                     },
                 },
             },
         }
     )
 
-    opt = Mount("/opt/", tmp_path)
+    etc = Mount("/etc/", tmp_path)
 
     return Container(
         name=CONTAINER,
         can_connect=True,
         layers={"base": layer},
         service_status={"history-server": pebble.ServiceStatus.ACTIVE},
-        mounts={"opt": opt},
+        mounts={"etc": etc},
     )
 
 
@@ -66,7 +67,7 @@ def s3_relation():
     relation_id = next_relation_id(update=True)
 
     return Relation(
-        endpoint=S3_INTEGRATOR_REL,
+        endpoint=S3,
         interface="s3",
         remote_app_name="s3-integrator",
         relation_id=relation_id,
@@ -83,12 +84,35 @@ def s3_relation():
 
 
 @pytest.fixture
+def s3_relation_tls():
+    """Provide fixture for the S3 relation."""
+    relation_id = next_relation_id(update=True)
+
+    return Relation(
+        endpoint=S3,
+        interface="s3",
+        remote_app_name="s3-integrator",
+        relation_id=relation_id,
+        local_app_data={"bucket": f"relation-{relation_id}"},
+        remote_app_data={
+            "access-key": "access-key",
+            "bucket": "my-bucket",
+            "data": f'{{"bucket": "relation-{relation_id}"}}',
+            "endpoint": "https://s3.endpoint",
+            "path": "spark-events",
+            "secret-key": "secret-key",
+            "tls-ca-chain": '["certificate"]',
+        },
+    )
+
+
+@pytest.fixture
 def ingress_relation():
     """Provide fixture for the ingress relation."""
     relation_id = next_relation_id(update=True)
 
     return Relation(
-        endpoint=INGRESS_REL,
+        endpoint=INGRESS,
         interface="ingress",
         remote_app_name="traefik-k8s",
         relation_id=relation_id,
