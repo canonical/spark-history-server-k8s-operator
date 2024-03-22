@@ -4,6 +4,7 @@
 
 """Spark History Server workload related event handlers."""
 
+from ops import ConfigChangedEvent
 from ops.charm import CharmBase
 
 from common.utils import WithLogging
@@ -31,13 +32,34 @@ class HistoryServerEvents(BaseEventHandler, WithLogging):
         )
         self.framework.observe(self.charm.on.update_status, self._update_event)
         self.framework.observe(self.charm.on.install, self._update_event)
+        self.framework.observe(self.charm.on.config_changed, self._on_config_changed)
 
     @compute_status
     def _on_spark_history_server_pebble_ready(self, event):
         """Handle on Pebble ready event."""
         self.logger.info("Pebble ready")
-        self.history_server.update(self.context.s3, self.context.ingress)
+        self.history_server.update(
+            self.context.s3,
+            self.context.ingress,
+            self.context.auth_proxy_config,
+            self.context.authorized_users,
+        )
 
     @compute_status
     def _update_event(self, _):
         pass
+
+    def _on_config_changed(self, _: ConfigChangedEvent):
+        """Handle the on config changed event."""
+        self.logger.info("On config changed event.")
+        self.history_server.update(
+            self.context.s3,
+            self.context.ingress,
+            self.context.auth_proxy_config,
+            self.context.authorized_users,
+        )
+        self.charm.unit.status = self.get_app_status(self.context.s3, self.context.ingress, None)
+        if self.charm.unit.is_leader():
+            self.charm.app.status = self.get_app_status(
+                self.context.s3, self.context.ingress, self.context.auth_proxy_config
+            )

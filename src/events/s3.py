@@ -40,12 +40,22 @@ class S3Events(BaseEventHandler, WithLogging):
     def _on_s3_credential_changed(self, _: CredentialsChangedEvent):
         """Handle the `CredentialsChangedEvent` event from S3 integrator."""
         self.logger.info("S3 Credentials changed")
-        self.history_server.update(self.context.s3, self.context.ingress)
+        self.history_server.update(
+            self.context.s3,
+            self.context.ingress,
+            self.context.auth_proxy_config,
+            self.context.authorized_users,
+        )
 
     def _on_s3_credential_gone(self, _: CredentialsGoneEvent):
         """Handle the `CredentialsGoneEvent` event for S3 integrator."""
         self.logger.info("S3 Credentials gone")
-        self.history_server.update(None, self.context.ingress)
+        self.history_server.update(
+            None,
+            self.context.ingress,
+            self.context.auth_proxy_config,
+            self.context.authorized_users,
+        )
 
         self.charm.unit.status = self.get_app_status(
             None, self.context.ingress, self.context.auth_proxy_config
