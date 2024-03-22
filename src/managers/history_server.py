@@ -6,8 +6,6 @@
 
 import re
 
-from charms.oathkeeper.v0.auth_proxy import AuthProxyConfig
-
 from common.utils import WithLogging
 from core.context import AUTH_PROXY_HEADERS, IngressUrl, S3ConnectionInfo
 from core.workload import SparkHistoryWorkloadBase
@@ -28,12 +26,10 @@ class HistoryServerConfig(WithLogging):
         self,
         s3: S3ConnectionInfo | None,
         ingress: IngressUrl | None,
-        auth_proxy_config: AuthProxyConfig | None,
         authorized_users: str | None,
     ):
         self.s3 = s3
         self.ingress = ingress
-        self.auth_proxy_config = auth_proxy_config
         self.authorized_users = authorized_users
 
     @staticmethod
@@ -77,11 +73,9 @@ class HistoryServerConfig(WithLogging):
                 "spark.com.canonical.charmedspark.history.AuthorizationServletFilter.param.authorizedParameter": AUTH_PROXY_HEADERS[
                     1
                 ],
-                "spark.com.canonical.charmedspark.history.AuthorizationServletFilter.param.authorizedEntities": (
-                    self.authorized_users if self.authorized_users else ""
-                ),
+                "spark.com.canonical.charmedspark.history.AuthorizationServletFilter.param.authorizedEntities": users,
             }
-            if self.auth_proxy_config and self.ingress
+            if (users := self.authorized_users)
             else {}
         )
 
@@ -115,7 +109,6 @@ class HistoryServerManager(WithLogging):
         self,
         s3: S3ConnectionInfo | None,
         ingress: IngressUrl | None,
-        auth_proxy_config: AuthProxyConfig | None,
         authorized_users: str | None,
     ) -> None:
         """Update the Spark History server service if needed."""
@@ -124,7 +117,7 @@ class HistoryServerManager(WithLogging):
 
         self.workload.stop()
 
-        config = HistoryServerConfig(s3, ingress, auth_proxy_config, authorized_users)
+        config = HistoryServerConfig(s3, ingress, authorized_users)
 
         self.workload.write(config.contents, str(self.workload.paths.spark_properties))
         self.workload.set_environment(

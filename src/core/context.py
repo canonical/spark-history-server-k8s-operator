@@ -39,7 +39,7 @@ class Context(WithLogging):
     @property
     def authorized_users(self) -> str | None:
         """The comma-separated list of authorized users."""
-        return self.charm.config[AUTHORIZED_USERS]
+        return self.charm.config[AUTHORIZED_USERS] if self._oathkeeper_relation else None
 
     # -----------------
     # --- RELATIONS ---

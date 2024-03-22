@@ -13,7 +13,7 @@ from charms.traefik_k8s.v2.ingress import (
     IngressPerAppRequirer,
     IngressPerAppRevokedEvent,
 )
-from ops import CharmBase
+from ops import CharmBase, RelationChangedEvent
 
 from common.utils import WithLogging
 from core.context import INGRESS, OATHKEEPER, Context
@@ -56,7 +56,6 @@ class IngressEvents(BaseEventHandler, WithLogging):
         self.history_server.update(
             self.context.s3,
             self.context.ingress,
-            self.context.auth_proxy_config,
             self.context.authorized_users,
         )
 
@@ -66,7 +65,7 @@ class IngressEvents(BaseEventHandler, WithLogging):
     def _on_ingress_revoked(self, _: IngressPerAppRevokedEvent):
         """Handle the `IngressPerAppRevokedEvent`."""
         self.log_result("This app no longer has ingress")(
-            self.history_server.update(self.context.s3, None, None, self.context.authorized_users)
+            self.history_server.update(self.context.s3, None, self.context.authorized_users)
         )
 
         self.charm.unit.status = self.get_app_status(
@@ -81,7 +80,7 @@ class IngressEvents(BaseEventHandler, WithLogging):
         """Handle the removal of the AuthProxy."""
         self.logger.info("AuthProxy configuration gone")
         self.history_server.update(
-            self.context.s3, self.context.ingress, None, self.context.authorized_users
+            self.context.s3, self.context.ingress, self.context.authorized_users
         )
 
         self.charm.unit.status = self.get_app_status(self.context.s3, self.context.ingress, None)
@@ -91,18 +90,13 @@ class IngressEvents(BaseEventHandler, WithLogging):
             )
 
     @compute_status
-    def _on_auth_proxy_changed(self, _: AuthProxyRelationRemovedEvent):
-        """Handle the removal of the AuthProxy."""
-        self.logger.info("AuthProxy configuration gone")
+    def _on_auth_proxy_changed(self, _: RelationChangedEvent):
+        """Handle the change of configuration of the AuthProxy."""
+        self.logger.info("AuthProxy configuration changed.")
         self.history_server.update(
             self.context.s3,
             self.context.ingress,
-            self.context.auth_proxy_config,
             self.context.authorized_users,
         )
-
-        self.charm.unit.status = self.get_app_status(self.context.s3, self.context.ingress, None)
-        if self.charm.unit.is_leader():
-            self.charm.app.status = self.get_app_status(
-                self.context.s3, self.context.ingress, self.context.auth_proxy_config
-            )
+        # auth proxy config
+        self.auth_proxy.update_auth_proxy_config(auth_proxy_config=self.context.auth_proxy_config)

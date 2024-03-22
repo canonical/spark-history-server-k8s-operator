@@ -41,7 +41,6 @@ class HistoryServerEvents(BaseEventHandler, WithLogging):
         self.history_server.update(
             self.context.s3,
             self.context.ingress,
-            self.context.auth_proxy_config,
             self.context.authorized_users,
         )
 
@@ -55,11 +54,10 @@ class HistoryServerEvents(BaseEventHandler, WithLogging):
         self.history_server.update(
             self.context.s3,
             self.context.ingress,
-            self.context.auth_proxy_config,
             self.context.authorized_users,
         )
         self.charm.unit.status = self.get_app_status(self.context.s3, self.context.ingress, None)
         if self.charm.unit.is_leader():
             self.charm.app.status = self.get_app_status(
-                self.context.s3, self.context.ingress, self.context.auth_proxy_config
+                self.context.s3, self.context.ingress, self.context.authorized_users
             )

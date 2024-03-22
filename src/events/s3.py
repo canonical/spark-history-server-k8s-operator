@@ -43,7 +43,6 @@ class S3Events(BaseEventHandler, WithLogging):
         self.history_server.update(
             self.context.s3,
             self.context.ingress,
-            self.context.auth_proxy_config,
             self.context.authorized_users,
         )
 
@@ -53,7 +52,6 @@ class S3Events(BaseEventHandler, WithLogging):
         self.history_server.update(
             None,
             self.context.ingress,
-            self.context.auth_proxy_config,
             self.context.authorized_users,
         )
 
