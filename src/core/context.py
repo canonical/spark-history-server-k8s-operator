@@ -17,8 +17,8 @@ from core.domain import S3ConnectionInfo
 S3 = "s3-credentials"
 INGRESS = "ingress"
 OATHKEEPER = "auth-proxy"
-
-AUTH_PROXY_HEADERS = ["X-User"]
+AUTHORIZED_USERS = "authorized-users"
+AUTH_PROXY_HEADERS = ["X-User", "X-Email"]
 
 
 class Context(WithLogging):
@@ -36,8 +36,10 @@ class Context(WithLogging):
     # --------------
     # --- CONFIG ---
     # --------------
-    # We don't have config yet in the Spark History Server charm.
-    # --------------
+    @property
+    def authorized_users(self) -> str | None:
+        """The comma-separated list of authorized users."""
+        return self.charm.config[AUTHORIZED_USERS] if self._oathkeeper_relation else None
 
     # -----------------
     # --- RELATIONS ---

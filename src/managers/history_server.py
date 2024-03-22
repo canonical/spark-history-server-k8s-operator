@@ -7,7 +7,7 @@
 import re
 
 from common.utils import WithLogging
-from core.context import IngressUrl, S3ConnectionInfo
+from core.context import AUTH_PROXY_HEADERS, IngressUrl, S3ConnectionInfo
 from core.workload import SparkHistoryWorkloadBase
 from managers.tls import TLSManager
 
@@ -22,9 +22,15 @@ class HistoryServerConfig(WithLogging):
         "spark.eventLog.enabled": "true",
     }
 
-    def __init__(self, s3: S3ConnectionInfo | None, ingress: IngressUrl | None):
+    def __init__(
+        self,
+        s3: S3ConnectionInfo | None,
+        ingress: IngressUrl | None,
+        authorized_users: str | None,
+    ):
         self.s3 = s3
         self.ingress = ingress
+        self.authorized_users = authorized_users
 
     @staticmethod
     def _ssl_enabled(endpoint: str | None) -> str:
@@ -59,9 +65,23 @@ class HistoryServerConfig(WithLogging):
             }
         return {}
 
+    @property
+    def _auth_conf(self) -> dict[str, str]:
+        return (
+            {
+                "spark.ui.filters": "com.canonical.charmedspark.history.AuthorizationServletFilter",
+                "spark.com.canonical.charmedspark.history.AuthorizationServletFilter.param.authorizedParameter": AUTH_PROXY_HEADERS[
+                    1
+                ],
+                "spark.com.canonical.charmedspark.history.AuthorizationServletFilter.param.authorizedEntities": users,
+            }
+            if (users := self.authorized_users)
+            else {}
+        )
+
     def to_dict(self) -> dict[str, str]:
         """Return the dict representation of the configuration file."""
-        return self._base_conf | self._s3_conf | self._ingress_proxy_conf
+        return self._base_conf | self._s3_conf | self._ingress_proxy_conf | self._auth_conf
 
     @property
     def contents(self) -> str:
@@ -85,11 +105,19 @@ class HistoryServerManager(WithLogging):
 
         self.tls = TLSManager(workload)
 
-    def update(self, s3: S3ConnectionInfo | None, ingress: IngressUrl | None) -> None:
+    def update(
+        self,
+        s3: S3ConnectionInfo | None,
+        ingress: IngressUrl | None,
+        authorized_users: str | None,
+    ) -> None:
         """Update the Spark History server service if needed."""
+        if not self.workload.ready():
+            return
+
         self.workload.stop()
 
-        config = HistoryServerConfig(s3, ingress)
+        config = HistoryServerConfig(s3, ingress, authorized_users)
 
         self.workload.write(config.contents, str(self.workload.paths.spark_properties))
         self.workload.set_environment(

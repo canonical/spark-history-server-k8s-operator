@@ -17,6 +17,8 @@ import yaml
 from pytest_operator.plugin import OpsTest
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
+from core.context import AUTH_PROXY_HEADERS
+
 from .test_helpers import fetch_action_sync_s3_credentials, setup_s3_bucket_for_history_server
 
 logger = logging.getLogger(__name__)
@@ -322,6 +324,61 @@ async def test_oathkeeper(ops_test: OpsTest, charm_versions):
         assert e.code == 401
 
     logger.info(f"Endpoint: {ingress_endpoint} successfully protected.")
+
+    # check that servlet filter is enabled on the unit endpoint
+    status = await ops_test.model.get_status()
+    address = status["applications"][APP_NAME]["units"][f"{APP_NAME}/0"]["address"]
+    try:
+        _ = urllib.request.urlopen(f"http://{address}:18080/api/v1/applications")
+        raise Exception(
+            "Successful request.... something is wrong with the servlet filter configuration..."
+        )
+
+    except urllib.error.HTTPError as e:  # type: ignore
+        # Return code error (e.g. 404, 501, ...)
+        logger.info("HTTPError: {}".format(e.code))
+        # check that the endopoint respond with code 500
+        assert e.code == 500
+
+    status = await ops_test.model.get_status()
+    address = status["applications"][APP_NAME]["units"][f"{APP_NAME}/0"]["address"]
+    req = urllib.request.Request(f"http://{address}:18080/api/v1/applications")
+    req.add_header(AUTH_PROXY_HEADERS[1], "xxx")
+    apps = json.loads(urllib.request.urlopen(req).read())
+    assert len(apps) == 1
+
+    # configure the history server charm with a new authorized user yyy
+    authorized_user = "test-user"
+    authorized_users = {"authorized-users": authorized_user}
+    await ops_test.model.applications[APP_NAME].set_config(authorized_users)
+
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME],
+        status="active",
+        timeout=300,
+        idle_period=30,
+    )
+
+    # check that user admin is not authorized
+    try:
+        req = urllib.request.Request(f"http://{address}:18080/api/v1/applications")
+        req.add_header(AUTH_PROXY_HEADERS[1], "admin")
+        _ = urllib.request.urlopen(req)
+        raise Exception(
+            "Successful request.... something is wrong with the servlet filter configuration..."
+        )
+
+    except urllib.error.HTTPError as e:  # type: ignore
+        # Return code error (e.g. 404, 501, ...)
+        logger.info("HTTPError: {}".format(e.code))
+        # check that the endopoint respond with code 401
+        assert e.code == 401
+
+    # check that user is authorized
+    req1 = urllib.request.Request(f"http://{address}:18080/api/v1/applications")
+    req1.add_header(AUTH_PROXY_HEADERS[1], authorized_user)
+    apps = json.loads(urllib.request.urlopen(req1).read())
+    assert len(apps) == 1
 
 
 @pytest.mark.skip
