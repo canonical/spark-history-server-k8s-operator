@@ -79,9 +79,7 @@ class IngressEvents(BaseEventHandler, WithLogging):
     def _on_auth_proxy_removed(self, _: AuthProxyRelationRemovedEvent):
         """Handle the removal of the AuthProxy."""
         self.logger.info("AuthProxy configuration gone")
-        self.history_server.update(
-            self.context.s3, self.context.ingress, self.context.authorized_users
-        )
+        self.history_server.update(self.context.s3, self.context.ingress, None)
 
         self.charm.unit.status = self.get_app_status(self.context.s3, self.context.ingress, None)
         if self.charm.unit.is_leader():
