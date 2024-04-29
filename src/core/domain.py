@@ -56,12 +56,12 @@ class S3ConnectionInfo(StateBase):
     @property
     def access_key(self) -> str:
         """Return the access key."""
-        return self.relation_data["access-key"]
+        return self.relation_data.get("access-key", "")
 
     @property
     def secret_key(self) -> str:
         """Return the secret key."""
-        return self.relation_data["secret-key"]
+        return self.relation_data.get("secret-key", "")
 
     @property
     def path(self) -> str:
