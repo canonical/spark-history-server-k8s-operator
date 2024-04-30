@@ -9,6 +9,7 @@ import re
 from common.utils import WithLogging
 from core.context import AUTH_PROXY_HEADERS, IngressUrl, S3ConnectionInfo
 from core.workload import SparkHistoryWorkloadBase
+from managers.s3 import S3Manager
 from managers.tls import TLSManager
 
 
@@ -24,7 +25,7 @@ class HistoryServerConfig(WithLogging):
 
     def __init__(
         self,
-        s3: S3ConnectionInfo | None,
+        s3: S3Manager | None,
         ingress: IngressUrl | None,
         authorized_users: str | None,
     ):
@@ -53,15 +54,17 @@ class HistoryServerConfig(WithLogging):
 
     @property
     def _s3_conf(self) -> dict[str, str]:
-        if s3 := self.s3:
+        if (s3 := self.s3) and s3.verify():
             return {
-                "spark.hadoop.fs.s3a.endpoint": s3.endpoint or "https://s3.amazonaws.com",
-                "spark.hadoop.fs.s3a.access.key": s3.access_key,
-                "spark.hadoop.fs.s3a.secret.key": s3.secret_key,
-                "spark.eventLog.dir": s3.log_dir,
-                "spark.history.fs.logDirectory": s3.log_dir,
+                "spark.hadoop.fs.s3a.endpoint": s3.config.endpoint or "https://s3.amazonaws.com",
+                "spark.hadoop.fs.s3a.access.key": s3.config.access_key,
+                "spark.hadoop.fs.s3a.secret.key": s3.config.secret_key,
+                "spark.eventLog.dir": s3.config.log_dir,
+                "spark.history.fs.logDirectory": s3.config.log_dir,
                 "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-                "spark.hadoop.fs.s3a.connection.ssl.enabled": self._ssl_enabled(s3.endpoint),
+                "spark.hadoop.fs.s3a.connection.ssl.enabled": self._ssl_enabled(
+                    s3.config.endpoint
+                ),
             }
         return {}
 
@@ -117,7 +120,8 @@ class HistoryServerManager(WithLogging):
 
         self.workload.stop()
 
-        config = HistoryServerConfig(s3, ingress, authorized_users)
+        s3_manager = S3Manager(s3) if s3 else None
+        config = HistoryServerConfig(s3_manager, ingress, authorized_users)
 
         self.workload.write(config.contents, str(self.workload.paths.spark_properties))
         self.workload.set_environment(
@@ -126,7 +130,7 @@ class HistoryServerManager(WithLogging):
 
         self.tls.reset()
 
-        if not s3:
+        if not s3_manager or not s3_manager.verify():
             return
 
         if tls_ca_chain := s3.tls_ca_chain:
