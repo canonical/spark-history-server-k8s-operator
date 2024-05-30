@@ -10,8 +10,10 @@ It is part of an open source, end-to-end, production ready data platform on top 
 
 History Server is the component of Apache Spark which enables the user to view and analyze logs of completed Spark applications.
 
-This operator charm deploys and operates Apache Spark History Server on Kubernetes environments. 
+The Spark History Server charm operator deploys and operates Apache Spark History Server on Kubernetes environments.
 It depends on the S3 integrator charm from Canonical for S3 related configuration.
+
+The Spark History Server charm can be found on [Charmhub](https://charmhub.io/spark-history-server-k8s). 
 
 ## Usage
 
