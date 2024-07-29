@@ -42,6 +42,7 @@ class S3Events(BaseEventHandler, WithLogging):
         self.logger.info("S3 Credentials changed")
         self.history_server.update(
             self.context.s3,
+            self.context.azure_storage,
             self.context.ingress,
             self.context.authorized_users,
         )
@@ -51,14 +52,18 @@ class S3Events(BaseEventHandler, WithLogging):
         self.logger.info("S3 Credentials gone")
         self.history_server.update(
             None,
+            self.context.azure_storage,
             self.context.ingress,
             self.context.authorized_users,
         )
 
         self.charm.unit.status = self.get_app_status(
-            None, self.context.ingress, self.context.auth_proxy_config
+            None, self.context.azure_storage, self.context.ingress, self.context.auth_proxy_config
         )
         if self.charm.unit.is_leader():
             self.charm.app.status = self.get_app_status(
-                None, self.context.ingress, self.context.auth_proxy_config
+                None,
+                self.context.azure_storage,
+                self.context.ingress,
+                self.context.auth_proxy_config,
             )

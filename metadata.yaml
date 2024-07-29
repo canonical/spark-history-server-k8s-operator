@@ -1,4 +1,4 @@
-# Copyright 2023 Canonical Ltd.
+# Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 name: spark-history-server-k8s
@@ -25,6 +25,8 @@ resources:
 requires:
   s3-credentials:
     interface: s3
+  azure-credentials:
+    interface: azure
   ingress:
     interface: ingress
     limit: 1

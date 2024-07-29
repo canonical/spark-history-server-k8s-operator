@@ -7,7 +7,7 @@ from scenario import Container, Context, Model, Mount, Relation
 from scenario.state import next_relation_id
 
 from charm import SparkHistoryServerCharm
-from constants import CONTAINER
+from constants import AZURE_RELATION_NAME, CONTAINER
 from core.context import INGRESS, S3
 
 
@@ -126,5 +126,27 @@ def ingress_relation():
         },
         remote_app_data={
             "ingress": '{"url": "http://spark.deusebio.com/spark-spark-history-server-k8s"}'
+        },
+    )
+
+
+@pytest.fixture
+def azure_storage_relation():
+    """Provide fixture for the Azure storage relation."""
+    relation_id = next_relation_id(update=True)
+
+    return Relation(
+        endpoint=AZURE_RELATION_NAME,
+        interface="azure",
+        remote_app_name="azure-storage-integrator",
+        relation_id=relation_id,
+        local_app_data={"container": f"relation-{relation_id}"},
+        remote_app_data={
+            "container": "my-bucket",
+            "data": f'{{"container": "relation-{relation_id}"}}',
+            "path": "spark-events",
+            "storage-account": "test-storage-account",
+            "connection-protocol": "abfss",
+            "secret-key": "some-secret",
         },
     )

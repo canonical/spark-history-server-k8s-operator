@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-# Copyright 2022 Canonical Ltd.
+# Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
+import os
 from typing import Optional
 
 import pytest
 from pydantic import BaseModel
+from pytest_operator.plugin import OpsTest
 
 
 class CharmVersion(BaseModel):
@@ -42,6 +44,7 @@ class IntegrationTestsCharms(BaseModel):
     s3: CharmVersion
     ingress: CharmVersion
     oathkeeper: CharmVersion
+    azure_storage: CharmVersion
 
 
 @pytest.fixture
@@ -64,4 +67,23 @@ def charm_versions() -> IntegrationTestsCharms:
                 "series": "jammy",
             }
         ),
+        azure_storage=CharmVersion(
+            **{
+                "name": "azure-storage-integrator",
+                "channel": "edge",
+                "series": "jammy",
+                "alias": "azure-storage",
+            }
+        ),
     )
+
+
+@pytest.fixture(scope="module")
+def azure_credentials(ops_test: OpsTest):
+    return {
+        "container": "test-container",
+        "path": "spark-events",
+        "storage-account": os.environ["AZURE_STORAGE_ACCOUNT"],
+        "connection-protocol": "abfss",
+        "secret-key": os.environ["AZURE_STORAGE_KEY"],
+    }

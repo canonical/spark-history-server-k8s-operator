@@ -86,3 +86,62 @@ class S3ConnectionInfo(StateBase):
     def log_dir(self) -> str:
         """Return the full path to the object."""
         return f"s3a://{self.bucket}/{self.path}"
+
+
+class AzureStorageConnectionInfo:
+    """Class representing credentials and endpoints to connect to S3."""
+
+    def __init__(self, relation_data):
+        self.relation_data = relation_data
+
+    @property
+    def endpoint(self) -> str | None:
+        """Return endpoint of the Azure storage container."""
+        if self.connection_protocol in ("abfs", "abfss"):
+            return f"{self.connection_protocol}://{self.container}@{self.storage_account}.dfs.core.windows.net"
+        elif self.connection_protocol in ("wasb", "wasbs"):
+            return f"{self.connection_protocol}://{self.container}@{self.storage_account}.blob.core.windows.net"
+        return ""
+
+    @property
+    def secret_key(self) -> str:
+        """Return the secret key."""
+        return self.relation_data["secret-key"]
+
+    @property
+    def path(self) -> str:
+        """Return the path in the Azure Storage container."""
+        return self.relation_data.get("path", "")
+
+    @property
+    def container(self) -> str:
+        """Return the name of the Azure Storage container."""
+        return self.relation_data["container"]
+
+    @property
+    def connection_protocol(self) -> str:
+        """Return the protocol to be used to access files."""
+        return self.relation_data["connection-protocol"].lower()
+
+    @property
+    def storage_account(self) -> str:
+        """Return the name of the Azure Storage account."""
+        return self.relation_data["storage-account"]
+
+    @property
+    def log_dir(self) -> str:
+        """Return the full path to the object."""
+        if self.endpoint:
+            return f"{self.endpoint}//{self.path}"
+        return ""
+
+    @property
+    def connection_string(self) -> str:
+        """Return the connection string that can be used to connect to storage account."""
+        protocol = "http" if self.connection_protocol in ("wasb", "abfs") else "https"
+        return (
+            f"DefaultEndpointsProtocol={protocol};"
+            f"AccountName={self.storage_account};"
+            f"AccountKey={self.secret_key};"
+            "EndpointSuffix=core.windows.net"
+        )

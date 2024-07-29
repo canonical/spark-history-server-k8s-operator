@@ -11,6 +11,7 @@ from common.utils import WithLogging
 from constants import CONTAINER, PEBBLE_USER
 from core.context import Context
 from core.domain import User
+from events.azure_storage import AzureStorageEvents
 from events.history_server import HistoryServerEvents
 from events.ingress import IngressEvents
 from events.s3 import S3Events
@@ -31,6 +32,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
 
         self.ingress = IngressEvents(self, context, workload)
         self.s3 = S3Events(self, context, workload)
+        self.azure_storage = AzureStorageEvents(self, context, workload)
         self.history_server = HistoryServerEvents(self, context, workload)
 
 
