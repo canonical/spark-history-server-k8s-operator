@@ -109,6 +109,10 @@ jobs:
           secretkey: 'secretkey'
           bucket: 'testbucket'
           osdsize: '3G'
+      - name: Setup Azure CLI
+        id: Azure
+        run: |
+          sudo snap install azcli
       - name: Download packed charm(s)
         uses: actions/download-artifact@v4
         with:
