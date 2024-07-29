@@ -131,7 +131,18 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_credent
     status = await ops_test.model.get_status()
     address = status["applications"][APP_NAME]["units"][f"{APP_NAME}/0"]["address"]
 
-    apps = json.loads(urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read())
+    for i in range(0, 5):
+        try:
+            apps = json.loads(
+                urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read()
+            )
+        except Exception:
+            apps = []
+
+        if len(apps) == 0:
+            break
+        else:
+            sleep(5)
 
     assert len(apps) == 0
 
