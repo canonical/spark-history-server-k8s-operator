@@ -71,6 +71,7 @@ jobs:
         tox-environments:
           - integration-charm
           - integration-tls
+          - integration-azure
     name: ${{ matrix.tox-environments }}
     needs:
       - lint
