@@ -59,7 +59,10 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_credent
     )
 
     await ops_test.model.wait_for_idle(
-        apps=[APP_NAME, charm_versions.azure_storage.application_name], timeout=1000
+        apps=[charm_versions.azure_storage.application_name],
+        timeout=1000,
+        status="blocked",
+        idle_period=30,
     )
 
     logger.info("Adding Juju secret for secret-key config option for azure-storage-integrator")
