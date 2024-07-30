@@ -44,7 +44,7 @@ def test_pebble_ready(exec_calls, history_server_ctx, history_server_container):
         containers=[history_server_container],
     )
     out = history_server_ctx.run(history_server_container.pebble_ready_event, state)
-    assert out.unit_status == BlockedStatus("Missing S3 relation")
+    assert out.unit_status == BlockedStatus("Missing relation with storage (s3 or azure)")
 
 
 @patch("managers.s3.S3Manager.verify", return_value=True)
@@ -169,7 +169,9 @@ def test_s3_relation_broken(
         s3_relation.broken_event, state_after_relation_changed
     )
 
-    assert state_after_relation_broken.unit_status == BlockedStatus("Missing S3 relation")
+    assert state_after_relation_broken.unit_status == BlockedStatus(
+        "Missing relation with storage (s3 or azure)"
+    )
 
     spark_properties = parse_spark_properties(state_after_relation_broken, tmp_path)
 
@@ -192,7 +194,7 @@ def test_ingress_relation_creation(
         networks=[Network.default(ingress_relation.endpoint)],
     )
     out = history_server_ctx.run(ingress_relation.changed_event, state)
-    assert out.unit_status == BlockedStatus("Missing S3 relation")
+    assert out.unit_status == BlockedStatus("Missing relation with storage (s3 or azure)")
 
 
 @patch("managers.s3.S3Manager.verify", return_value=True)
@@ -242,3 +244,111 @@ def test_remove_ingress(
     spark_properties = parse_spark_properties(out, tmp_path)
 
     assert "spark.ui.proxyRedirectUri" not in spark_properties
+
+
+@patch("managers.s3.S3Manager.verify", return_value=True)
+@patch("workload.SparkHistoryServer.exec")
+@patch("ops.JujuVersion.has_secrets", return_value=True)
+def test_azure_storage_relation(
+    mock_has_secrets,
+    exec_calls,
+    verify_call,
+    tmp_path,
+    history_server_ctx,
+    history_server_container,
+    azure_storage_relation,
+):
+    state = State(
+        relations=[azure_storage_relation],
+        containers=[history_server_container],
+    )
+
+    out = history_server_ctx.run(azure_storage_relation.changed_event, state)
+    assert out.unit_status == ActiveStatus("")
+
+    # Check containers modifications
+    assert len(out.get_container(CONTAINER).layers) == 2
+
+    envs = (
+        out.get_container(CONTAINER)
+        .layers["spark-history-server"]
+        .services["history-server"]
+        .environment
+    )
+
+    assert "SPARK_PROPERTIES_FILE" in envs
+
+    spark_properties = parse_spark_properties(out, tmp_path)
+
+    # Assert one of the keys
+    storage_account = azure_storage_relation.remote_app_data["storage-account"]
+    assert (
+        f"spark.hadoop.fs.azure.account.key.{storage_account}.dfs.core.windows.net"
+        in spark_properties
+    )
+    assert (
+        spark_properties[
+            f"spark.hadoop.fs.azure.account.key.{storage_account}.dfs.core.windows.net"
+        ]
+        == azure_storage_relation.remote_app_data["secret-key"]
+    )
+
+
+@patch("managers.s3.S3Manager.verify", return_value=True)
+@patch("workload.SparkHistoryServer.exec")
+@patch("ops.JujuVersion.has_secrets", return_value=True)
+def test_azure_storage_relation_broken(
+    mock_has_secrets,
+    exec_calls,
+    verify_call,
+    tmp_path,
+    history_server_ctx,
+    history_server_container,
+    azure_storage_relation,
+):
+    state = State(
+        relations=[azure_storage_relation],
+        containers=[history_server_container],
+    )
+
+    state_after_relation_changed = history_server_ctx.run(
+        azure_storage_relation.changed_event, state
+    )
+    state_after_relation_broken = history_server_ctx.run(
+        azure_storage_relation.broken_event, state_after_relation_changed
+    )
+
+    assert state_after_relation_broken.unit_status == BlockedStatus(
+        "Missing relation with storage (s3 or azure)"
+    )
+
+    spark_properties = parse_spark_properties(state_after_relation_broken, tmp_path)
+
+    storage_account = azure_storage_relation.remote_app_data["storage-account"]
+    assert (
+        f"spark.hadoop.fs.azure.account.key.{storage_account}.dfs.core.windows.net"
+        not in spark_properties
+    )
+
+
+@patch("managers.s3.S3Manager.verify", return_value=True)
+@patch("workload.SparkHistoryServer.exec")
+@patch("ops.JujuVersion.has_secrets", return_value=True)
+def test_both_azure_storage_and_s3_relation_together(
+    mock_has_secrets,
+    exec_calls,
+    verify_call,
+    tmp_path,
+    history_server_ctx,
+    history_server_container,
+    s3_relation,
+    azure_storage_relation,
+):
+    state = State(
+        relations=[s3_relation, azure_storage_relation],
+        containers=[history_server_container],
+    )
+    out = history_server_ctx.run(azure_storage_relation.changed_event, state)
+    assert out.unit_status == BlockedStatus(
+        "Spark History Server can be related to only one storage backend at a time."
+    )

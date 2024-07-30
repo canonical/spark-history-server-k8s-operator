@@ -9,3 +9,4 @@
 CONTAINER = "spark-history-server"
 
 PEBBLE_USER = ("_daemon_", "_daemon_")
+AZURE_RELATION_NAME = "azure-credentials"

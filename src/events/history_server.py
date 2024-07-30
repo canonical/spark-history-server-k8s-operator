@@ -40,6 +40,7 @@ class HistoryServerEvents(BaseEventHandler, WithLogging):
         self.logger.info("Pebble ready")
         self.history_server.update(
             self.context.s3,
+            self.context.azure_storage,
             self.context.ingress,
             self.context.authorized_users,
         )
@@ -53,11 +54,14 @@ class HistoryServerEvents(BaseEventHandler, WithLogging):
         self.logger.info("On config changed event.")
         self.history_server.update(
             self.context.s3,
+            self.context.azure_storage,
             self.context.ingress,
             self.context.authorized_users,
         )
-        self.charm.unit.status = self.get_app_status(self.context.s3, self.context.ingress, None)
+        self.charm.unit.status = self.get_app_status(
+            self.context.s3, self.context.azure_storage, self.context.ingress, None
+        )
         if self.charm.unit.is_leader():
             self.charm.app.status = self.get_app_status(
-                self.context.s3, self.context.ingress, self.context.authorized_users
+                self.context.s3, self.context.azure_storage, self.context.ingress, self.context.authorized_users  # type: ignore
             )

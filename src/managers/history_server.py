@@ -8,7 +8,9 @@ import re
 
 from common.utils import WithLogging
 from core.context import AUTH_PROXY_HEADERS, IngressUrl, S3ConnectionInfo
+from core.domain import AzureStorageConnectionInfo
 from core.workload import SparkHistoryWorkloadBase
+from managers.azure_storage import AzureStorageManager
 from managers.s3 import S3Manager
 from managers.tls import TLSManager
 
@@ -26,10 +28,12 @@ class HistoryServerConfig(WithLogging):
     def __init__(
         self,
         s3: S3Manager | None,
+        azure: AzureStorageConnectionInfo | None,
         ingress: IngressUrl | None,
         authorized_users: str | None,
     ):
         self.s3 = s3
+        self.azure_storage = AzureStorageManager(azure) if azure else None
         self.ingress = ingress
         self.authorized_users = authorized_users
 
@@ -69,6 +73,30 @@ class HistoryServerConfig(WithLogging):
         return {}
 
     @property
+    def _azure_storage_conf(self) -> dict[str, str]:
+        if azure_storage := self.azure_storage:
+            confs = {
+                "spark.eventLog.enabled": "true",
+                "spark.eventLog.dir": azure_storage.config.log_dir,
+                "spark.history.fs.logDirectory": azure_storage.config.log_dir,
+            }
+            connection_protocol = azure_storage.config.connection_protocol
+            if connection_protocol.lower() in ("abfss", "abfs"):
+                confs.update(
+                    {
+                        f"spark.hadoop.fs.azure.account.key.{azure_storage.config.storage_account}.dfs.core.windows.net": azure_storage.config.secret_key
+                    }
+                )
+            elif connection_protocol.lower() in ("wasb", "wasbs"):
+                confs.update(
+                    {
+                        f"spark.hadoop.fs.azure.account.key.{azure_storage.config.storage_account}.blob.core.windows.net": azure_storage.config.secret_key
+                    }
+                )
+            return confs
+        return {}
+
+    @property
     def _auth_conf(self) -> dict[str, str]:
         return (
             {
@@ -84,7 +112,13 @@ class HistoryServerConfig(WithLogging):
 
     def to_dict(self) -> dict[str, str]:
         """Return the dict representation of the configuration file."""
-        return self._base_conf | self._s3_conf | self._ingress_proxy_conf | self._auth_conf
+        return (
+            self._base_conf
+            | self._s3_conf
+            | self._azure_storage_conf
+            | self._ingress_proxy_conf
+            | self._auth_conf
+        )
 
     @property
     def contents(self) -> str:
@@ -111,6 +145,7 @@ class HistoryServerManager(WithLogging):
     def update(
         self,
         s3: S3ConnectionInfo | None,
+        azure: AzureStorageConnectionInfo | None,
         ingress: IngressUrl | None,
         authorized_users: str | None,
     ) -> None:
@@ -121,7 +156,7 @@ class HistoryServerManager(WithLogging):
         self.workload.stop()
 
         s3_manager = S3Manager(s3) if s3 else None
-        config = HistoryServerConfig(s3_manager, ingress, authorized_users)
+        config = HistoryServerConfig(s3_manager, azure, ingress, authorized_users)
 
         self.workload.write(config.contents, str(self.workload.paths.spark_properties))
         self.workload.set_environment(
@@ -130,18 +165,19 @@ class HistoryServerManager(WithLogging):
 
         self.tls.reset()
 
-        if not s3_manager or not s3_manager.verify():
+        if (not s3_manager or not s3_manager.verify()) and not azure:
+            self.logger.info("Nor s3 or azure are ready")
             return
-
-        if tls_ca_chain := s3.tls_ca_chain:
-            self.tls.import_ca("\n".join(tls_ca_chain))
-            self.workload.set_environment(
-                {
-                    "SPARK_HISTORY_OPTS": f"-Djavax.net.ssl.trustStore={self.workload.paths.truststore} "
-                    f"-Djavax.net.ssl.trustStorePassword={self.tls.truststore_password}"
-                }
-            )
-        else:
-            self.workload.set_environment({"SPARK_HISTORY_OPTS": ""})
+        if s3:
+            if tls_ca_chain := s3.tls_ca_chain:
+                self.tls.import_ca("\n".join(tls_ca_chain))
+                self.workload.set_environment(
+                    {
+                        "SPARK_HISTORY_OPTS": f"-Djavax.net.ssl.trustStore={self.workload.paths.truststore} "
+                        f"-Djavax.net.ssl.trustStorePassword={self.tls.truststore_password}"
+                    }
+                )
+            else:
+                self.workload.set_environment({"SPARK_HISTORY_OPTS": ""})
 
         self.workload.start()

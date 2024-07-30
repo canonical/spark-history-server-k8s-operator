@@ -12,7 +12,8 @@ from charms.traefik_k8s.v2.ingress import IngressProviderAppData, IngressUrl
 from ops import ActiveStatus, BlockedStatus, CharmBase, MaintenanceStatus, ModelError, Relation
 
 from common.utils import WithLogging
-from core.domain import S3ConnectionInfo
+from constants import AZURE_RELATION_NAME
+from core.domain import AzureStorageConnectionInfo, S3ConnectionInfo
 
 S3 = "s3-credentials"
 INGRESS = "ingress"
@@ -32,6 +33,10 @@ class Context(WithLogging):
         self.s3_endpoint = RequirerData(
             self.charm.model, S3
         )  # TODO: It would be nice if we had something that is more general (e.g. without extra-user-roles)
+
+        self.azure_storage_endpoint = RequirerData(
+            self.charm.model, AZURE_RELATION_NAME, additional_secret_fields=["secret-key"]
+        )
 
     # --------------
     # --- CONFIG ---
@@ -113,13 +118,40 @@ class Context(WithLogging):
         else:
             return None
 
+    @property
+    def _azure_storage_relation_id(self) -> int | None:
+        """The Azure relation ID."""
+        return (
+            relation.id
+            if (relation := self.charm.model.get_relation(AZURE_RELATION_NAME))
+            else None
+        )
+
+    @property
+    def _azure_storage_relation(self) -> Relation | None:
+        """The Azure relation."""
+        return self.charm.model.get_relation(AZURE_RELATION_NAME)
+
+    @property
+    def azure_storage(self) -> AzureStorageConnectionInfo | None:
+        """The server state of the current running Unit."""
+        relation_data = (
+            self.azure_storage_endpoint.fetch_relation_data()[self._azure_storage_relation_id]
+            if self._azure_storage_relation
+            else None
+        )
+        return AzureStorageConnectionInfo(relation_data) if relation_data else None
+
 
 class Status(Enum):
     """Class bundling all statuses that the charm may fall into."""
 
     WAITING_PEBBLE = MaintenanceStatus("Waiting for Pebble")
-    MISSING_S3_RELATION = BlockedStatus("Missing S3 relation")
-    INVALID_CREDENTIALS = BlockedStatus("Invalid S3 credentials")
+    MISSING_STORAGE_RELATION = BlockedStatus("Missing relation with storage (s3 or azure)")
+    INVALID_S3_CREDENTIALS = BlockedStatus("Invalid S3 credentials")
     MISSING_INGRESS_RELATION = BlockedStatus("Missing INGRESS relation")
     NOT_RUNNING = BlockedStatus("History server not running. Please check logs.")
+    MULTIPLE_OBJECT_STORAGE_RELATIONS = BlockedStatus(
+        "Spark History Server can be related to only one storage backend at a time."
+    )
     ACTIVE = ActiveStatus("")

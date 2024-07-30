@@ -18,7 +18,7 @@ from ops import CharmBase, RelationChangedEvent
 from common.utils import WithLogging
 from core.context import INGRESS, OATHKEEPER, Context
 from core.workload import SparkHistoryWorkloadBase
-from events.base import BaseEventHandler, compute_status
+from events.base import BaseEventHandler, compute_status, defer_when_not_ready
 from managers.history_server import HistoryServerManager
 
 
@@ -49,12 +49,14 @@ class IngressEvents(BaseEventHandler, WithLogging):
         )
 
     @compute_status
+    @defer_when_not_ready
     def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
         """Handle the `IngressPerAppReadyEvent`."""
         self.logger.info("This app's ingress URL: %s", event.url)
 
         self.history_server.update(
             self.context.s3,
+            self.context.azure_storage,
             self.context.ingress,
             self.context.authorized_users,
         )
@@ -62,37 +64,47 @@ class IngressEvents(BaseEventHandler, WithLogging):
         # auth proxy config
         self.auth_proxy.update_auth_proxy_config(auth_proxy_config=self.context.auth_proxy_config)
 
+    @defer_when_not_ready
     def _on_ingress_revoked(self, _: IngressPerAppRevokedEvent):
         """Handle the `IngressPerAppRevokedEvent`."""
         self.log_result("This app no longer has ingress")(
-            self.history_server.update(self.context.s3, None, self.context.authorized_users)
+            self.history_server.update(
+                self.context.s3, self.context.azure_storage, None, self.context.authorized_users
+            )
         )
 
         self.charm.unit.status = self.get_app_status(
-            self.context.s3, None, self.context.auth_proxy_config
+            self.context.s3, self.context.azure_storage, None, self.context.auth_proxy_config
         )
         if self.charm.unit.is_leader():
             self.charm.app.status = self.get_app_status(
-                self.context.s3, None, self.context.auth_proxy_config
+                self.context.s3, self.context.azure_storage, None, self.context.auth_proxy_config
             )
 
+    @defer_when_not_ready
     def _on_auth_proxy_removed(self, _: AuthProxyRelationRemovedEvent):
         """Handle the removal of the AuthProxy."""
         self.logger.info("AuthProxy configuration gone")
-        self.history_server.update(self.context.s3, self.context.ingress, None)
+        self.history_server.update(
+            self.context.s3, self.context.azure_storage, self.context.ingress, None
+        )
 
-        self.charm.unit.status = self.get_app_status(self.context.s3, self.context.ingress, None)
+        self.charm.unit.status = self.get_app_status(
+            self.context.s3, self.context.azure_storage, self.context.ingress, None
+        )
         if self.charm.unit.is_leader():
             self.charm.app.status = self.get_app_status(
-                self.context.s3, self.context.ingress, None
+                self.context.s3, self.context.azure_storage, self.context.ingress, None
             )
 
     @compute_status
+    @defer_when_not_ready
     def _on_auth_proxy_changed(self, _: RelationChangedEvent):
         """Handle the change of configuration of the AuthProxy."""
         self.logger.info("AuthProxy configuration changed.")
         self.history_server.update(
             self.context.s3,
+            self.context.azure_storage,
             self.context.ingress,
             self.context.authorized_users,
         )
