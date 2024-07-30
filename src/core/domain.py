@@ -132,7 +132,7 @@ class AzureStorageConnectionInfo:
     def log_dir(self) -> str:
         """Return the full path to the object."""
         if self.endpoint:
-            return f"{self.endpoint}//{self.path}"
+            return f"{self.endpoint}/{self.path}"
         return ""
 
     @property
