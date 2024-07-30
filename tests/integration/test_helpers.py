@@ -140,10 +140,13 @@ async def add_juju_secret(
     ops_test: OpsTest, charm_name: str, secret_label: str, data: Dict[str, str]
 ) -> str:
     """Add a new juju secret."""
+    logger.info(f"Data keys to insert: {data.keys()}")
     key_values = " ".join([f"{key}={value}" for key, value in data.items()])
     command = f"add-secret {secret_label} {key_values}"
     _, stdout, _ = await ops_test.juju(*command.split())
+    logger.info(f"Add secret output: {stdout}")
     secret_uri = stdout.strip()
+    logger.info(f"Secret uri: {secret_uri}")
     command = f"grant-secret {secret_label} {charm_name}"
     _, stdout, _ = await ops_test.juju(*command.split())
     return secret_uri
