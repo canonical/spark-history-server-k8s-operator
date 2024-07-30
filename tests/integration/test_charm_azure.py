@@ -146,10 +146,6 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_credent
 
     assert len(apps) == 0
 
-    # create azure container
-
-    logger.info("Container setup complete")
-
     logger.info("Setting up spark")
 
     setup_spark_output = subprocess.check_output(
@@ -185,4 +181,5 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_credent
 
     assert len(apps) == 1
 
+    logger.info("Delete azure container!")
     delete_azure_container(azure_credentials["container"])

@@ -157,7 +157,7 @@ class HistoryServerManager(WithLogging):
 
         s3_manager = S3Manager(s3) if s3 else None
         config = HistoryServerConfig(s3_manager, azure, ingress, authorized_users)
-        self.logger.info(f"Config: {config.contents}")
+
         self.workload.write(config.contents, str(self.workload.paths.spark_properties))
         self.workload.set_environment(
             {"SPARK_PROPERTIES_FILE": str(self.workload.paths.spark_properties)}

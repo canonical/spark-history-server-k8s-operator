@@ -18,7 +18,7 @@ from ops import CharmBase, RelationChangedEvent
 from common.utils import WithLogging
 from core.context import INGRESS, OATHKEEPER, Context
 from core.workload import SparkHistoryWorkloadBase
-from events.base import BaseEventHandler, compute_status
+from events.base import BaseEventHandler, compute_status, defer_when_not_ready
 from managers.history_server import HistoryServerManager
 
 
@@ -49,6 +49,7 @@ class IngressEvents(BaseEventHandler, WithLogging):
         )
 
     @compute_status
+    @defer_when_not_ready
     def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
         """Handle the `IngressPerAppReadyEvent`."""
         self.logger.info("This app's ingress URL: %s", event.url)
@@ -63,6 +64,7 @@ class IngressEvents(BaseEventHandler, WithLogging):
         # auth proxy config
         self.auth_proxy.update_auth_proxy_config(auth_proxy_config=self.context.auth_proxy_config)
 
+    @defer_when_not_ready
     def _on_ingress_revoked(self, _: IngressPerAppRevokedEvent):
         """Handle the `IngressPerAppRevokedEvent`."""
         self.log_result("This app no longer has ingress")(
@@ -79,6 +81,7 @@ class IngressEvents(BaseEventHandler, WithLogging):
                 self.context.s3, self.context.azure_storage, None, self.context.auth_proxy_config
             )
 
+    @defer_when_not_ready
     def _on_auth_proxy_removed(self, _: AuthProxyRelationRemovedEvent):
         """Handle the removal of the AuthProxy."""
         self.logger.info("AuthProxy configuration gone")
@@ -95,6 +98,7 @@ class IngressEvents(BaseEventHandler, WithLogging):
             )
 
     @compute_status
+    @defer_when_not_ready
     def _on_auth_proxy_changed(self, _: RelationChangedEvent):
         """Handle the change of configuration of the AuthProxy."""
         self.logger.info("AuthProxy configuration changed.")

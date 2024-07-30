@@ -14,7 +14,7 @@ from ops import CharmBase
 from common.utils import WithLogging
 from core.context import Context
 from core.workload import SparkHistoryWorkloadBase
-from events.base import BaseEventHandler, compute_status
+from events.base import BaseEventHandler, compute_status, defer_when_not_ready
 from managers.history_server import HistoryServerManager
 
 
@@ -37,6 +37,7 @@ class S3Events(BaseEventHandler, WithLogging):
         self.framework.observe(self.s3_requirer.on.credentials_gone, self._on_s3_credential_gone)
 
     @compute_status
+    @defer_when_not_ready
     def _on_s3_credential_changed(self, _: CredentialsChangedEvent):
         """Handle the `CredentialsChangedEvent` event from S3 integrator."""
         self.logger.info("S3 Credentials changed")
@@ -47,6 +48,7 @@ class S3Events(BaseEventHandler, WithLogging):
             self.context.authorized_users,
         )
 
+    @defer_when_not_ready
     def _on_s3_credential_gone(self, _: CredentialsGoneEvent):
         """Handle the `CredentialsGoneEvent` event for S3 integrator."""
         self.logger.info("S3 Credentials gone")
