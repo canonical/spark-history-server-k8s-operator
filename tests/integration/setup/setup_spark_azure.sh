@@ -18,6 +18,7 @@ spark-client.service-account-registry create --username hello \
     --conf spark.hadoop.fs.azure.account.key.$account_name.dfs.core.windows.net=$secret_key \
     --conf spark.eventLog.enabled=true \
     --conf spark.eventLog.dir=$folder \
-    --conf spark.history.fs.logDirectory=$folder
+    --conf spark.history.fs.logDirectory=$folder \
+    --conf spark.kubernetes.container.image=ghcr.io/welpaolo/charmed-spark:4.0.0-preview1_edge
 
 spark-client.service-account-registry get-config --username hello
