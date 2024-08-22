@@ -13,5 +13,5 @@ spark-client.service-account-registry add-config --username hello \
     --conf spark.kubernetes.executor.secrets.spark-truststore=/spark-truststore \
     --conf spark.kubernetes.driver.secrets.spark-truststore=/spark-truststore 
 echo "Run Spark job"
-spark-client.spark-submit --username hello --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.executor.request.cores=0.1 --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.12-3.4.2.jar 100
+spark-client.spark-submit --username hello --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.executor.request.cores=0.1 --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.13-4.0.0-preview1.jar --conf spark.kubernetes.container.image=ghcr.io/welpaolo/charmed-spark:4.0.0-preview1_edge 100
 set +e
