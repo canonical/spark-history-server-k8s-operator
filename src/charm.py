@@ -4,6 +4,7 @@
 
 """Charmed Kubernetes Operator for Apache Spark History Server."""
 
+from charms.loki_k8s.v1.loki_push_api import LogForwarder
 from ops import CharmBase
 from ops.main import main
 
@@ -23,6 +24,11 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
 
     def __init__(self, *args):
         super().__init__(*args)
+
+        self._log_forwarder = LogForwarder(
+            self,
+            relation_name="logging",  # optional, defaults to "logging"
+        )
 
         context = Context(self)
 

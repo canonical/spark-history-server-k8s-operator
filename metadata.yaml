@@ -33,3 +33,7 @@ requires:
   auth-proxy:
     interface: auth_proxy
     limit: 1
+  logging:  # recommended name, but you can change it
+    interface: loki_push_api
+    description: |
+      Receives Loki's push api endpoint address to push logs to, and forwards charm's built-in alert rules to Loki.
