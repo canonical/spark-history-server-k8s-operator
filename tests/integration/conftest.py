@@ -57,11 +57,7 @@ def charm_versions() -> IntegrationTestsCharms:
             **{"name": "s3-integrator", "channel": "edge", "series": "jammy", "alias": "s3"}
         ),
         ingress=CharmVersion(
-            **{
-                "name": "traefik-k8s",
-                "channel": "edge",
-                "series": "focal",
-            }
+            **{"name": "traefik-k8s", "channel": "edge", "series": "focal", "trust": True}
         ),
         oathkeeper=CharmVersion(
             **{

@@ -231,7 +231,7 @@ async def test_oathkeeper(ops_test: OpsTest, charm_versions):
     )
 
     # Deploy the oathkeeper charm and wait for waiting status
-    _ = await ops_test.model.deploy(**charm_versions.oathkeeper.deploy_dict(), trust=True)
+    _ = await ops_test.model.deploy(**charm_versions.oathkeeper.deploy_dict())
 
     await ops_test.model.wait_for_idle(
         apps=[charm_versions.oathkeeper.application_name],
