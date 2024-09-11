@@ -6,6 +6,7 @@ do
   echo "s3 params setup attempt=$attempt"
   if [ -z "$access_key" ]; then
     access_key=$(sudo microk8s.kubectl get secret -n minio-operator microk8s-user-1 -o jsonpath='{.data.CONSOLE_ACCESS_KEY}' | base64 -d)
+    sudo microk8s.kubectl get secret -n minio-operator microk8s-user-1
     if [ $? -eq 0 ]; then
       echo "access_key=$access_key"
     else
@@ -14,6 +15,7 @@ do
   fi
   if [ -z "$secret_key" ]; then
     secret_key=$(sudo microk8s.kubectl get secret -n minio-operator microk8s-user-1 -o jsonpath='{.data.CONSOLE_SECRET_KEY}' | base64 -d)
+    sudo microk8s.kubectl get secret -n minio-operator microk8s-user-1
     if [ $? -eq 0 ]; then
       echo "secret_key=$secret_key"
     else
