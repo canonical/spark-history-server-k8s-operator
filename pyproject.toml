@@ -58,7 +58,8 @@ optional = true
 pytest = "^8.0.0"
 pytest-asyncio = ">=0.21"
 coverage = {extras = ["toml"], version = ">7.0"}
-ops-scenario = "==5.8.1"
+ops-scenario = "==6.1.7"
+cosl = ">=0.0.32"
 
 [tool.poetry.group.integration]
 optional = true
