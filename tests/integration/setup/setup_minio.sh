@@ -23,11 +23,14 @@ do
     fi
   fi
   if [ -z "$endpoint_ip" ]; then
-    endpoint_ip=$(sudo microk8s.kubectl get services -n minio-operator | grep minio | awk '{ print $3 }')
+    endpoint_ip=$(sudo microk8s.kubectl get service minio -n minio-operator -o jsonpath='{.spec.clusterIP}' )
     endpoint="http://$endpoint_ip:80"
     echo "endpoint=$endpoint"
   fi
-
+  echo "AK: $access_key"
+  echo "AK: $secret_key"
+  echo "EP: $endpoint_ip"
+  
   if [ -z "$access_key" ] || [ -z "$secret_key" ] || [ -z "$endpoint_ip" ]
   then
         if [ $attempt -ge 10 ];then
