@@ -1539,31 +1539,31 @@ dev = ["argcomplete", "attrs (>=19.2)", "hypothesis (>=3.56)", "mock", "pygments
 
 [[package]]
 name = "pytest-asyncio"
-version = "0.24.0"
+version = "0.21.2"
 description = "Pytest support for asyncio"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.7"
 files = [
-    {file = "pytest_asyncio-0.24.0-py3-none-any.whl", hash = "sha256:a811296ed596b69bf0b6f3dc40f83bcaf341b155a269052d82efa2b25ac7037b"},
-    {file = "pytest_asyncio-0.24.0.tar.gz", hash = "sha256:d081d828e576d85f875399194281e92bf8a68d60d72d1a2faf2feddb6c46b276"},
+    {file = "pytest_asyncio-0.21.2-py3-none-any.whl", hash = "sha256:ab664c88bb7998f711d8039cacd4884da6430886ae8bbd4eded552ed2004f16b"},
+    {file = "pytest_asyncio-0.21.2.tar.gz", hash = "sha256:d67738fc232b94b326b9d060750beb16e0074210b98dd8b58a5239fa2a154f45"},
 ]
 
 [package.dependencies]
-pytest = ">=8.2,<9"
+pytest = ">=7.0.0"
 
 [package.extras]
 docs = ["sphinx (>=5.3)", "sphinx-rtd-theme (>=1.0)"]
-testing = ["coverage (>=6.2)", "hypothesis (>=5.7.1)"]
+testing = ["coverage (>=6.2)", "flaky (>=3.5.0)", "hypothesis (>=5.7.1)", "mypy (>=0.931)", "pytest-trio (>=0.7.0)"]
 
 [[package]]
 name = "pytest-operator"
-version = "1.0.0b1"
+version = "0.36.0"
 description = "Fixtures for Operators"
 optional = false
 python-versions = "*"
 files = [
-    {file = "pytest-operator-1.0.0b1.tar.gz", hash = "sha256:c59fa48cc75dd58363fb91293376951b93b4cf1e51fff7e2605d7fc1ae9ffda1"},
-    {file = "pytest_operator-1.0.0b1-py3-none-any.whl", hash = "sha256:4a30553609fbcb5d927d13953987f186e207e467ed38bc065b733f8820d26e4f"},
+    {file = "pytest_operator-0.36.0-py3-none-any.whl", hash = "sha256:edab65d9d80b19fc85acddeda4a1fd3bb55a781f43ffbb6e9c4002aeeada6ad2"},
+    {file = "pytest_operator-0.36.0.tar.gz", hash = "sha256:041eeabd4c9590614f78b7568c74b0d42f768815a6b5c183da8ccfc23345bea9"},
 ]
 
 [package.dependencies]
@@ -1571,7 +1571,7 @@ ipdb = "*"
 jinja2 = "*"
 juju = "*"
 pytest = "*"
-pytest-asyncio = "*"
+pytest-asyncio = "<0.23"
 pyyaml = "*"
 
 [[package]]
@@ -2200,4 +2200,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8,<4.0"
-content-hash = "b690b8683526eb615361a4401d2dfe182b6a2aabe9390200bf022bb982c2aaf7"
+content-hash = "13dd7b74f02cf3b6b63fbee4c7a79a833390501ac2f2104e5d7e27cf2e78ce3f"
