@@ -2,8 +2,6 @@
 # Copyright 2024 Canonical Limited
 # See LICENSE file for licensing details.
 
-# Integration Tests TBD separately in next pulse
-
 import asyncio
 import json
 import logging
@@ -120,8 +118,30 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
         timeout=1000,
     )
 
-    logger.info("Verifying history server has no app entries")
 
+@pytest.mark.abort_on_fail
+async def test_loki_integration(ops_test: OpsTest, charm_versions):
+    """Check that logs are forwarded to Loki.
+
+    Assert on the unit status before any relations/configurations take place.
+    """
+    # Get minio credentials
+    setup_minio_output = (
+        subprocess.check_output(
+            "./tests/integration/setup/setup_minio.sh | tail -n 1", shell=True, stderr=None
+        )
+        .decode("utf-8")
+        .strip()
+    )
+
+    logger.info(f"Minio output:\n{setup_minio_output}")
+
+    s3_params = setup_minio_output.strip().split(",")
+    endpoint_url = s3_params[0]
+    access_key = s3_params[1]
+    secret_key = s3_params[2]
+
+    logger.info("Verifying history server has no app entries")
     status = await ops_test.model.get_status()
     address = status["applications"][APP_NAME]["units"][f"{APP_NAME}/0"]["address"]
 
@@ -129,14 +149,14 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
 
     assert len(apps) == 0
 
-    # loki
+    logger.info("Integrate spark-history-server with Loki-k8s ")
 
     await ops_test.model.integrate(charm_versions.loki.application_name, APP_NAME)
     await ops_test.model.wait_for_idle(
         apps=[APP_NAME, charm_versions.loki.application_name], timeout=1000
     )
 
-    logger.info("Setting up spark")
+    logger.info("Setup a spark to run job")
 
     setup_spark_output = subprocess.check_output(
         f"./tests/integration/setup/setup_spark.sh {endpoint_url} {access_key} {secret_key}",
@@ -176,7 +196,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
     status = await ops_test.model.get_status()
     loki_address = status["applications"][loki_app_name]["units"][f"{loki_app_name}/0"]["address"]
 
-    # check labels existence
+    logger.info("Verifying loki labels")
     try:
         labels = json.loads(
             urllib.request.urlopen(f"http://{loki_address}:3100/loki/api/v1/labels").read()
@@ -188,7 +208,6 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
     assert "success" == labels["status"]
     assert "juju_unit" in labels["data"]
 
-    # check label juju_unit contains spark-history-server-k8s application
     try:
         units = json.loads(
             urllib.request.urlopen(
@@ -198,6 +217,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
     except Exception:
         units = {}
 
+    # check label juju_unit contains spark-history-server-k8s application
     logger.info(f"units: {units}")
     assert "success" == units["status"]
     assert f"{APP_NAME}/0" in units["data"][0]
@@ -229,3 +249,4 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
             c = c + 1
     logger.info(f"Number of line found: {c}")
     assert c > 0
+    logger.info("End of the tests")
