@@ -58,7 +58,8 @@ optional = true
 pytest = "^8.0.0"
 pytest-asyncio = ">=0.21"
 coverage = {extras = ["toml"], version = ">7.0"}
-ops-scenario = "==5.8.1"
+ops-scenario = "==6.1.7"
+cosl = ">=0.0.32"
 
 [tool.poetry.group.integration]
 optional = true
@@ -67,7 +68,7 @@ optional = true
 pytest = "^8.0.0"
 juju = ">=3.0"
 coverage = {extras = ["toml"], version = ">7.0"}
-pytest-operator = ">=0.34.0"
+pytest-operator = "==0.36.0"
 tenacity = "^8.2.2"
 pytest-operator-cache = {git = "https://github.com/canonical/data-platform-workflows", tag = "v6.1.1", subdirectory = "python/pytest_plugins/pytest_operator_cache"}
 # To be enabled if we are using groups on integration tests

@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from ops import ActiveStatus, BlockedStatus, MaintenanceStatus
-from scenario import Container, Network, State
+from scenario import Container, State
 
 from constants import CONTAINER
 
@@ -191,7 +191,6 @@ def test_ingress_relation_creation(
         leader=True,
         relations=[ingress_relation],
         containers=[history_server_container],
-        networks=[Network.default(ingress_relation.endpoint)],
     )
     out = history_server_ctx.run(ingress_relation.changed_event, state)
     assert out.unit_status == BlockedStatus("Missing relation with storage (s3 or azure)")
@@ -211,7 +210,6 @@ def test_with_ingress(
     state = State(
         relations=[s3_relation, ingress_relation],
         containers=[history_server_container],
-        networks=[Network.default(ingress_relation.endpoint)],
     )
     out = history_server_ctx.run(ingress_relation.changed_event, state)
 

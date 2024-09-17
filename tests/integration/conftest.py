@@ -25,6 +25,7 @@ class CharmVersion(BaseModel):
     series: str
     num_units: int = 1
     alias: Optional[str] = None
+    trust: bool = False
 
     @property
     def application_name(self) -> str:
@@ -37,6 +38,7 @@ class CharmVersion(BaseModel):
             "series": self.series,
             "num_units": self.num_units,
             "application_name": self.application_name,
+            "trust": self.trust,
         }
 
 
@@ -45,6 +47,7 @@ class IntegrationTestsCharms(BaseModel):
     ingress: CharmVersion
     oathkeeper: CharmVersion
     azure_storage: CharmVersion
+    loki: CharmVersion
 
 
 @pytest.fixture
@@ -54,11 +57,7 @@ def charm_versions() -> IntegrationTestsCharms:
             **{"name": "s3-integrator", "channel": "edge", "series": "jammy", "alias": "s3"}
         ),
         ingress=CharmVersion(
-            **{
-                "name": "traefik-k8s",
-                "channel": "edge",
-                "series": "focal",
-            }
+            **{"name": "traefik-k8s", "channel": "edge", "series": "focal", "trust": True}
         ),
         oathkeeper=CharmVersion(
             **{
@@ -73,6 +72,15 @@ def charm_versions() -> IntegrationTestsCharms:
                 "channel": "edge",
                 "series": "jammy",
                 "alias": "azure-storage",
+            }
+        ),
+        loki=CharmVersion(
+            **{
+                "name": "loki-k8s",
+                "channel": "latest/edge",
+                "series": "focal",
+                "alias": "loki",
+                "trust": True,
             }
         ),
     )
