@@ -28,7 +28,7 @@ BUCKET_NAME = "history-server"
 async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
     """Build the charm-under-test and deploy it together with related charms.
 
-    Assert on the unit status before any relations/configurations take place.
+    Assert on the output of collected Loki labels and logs.
     """
     logger.info("Setting up minio.....")
 
