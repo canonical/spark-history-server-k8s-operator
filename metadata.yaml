@@ -20,7 +20,7 @@ resources:
   spark-history-server-image:
     type: oci-image
     description: OCI image for Spark History Server
-    upstream-source: ghcr.io/canonical/charmed-spark@sha256:4c4e6f9d394348a26ec66969898434f007467b2caee03b2d393ddffd14dc2ecf # spark-version: 3.4.2 revision: 11ea444ff878f57f92c84190a6a1a2dedadd1f3f 
+    upstream-source: ghcr.io/welpaolo/charmed-spark@sha256:90c3b889a1af438661afa431993e262503ca4ed8f4993c35149248c8e3107af3
 
 requires:
   s3-credentials:
@@ -37,3 +37,10 @@ requires:
     interface: loki_push_api
     description: |
       Receives Loki's push api endpoint address to push logs to, and forwards charm's built-in alert rules to Loki.
+
+provides:
+  metrics-endpoint:
+    interface: prometheus_scrape
+  grafana-dashboard:
+    interface: grafana_dashboard
+  

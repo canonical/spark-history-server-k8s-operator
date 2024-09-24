@@ -11,11 +11,21 @@ from pathlib import Path
 from time import sleep
 from urllib.parse import urlencode
 
+import juju
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
+from tenacity import Retrying, stop_after_attempt, wait_fixed
 
-from .test_helpers import fetch_action_sync_s3_credentials, setup_s3_bucket_for_history_server
+from .test_helpers import (
+    all_prometheus_exporters_data,
+    fetch_action_sync_s3_credentials,
+    get_cos_address,
+    published_grafana_dashboards,
+    published_prometheus_alerts,
+    published_prometheus_data,
+    setup_s3_bucket_for_history_server,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -249,4 +259,117 @@ async def test_loki_integration(ops_test: OpsTest, charm_versions):
             c = c + 1
     logger.info(f"Number of line found: {c}")
     assert c > 0
+
+
+@pytest.mark.abort_on_fail
+async def test_history_server_cos_relation_joined(ops_test: OpsTest, charm_versions):
+    # Prometheus data is being published by the app
+    assert await all_prometheus_exporters_data(ops_test, check_field="jmx_scrape_duration_seconds")
+
+    # Deploying and relating to grafana-agent
+    logger.info("Deploying grafana-agent-k8s charm...")
+    await ops_test.model.deploy(**charm_versions.grafana_agent.deploy_dict())
+
+    logger.info("Waiting for test charm to be idle...")
+    await ops_test.model.wait_for_idle(
+        apps=[charm_versions.grafana_agent.name], timeout=1000, status="blocked"
+    )
+
+    await ops_test.model.integrate(
+        charm_versions.grafana_agent.name, f"{APP_NAME}:metrics-endpoint"
+    )
+    await ops_test.model.integrate(
+        charm_versions.grafana_agent.name, f"{APP_NAME}:grafana-dashboard"
+    )
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME], status="active", timeout=1000, idle_period=30
+    )
+    await ops_test.model.wait_for_idle(
+        apps=[charm_versions.grafana_agent.name], status="blocked", timeout=1000, idle_period=30
+    )
+
+    await ops_test.model.deploy(
+        "cos-lite",
+        series="jammy",
+        trust=True,
+    )
+
+    await ops_test.model.wait_for_idle(
+        apps=["prometheus", "alertmanager", "loki", "grafana"],
+        status="active",
+        timeout=1000,
+        idle_period=30,
+    )
+    await ops_test.model.wait_for_idle(
+        apps=[charm_versions.grafana_agent.name],
+        status="blocked",
+        timeout=1000,
+        idle_period=30,
+    )
+
+    # These two relations --though essential to publishing-- are not set.
+    # (May change in the future?)
+    try:
+        await ops_test.model.integrate(
+            f"{charm_versions.grafana_agent.name}:grafana-dashboards-provider", "grafana"
+        )
+    except juju.errors.JujuAPIError:
+        pass
+
+    try:
+        await ops_test.model.integrate(
+            f"{charm_versions.grafana_agent.name}:send-remote-write", "prometheus"
+        )
+    except juju.errors.JujuAPIError:
+        pass
+
+    await ops_test.model.wait_for_idle(
+        apps=[
+            APP_NAME,
+            charm_versions.grafana_agent.name,
+            "prometheus",
+            "alertmanager",
+            "loki",
+            "grafana",
+        ],
+        status="active",
+        timeout=1000,
+        idle_period=30,
+    )
+
+    # We should leave time for Prometheus data to be published
+    for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(30)):
+        with attempt:
+
+            # Data got published to Prometheus
+            cos_address = await get_cos_address(ops_test)
+            assert published_prometheus_data(ops_test, cos_address, "jmx_scrape_duration_seconds")
+
+            # Alerts got published to Prometheus
+            alerts_data = published_prometheus_alerts(ops_test, cos_address)
+            logger.info(f"Alerts data: {alerts_data}")
+
+            logger.info("Rules: ")
+            for group in alerts_data["data"]["groups"]:
+                for rule in group["rules"]:
+                    logger.info(f"Rule: {rule['name']}")
+            logger.info("End of rules.")
+
+            for alert in [
+                "Spark History Server Missing",
+                "Spark History Server Threads Dead Locked",
+            ]:
+                assert any(
+                    rule["name"] == alert
+                    for group in alerts_data["data"]["groups"]
+                    for rule in group["rules"]
+                )
+
+            # Grafana dashboard got published
+            dashboards_info = await published_grafana_dashboards(ops_test)
+            logger.info(f"Dashboard info {dashboards_info}")
+            assert any(
+                board["title"] == "Spark History Server JMX Dashboard" for board in dashboards_info
+            )
+
     logger.info("End of the tests")
