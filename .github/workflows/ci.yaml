@@ -93,7 +93,7 @@ jobs:
           echo "IPADDR=$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc')" >> $GITHUB_ENV
       - name: Setup operator environment
         # TODO: Replace with custom image on self-hosted runner
-        uses: charmed-kubernetes/actions-operator@main
+        uses: charmed-kubernetes/actions-operator@5193238c86d58e874ad3457da2df640ef138a41f
         with:
           juju-channel: 3.4/stable
           provider: microk8s
