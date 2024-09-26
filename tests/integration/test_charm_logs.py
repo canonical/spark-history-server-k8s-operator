@@ -262,7 +262,11 @@ async def test_loki_integration(ops_test: OpsTest, charm_versions):
 
 
 @pytest.mark.abort_on_fail
-async def test_history_server_cos_relation_joined(ops_test: OpsTest, charm_versions):
+async def test_history_server_cos_integration(ops_test: OpsTest, charm_versions):
+    """Check that the integration with cos work correctly.
+
+    Assert on absences of labels/dashbords/alert rules.
+    """
     # Prometheus data is being published by the app
     assert await all_prometheus_exporters_data(ops_test, check_field="jmx_scrape_duration_seconds")
 
