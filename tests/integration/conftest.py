@@ -48,6 +48,7 @@ class IntegrationTestsCharms(BaseModel):
     oathkeeper: CharmVersion
     azure_storage: CharmVersion
     loki: CharmVersion
+    grafana_agent: CharmVersion
 
 
 @pytest.fixture
@@ -80,6 +81,15 @@ def charm_versions() -> IntegrationTestsCharms:
                 "channel": "latest/edge",
                 "series": "focal",
                 "alias": "loki",
+                "trust": True,
+            }
+        ),
+        grafana_agent=CharmVersion(
+            **{
+                "name": "grafana-agent-k8s",
+                "channel": "latest/stable",
+                "series": "jammy",
+                "alias": "grafana-agent-k8s",
                 "trust": True,
             }
         ),

@@ -16,8 +16,9 @@ from core.domain import User
 class HistoryServerPaths:
     """Object to store common paths for Kafka."""
 
-    def __init__(self, conf_path: Path | str, keytool: str):
+    def __init__(self, conf_path: Path | str, lib_path: Path | str, keytool: str):
         self.conf_path = conf_path if isinstance(conf_path, Path) else Path(conf_path)
+        self.lib_path = lib_path if isinstance(lib_path, Path) else Path(lib_path)
         self.keytool = keytool
 
     @property
@@ -34,6 +35,19 @@ class HistoryServerPaths:
     def truststore(self):
         """Return the path of the truststore."""
         return self.conf_path / "truststore.jks"
+
+    @property
+    def jmx_prometheus_javaagent(self):
+        """The JMX exporter JAR filepath.
+
+        Used for scraping and exposing mBeans of a JMX target.
+        """
+        return self.lib_path / "jmx_prometheus_javaagent-0.20.0.jar"
+
+    @property
+    def jmx_prometheus_config(self):
+        """The configuration for the Spark History Server JMX exporter."""
+        return self.conf_path / "jmx_prometheus.yaml"
 
 
 class SparkHistoryWorkloadBase(AbstractWorkload):

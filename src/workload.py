@@ -10,6 +10,7 @@ from ops.model import Container
 
 from common.k8s import K8sWorkload
 from common.utils import WithLogging
+from constants import JMX_EXPORTER_PORT
 from core.domain import User
 from core.workload import HistoryServerPaths, SparkHistoryWorkloadBase
 
@@ -23,13 +24,16 @@ class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
     HISTORY_SERVER_SERVICE = "history-server"
 
     CONFS_PATH = "/etc/spark/conf"
+    LIB_PATH = "/opt/spark/jars"
     ENV_FILE = "/etc/spark/environment"
 
     def __init__(self, container: Container, user: User):
         self.container = container
         self.user = user
 
-        self.paths = HistoryServerPaths(conf_path=self.CONFS_PATH, keytool="keytool")
+        self.paths = HistoryServerPaths(
+            conf_path=self.CONFS_PATH, lib_path=self.LIB_PATH, keytool="keytool"
+        )
 
         self._envs = None
 
@@ -40,6 +44,10 @@ class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
             return self._envs
 
         self._envs = self.from_env(self.read(self.ENV_FILE)) if self.exists(self.ENV_FILE) else {}
+
+        self._envs["SPARK_DAEMON_JAVA_OPTS"] = (
+            f"-javaagent:{self.paths.jmx_prometheus_javaagent}={JMX_EXPORTER_PORT}:{self.paths.jmx_prometheus_config}"
+        )
 
         return self._envs
 

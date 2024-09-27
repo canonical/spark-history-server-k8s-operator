@@ -4,12 +4,14 @@
 
 """Charmed Kubernetes Operator for Apache Spark History Server."""
 
+from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v1.loki_push_api import LogForwarder
+from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from ops import CharmBase
 from ops.main import main
 
 from common.utils import WithLogging
-from constants import CONTAINER, PEBBLE_USER
+from constants import CONTAINER, JMX_CC_PORT, JMX_EXPORTER_PORT, METRICS_RULES_DIR, PEBBLE_USER
 from core.context import Context
 from core.domain import User
 from events.azure_storage import AzureStorageEvents
@@ -29,6 +31,15 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
             self,
             relation_name="logging",  # optional, defaults to "logging"
         )
+
+        self.metrics_endpoint = MetricsEndpointProvider(
+            self,
+            jobs=[
+                {"static_configs": [{"targets": [f"*:{JMX_EXPORTER_PORT}", f"*:{JMX_CC_PORT}"]}]}
+            ],
+            alert_rules_path=METRICS_RULES_DIR,
+        )
+        self.grafana_dashboards = GrafanaDashboardProvider(self)
 
         context = Context(self)
 
