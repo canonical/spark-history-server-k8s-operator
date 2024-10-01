@@ -60,9 +60,8 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_credent
         ),
         ops_test.model.deploy(**charm_versions.ingress.deploy_dict()),
         ops_test.model.deploy(**charm_versions.oathkeeper.deploy_dict()),
-    
     )
-    
+
     await ops_test.model.add_relation(charm_versions.azure_storage.application_name, APP_NAME)
     await ops_test.model.add_relation(charm_versions.ingress.application_name, APP_NAME)
     await ops_test.model.add_relation(charm_versions.oathkeeper.application_name, APP_NAME)
@@ -72,9 +71,12 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_credent
         charm_versions.oathkeeper.application_name,
     )
 
-
     await ops_test.model.wait_for_idle(
-        apps=[charm_versions.azure_storage.application_name,charm_versions.oathkeeper.application_name, charm_versions.ingress.application_name],
+        apps=[
+            charm_versions.azure_storage.application_name,
+            charm_versions.oathkeeper.application_name,
+            charm_versions.ingress.application_name,
+        ],
         timeout=1000,
         status="blocked",
         idle_period=30,
@@ -130,7 +132,6 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_credent
         )
 
     logger.info("Relating history server charm with azure-storage-integrator charm")
-
 
     await ops_test.model.wait_for_idle(
         apps=[APP_NAME, charm_versions.azure_storage.application_name], timeout=1000
@@ -206,7 +207,7 @@ async def test_ingress(ops_test: OpsTest, charm_versions):
     Assert on the unit status before any relations/configurations take place.
     """
     # Deploy the charm and wait for waiting status
-   
+
     await ops_test.model.wait_for_idle(
         apps=[charm_versions.ingress.application_name],
         status="active",
@@ -215,8 +216,6 @@ async def test_ingress(ops_test: OpsTest, charm_versions):
     )
 
     logger.info("Relating history server charm with ingress")
-
-    
 
     await ops_test.model.wait_for_idle(
         apps=[APP_NAME, charm_versions.ingress.application_name],
@@ -263,7 +262,6 @@ async def test_oathkeeper(ops_test: OpsTest, charm_versions, azure_credentials):
     )
 
     # Deploy the oathkeeper charm and wait for waiting status
-   
 
     await ops_test.model.wait_for_idle(
         apps=[charm_versions.oathkeeper.application_name],
