@@ -72,7 +72,6 @@ jobs:
           - integration-charm
           - integration-tls
           - integration-azure
-          - integration-azure_b
           - integration-logs
     name: ${{ matrix.tox-environments }}
     needs:
