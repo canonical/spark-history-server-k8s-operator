@@ -16,8 +16,6 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from core.context import AUTH_PROXY_HEADERS
-
 from .test_helpers import (
     add_juju_secret,
     delete_azure_container,
@@ -188,4 +186,3 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_credent
 
     logger.info("Delete azure container!")
     delete_azure_container(azure_credentials["container"])
-    
