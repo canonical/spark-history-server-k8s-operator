@@ -148,10 +148,15 @@ class Context(WithLogging):
             else None
         )
         # check if correct fields are present in the azure relation databag.
+
+        if not relation_data:
+            return None
+        # if relation data do not contains all required fields return None
         if relation_data:
             for option in AZURE_MANDATORY_OPTIONS:
                 if option not in relation_data:
                     return None
+
         return AzureStorageConnectionInfo(relation_data)
 
 
