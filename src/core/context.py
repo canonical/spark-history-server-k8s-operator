@@ -21,7 +21,7 @@ OATHKEEPER = "auth-proxy"
 AUTHORIZED_USERS = "authorized-users"
 AUTH_PROXY_HEADERS = ["X-User", "X-Email"]
 AZURE_MANDATORY_OPTIONS = [
-    "secret-key",
+    "access-key",
     "secret-key",
     "container",
     "connection-protocol",
