@@ -20,6 +20,12 @@ INGRESS = "ingress"
 OATHKEEPER = "auth-proxy"
 AUTHORIZED_USERS = "authorized-users"
 AUTH_PROXY_HEADERS = ["X-User", "X-Email"]
+AZURE_MANDATORY_OPTIONS = [
+    "secret-key",
+    "container",
+    "connection-protocol",
+    "storage-account",
+]
 
 
 class Context(WithLogging):
@@ -140,7 +146,17 @@ class Context(WithLogging):
             if self._azure_storage_relation
             else None
         )
-        return AzureStorageConnectionInfo(relation_data) if relation_data else None
+        # check if correct fields are present in the azure relation databag.
+
+        if not relation_data:
+            return None
+        # if relation data do not contains all required fields return None
+        if relation_data:
+            for option in AZURE_MANDATORY_OPTIONS:
+                if option not in relation_data:
+                    return None
+
+        return AzureStorageConnectionInfo(relation_data)
 
 
 class Status(Enum):

@@ -180,7 +180,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_credent
         if len(apps) > 0:
             break
         else:
-            sleep(3)
+            sleep(10)
 
     assert len(apps) == 1
 
