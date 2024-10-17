@@ -14,6 +14,7 @@ The Spark History Server charm operator deploys and operates Apache Spark Histor
 It depends on the S3 integrator charm from Canonical for S3 related configuration.
 
 The Spark History Server charm can be found on [Charmhub](https://charmhub.io/spark-history-server-k8s). 
+Apache Spark is a free, open source software project by the Apache Software Foundation. Users can find out more at the [Spark project page](https://spark.apache.org/).
 
 ## Usage
 
