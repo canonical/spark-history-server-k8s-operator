@@ -135,4 +135,8 @@ jobs:
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
           CI_PACKED_CHARMS: ${{ needs.build.outputs.charms }}
         run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}'
+      - name: Setup tmate session
+        timeout-minutes: 60
+        if: ${{ failure() }}
+        uses: canonical/action-tmate@main
           
