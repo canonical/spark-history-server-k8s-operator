@@ -78,7 +78,7 @@ jobs:
       - lint
       - unit-test
       - build
-    runs-on: ubuntu-22.04
+    runs-on: [self-hosted, linux, AMD64, X64, large, jammy]
     timeout-minutes: 120
     steps:
       - name: Checkout
@@ -134,5 +134,9 @@ jobs:
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
           CI_PACKED_CHARMS: ${{ needs.build.outputs.charms }}
-        run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}'
+        run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}' --keep-models
+      - name: Setup tmate session
+        timeout-minutes: 60
+        if: ${{ failure() }}
+        uses: canonical/action-tmate@main
           
