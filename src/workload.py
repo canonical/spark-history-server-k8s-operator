@@ -45,15 +45,17 @@ class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
 
         self._envs = self.from_env(self.read(self.ENV_FILE)) if self.exists(self.ENV_FILE) else {}
 
-        self._envs["SPARK_DAEMON_JAVA_OPTS"] = (
-            f"-javaagent:{self.paths.jmx_prometheus_javaagent}={JMX_EXPORTER_PORT}:{self.paths.jmx_prometheus_config}"
-        )
-
         return self._envs
 
     @property
     def _spark_history_server_layer(self):
         """Return a dictionary representing a Pebble layer."""
+        self.set_environment(
+            {
+                "SPARK_DAEMON_JAVA_OPTS": f"-javaagent:{self.paths.jmx_prometheus_javaagent}={JMX_EXPORTER_PORT}:{self.paths.jmx_prometheus_config}"
+            }
+        )
+
         layer = {
             "summary": "spark history server layer",
             "description": "pebble config layer for spark history server",
