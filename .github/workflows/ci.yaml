@@ -76,7 +76,7 @@ jobs:
         runner:
           - ubuntu-22.04
           - [self-hosted, linux, AMD64, X64, large, jammy]
-    name: ${{ matrix.tox-environments }}
+    name: ${{ matrix.tox-environments }} - ${{ matrix.runner }}
     needs:
       - lint
       - unit-test
