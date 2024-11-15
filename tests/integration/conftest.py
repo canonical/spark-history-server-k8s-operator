@@ -100,7 +100,7 @@ def charm_versions() -> IntegrationTestsCharms:
 @pytest.fixture(scope="module")
 def azure_credentials(ops_test: OpsTest):
     return {
-        "container": f"test-container-{uuid.uuid4()}",
+        "container": "test-container",
         "path": "spark-events",
         "storage-account": os.environ["AZURE_STORAGE_ACCOUNT"],
         "connection-protocol": "abfss",

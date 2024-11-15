@@ -76,6 +76,12 @@ jobs:
         runner:
           - ubuntu-22.04
           - [self-hosted, linux, AMD64, X64, large, jammy]
+        exclude:
+          - tox-environments: integration-azure           # Don't test azure twice
+            runner: [self-hosted, linux, AMD64, X64, large, jammy]
+          - tox-environments: integration-charm           # Don't test charm twice
+            runner: [self-hosted, linux, AMD64, X64, large, jammy]
+
     name: ${{ matrix.tox-environments }}
     needs:
       - lint
