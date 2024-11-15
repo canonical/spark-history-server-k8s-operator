@@ -2,6 +2,7 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 import os
+import uuid
 from typing import Optional
 
 import pytest
@@ -99,7 +100,7 @@ def charm_versions() -> IntegrationTestsCharms:
 @pytest.fixture(scope="module")
 def azure_credentials(ops_test: OpsTest):
     return {
-        "container": "test-container",
+        "container": f"test-container-{uuid.uuid4()}",
         "path": "spark-events",
         "storage-account": os.environ["AZURE_STORAGE_ACCOUNT"],
         "connection-protocol": "abfss",
