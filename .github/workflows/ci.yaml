@@ -76,7 +76,7 @@ jobs:
         runner:
           - ubuntu-22.04
           - [self-hosted, linux, AMD64, X64, large, jammy]
-    name: ${{ matrix.tox-environments }} - ${{ matrix.runner }}
+    name: ${{ matrix.tox-environments }}
     needs:
       - lint
       - unit-test
@@ -138,4 +138,8 @@ jobs:
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
           CI_PACKED_CHARMS: ${{ needs.build.outputs.charms }}
         run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}'
+      - name: Setup tmate session
+        timeout-minutes: 20
+        if: ${{ failure() }} && [ "${{ matrix.runner }}" == "ubuntu-22.04" ]
+        uses: mxschmitt/action-tmate@v3
           
