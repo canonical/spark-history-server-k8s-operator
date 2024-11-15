@@ -2,7 +2,6 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 import os
-import uuid
 from typing import Optional
 
 import pytest
