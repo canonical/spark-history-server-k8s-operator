@@ -73,12 +73,21 @@ jobs:
           - integration-tls
           - integration-azure
           - integration-logs
+        runner:
+          - ubuntu-22.04
+          - [self-hosted, linux, AMD64, X64, large, jammy]
+        exclude:
+          - tox-environments: integration-azure           # Don't test azure twice
+            runner: [self-hosted, linux, AMD64, X64, large, jammy]
+          - tox-environments: integration-charm           # Don't test charm twice
+            runner: [self-hosted, linux, AMD64, X64, large, jammy]
+
     name: ${{ matrix.tox-environments }}
     needs:
       - lint
       - unit-test
       - build
-    runs-on: ubuntu-22.04
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     steps:
       - name: Checkout
@@ -135,4 +144,3 @@ jobs:
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
           CI_PACKED_CHARMS: ${{ needs.build.outputs.charms }}
         run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}'
-          
