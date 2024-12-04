@@ -7,7 +7,6 @@ import logging
 import subprocess
 from pathlib import Path
 from subprocess import PIPE, check_output
-from time import sleep
 from typing import Dict
 
 import boto3
@@ -64,22 +63,22 @@ def setup_s3_bucket_for_history_server(
             s3.delete_objects(Bucket=bucket_str, Delete={"Objects": objs})
             s3.delete_bucket(Bucket=bucket_str)
 
-    logger.info("create bucket in minio")
-    for i in range(0, 30):
-        try:
-            s3.create_bucket(Bucket=bucket_str)
-            break
-        except Exception as e:
-            if i >= 30:
-                logger.error(f"create bucket failed....exiting....\n{str(e)}")
-                raise
-            else:
-                logger.warning(f"create bucket failed....retrying in 10 secs.....\n{str(e)}")
-                sleep(10)
-                continue
+    # logger.info("create bucket in minio")
+    # for i in range(0, 30):
+    #     try:
+    #         s3.create_bucket(Bucket=bucket_str)
+    #         break
+    #     except Exception as e:
+    #         if i >= 30:
+    #             logger.error(f"create bucket failed....exiting....\n{str(e)}")
+    #             raise
+    #         else:
+    #             logger.warning(f"create bucket failed....retrying in 10 secs.....\n{str(e)}")
+    #             sleep(10)
+    #             continue
 
-    s3.put_object(Bucket=bucket_str, Key=("spark-events/"))
-    logger.debug(s3.list_buckets())
+    # s3.put_object(Bucket=bucket_str, Key=("spark-events/"))
+    # logger.debug(s3.list_buckets())
 
 
 def setup_azure_container_for_history_server(container: str, path: str) -> None:

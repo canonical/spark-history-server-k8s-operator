@@ -65,6 +65,7 @@ pytest-asyncio = ">=0.21"
 coverage = {extras = ["toml"], version = ">7.0"}
 ops-scenario = "==6.1.7"
 cosl = ">=0.0.32"
+moto = {extras = ["s3"], version = "^5.0.22"}
 
 [tool.poetry.group.integration]
 optional = true
