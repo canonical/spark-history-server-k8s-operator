@@ -54,6 +54,7 @@ optional = true
 black = ">=22.3.0"
 ruff = ">=0.2.2"
 codespell = ">=2.2.2"
+boto3-stubs = { extras = ["s3"], version = "^1.35.8" }
 
 [tool.poetry.group.unit]
 optional = true
