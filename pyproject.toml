@@ -80,6 +80,11 @@ pytest-operator-cache = {git = "https://github.com/canonical/data-platform-workf
 
 [tool.ruff]
 line-length = 99
+extend-exclude = ["__pycache__", "*.egg_info"]
+target-version="py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
 select = ["E", "W", "F", "C", "N", "D", "I001"]
 extend-ignore = [
     "D203",
@@ -96,10 +101,5 @@ extend-ignore = [
     "D413",
 ]
 ignore = ["E501", "D107"]
-extend-exclude = ["__pycache__", "*.egg_info"]
 per-file-ignores = {"tests/*" = ["D100","D101","D102","D103","D104", "E999"], "src/literals.py" = ["D101"]}
-target-version="py310"
-src = ["src", "tests"]
-
-[tool.ruff.mccabe]
-max-complexity = 10
+mccabe.max-complexity = 10
