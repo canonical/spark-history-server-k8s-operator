@@ -4,6 +4,8 @@
 type: charm
 parts:
   charm:
+    build-snaps:
+      - rustup
     charm-binary-python-packages:
       - setuptools
       - jsonschema
@@ -11,12 +13,15 @@ parts:
       - libffi-dev
       - libssl-dev
       - pkg-config
-      - rustc
-      - cargo
+    override-build:
+      # get latest rust stable toolchain
+      rustup default stable
+
+      craftctl default
 bases:
   - build-on:
-    - name: ubuntu
-      channel: "22.04"
+      - name: ubuntu
+        channel: "22.04"
     run-on:
-    - name: ubuntu
-      channel: "22.04"
+      - name: ubuntu
+        channel: "22.04"

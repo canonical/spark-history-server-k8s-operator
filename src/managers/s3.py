@@ -4,6 +4,7 @@
 
 """S3 manager."""
 
+import os
 import tempfile
 from functools import cached_property
 
@@ -27,6 +28,41 @@ class S3Manager(WithLogging):
             aws_access_key_id=self.config.access_key,
             aws_secret_access_key=self.config.secret_key,
         )
+
+    def get_or_create_bucket(self, ca_file_name: str) -> bool:
+        """Create bucket if it does not exists."""
+        s3 = boto3.resource(
+            "s3",
+            aws_access_key_id=self.config.access_key,
+            aws_secret_access_key=self.config.secret_key,
+            region_name=None,
+            endpoint_url=self.config.endpoint or "https://s3.amazonaws.com",
+            verify=ca_file_name if self.config.tls_ca_chain else None,
+        )
+        bucket_name = self.config.bucket
+        bucket_exists = True
+
+        bucket = s3.Bucket(bucket_name)  # pyright: ignore [reportAttributeAccessIssue]
+
+        try:
+            bucket.meta.client.head_bucket(Bucket=bucket_name)
+        except ClientError as ex:
+            if "(403)" in ex.args[0]:
+                self.logger.error("Wrong credentials or access to bucket is forbidden")
+                return False
+            elif "(404)" in ex.args[0]:
+                bucket_exists = False
+        else:
+            self.logger.info(f"Using existing bucket {bucket_name}")
+
+        if not bucket_exists:
+            bucket.create()
+            bucket.wait_until_exists()
+            self.logger.info(f"Created bucket {bucket_name}")
+
+        bucket.put_object(Key=os.path.join(self.config.path, ""))
+
+        return True
 
     def verify(self) -> bool:
         """Verify S3 credentials."""
@@ -52,6 +88,9 @@ class S3Manager(WithLogging):
                 return False
             except Exception as e:
                 self.logger.error(f"S3 related error {e}")
+                return False
+
+            if not self.get_or_create_bucket(ca_file_name=ca_file.name):
                 return False
 
         return True
