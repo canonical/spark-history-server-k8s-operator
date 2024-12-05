@@ -1,13 +1,18 @@
+from __future__ import annotations
+
 import os
+from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
 import boto3
 import pytest
 from moto import mock_aws
-from mypy_boto3_s3.client import S3Client
 
 from core.domain import S3ConnectionInfo
 from managers.s3 import S3Manager
+
+if TYPE_CHECKING:
+    from mypy_boto3_s3.client import S3Client
 
 
 @pytest.fixture(scope="function")
