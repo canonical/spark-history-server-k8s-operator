@@ -33,6 +33,7 @@ pydantic ="^1.10.7"
 pyyaml = ">=6.0.1"
 boto3 = ">=1.34.55"
 jsonschema = "^4.19.1"
+tenacity = ">=8.0.1"
 
 [tool.poetry.group.charm-libs.dependencies]
 ops = "^2.13.0"
