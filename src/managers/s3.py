@@ -3,18 +3,22 @@
 # See LICENSE file for licensing details.
 
 """S3 manager."""
+from __future__ import annotations
 
 import os
 import tempfile
 from functools import cached_property
+from typing import TYPE_CHECKING
 
 import boto3
 from botocore.exceptions import ClientError, SSLError
-from mypy_boto3_s3.client import S3Client
 from tenacity import retry, retry_if_exception_cause_type, stop_after_attempt, wait_fixed
 
 from common.utils import WithLogging
 from core.domain import S3ConnectionInfo
+
+if TYPE_CHECKING:
+    from mypy_boto3_s3.client import S3Client
 
 
 class S3Manager(WithLogging):
