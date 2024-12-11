@@ -53,7 +53,7 @@ class S3Manager(WithLogging):
 
         if not bucket_exists:
             client.create_bucket(Bucket=bucket_name)
-            self._wait_unit_exists(client)
+            self._wait_until_exists(client)
             self.logger.info(f"Created bucket {bucket_name}")
 
         client.put_object(Bucket=bucket_name, Key=os.path.join(self.config.path, ""))
@@ -66,12 +66,12 @@ class S3Manager(WithLogging):
         retry=retry_if_exception_cause_type(ClientError),
         reraise=True,
     )
-    def _wait_unit_exists(self, client: S3Client):
+    def _wait_until_exists(self, client: S3Client):
         """Poll s3 API until resource is found."""
         client.head_bucket(Bucket=self.config.bucket)
 
     def verify(self) -> bool:
-        """Verify S3 credentials."""
+        """Verify S3 credentials and configuration."""
         with tempfile.NamedTemporaryFile() as ca_file:
 
             if config := self.config.tls_ca_chain:
