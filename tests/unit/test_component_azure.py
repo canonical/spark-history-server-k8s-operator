@@ -39,12 +39,12 @@ def manager(
         yield AzureStorageManager(connection_info)
 
 
-def test_bucket_created_on_verify(
+def test_container_created_on_verify(
     connection_info: AzureStorageConnectionInfo,
     manager: AzureStorageManager,
     container_client: ContainerClient,
 ) -> None:
-    """If the bucket does not exist, we create it."""
+    """If the container does not exist, we create it."""
     # Given
     setattr(container_client.exists, "side_effect", [False, True])
     blob_client = container_client.get_blob_client(connection_info.path)
@@ -58,12 +58,12 @@ def test_bucket_created_on_verify(
     getattr(blob_client.create_append_blob, "assert_called_once")()
 
 
-def test_bucket_existing_path_created_on_verify(
+def test_container_existing_path_created_on_verify(
     connection_info: AzureStorageConnectionInfo,
     manager: AzureStorageManager,
     container_client: ContainerClient,
 ) -> None:
-    """If the bucket does exist, we use it and add the path."""
+    """If the container does exist, we use it and add the path."""
     # Given
     setattr(container_client.exists, "side_effect", [True])
     blob_client = container_client.get_blob_client(connection_info.path)

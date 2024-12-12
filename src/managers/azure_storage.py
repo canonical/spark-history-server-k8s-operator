@@ -38,7 +38,6 @@ class AzureStorageManager(WithLogging):
             container_name=self.config.container,
             credential=self.config.secret_key,
         )
-        pass
 
     def get_or_create_container(self) -> bool:
         """Create container if it does not exists."""
