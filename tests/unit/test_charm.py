@@ -244,7 +244,7 @@ def test_remove_ingress(
     assert "spark.ui.proxyRedirectUri" not in spark_properties
 
 
-@patch("managers.s3.S3Manager.verify", return_value=True)
+@patch("managers.azure_storage.AzureStorageManager.verify", return_value=True)
 @patch("workload.SparkHistoryServer.exec")
 @patch("ops.JujuVersion.has_secrets", return_value=True)
 def test_azure_storage_relation(

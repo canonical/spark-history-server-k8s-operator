@@ -28,12 +28,12 @@ class HistoryServerConfig(WithLogging):
     def __init__(
         self,
         s3: S3Manager | None,
-        azure: AzureStorageConnectionInfo | None,
+        azure: AzureStorageManager | None,
         ingress: IngressUrl | None,
         authorized_users: str | None,
     ):
         self.s3 = s3
-        self.azure_storage = AzureStorageManager(azure) if azure else None
+        self.azure_storage = azure
         self.ingress = ingress
         self.authorized_users = authorized_users
 
@@ -156,7 +156,8 @@ class HistoryServerManager(WithLogging):
         self.workload.stop()
 
         s3_manager = S3Manager(s3) if s3 else None
-        config = HistoryServerConfig(s3_manager, azure, ingress, authorized_users)
+        azure_manager = AzureStorageManager(azure) if azure else None
+        config = HistoryServerConfig(s3_manager, azure_manager, ingress, authorized_users)
 
         self.workload.write(config.contents, str(self.workload.paths.spark_properties))
         self.workload.set_environment(
@@ -165,7 +166,9 @@ class HistoryServerManager(WithLogging):
 
         self.tls.reset()
 
-        if (not s3_manager or not s3_manager.verify()) and not azure:
+        if (not s3_manager or not s3_manager.verify()) and (
+            not azure_manager or not azure_manager.verify()
+        ):
             self.logger.info("Nor s3 or azure are ready")
             return
         if s3:
