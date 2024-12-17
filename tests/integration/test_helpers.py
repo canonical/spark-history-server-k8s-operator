@@ -64,47 +64,6 @@ def setup_s3_bucket_for_history_server(
             s3.delete_bucket(Bucket=bucket_str)
 
 
-def setup_azure_container_for_history_server(container: str, path: str) -> None:
-    """Setup azure container."""
-    logger.info(f"Create container: {container}")
-    create_azure_container(container)
-    logger.info(f"Create folder {path}")
-    create_folder_in_container(container, path)
-    logger.info("Setup of azure storage done!")
-
-
-def create_folder_in_container(container: str, path: str):
-    """Setup required folder in azure container."""
-    command = [
-        "azcli",
-        "storage",
-        "blob",
-        "upload",
-        "--container-name",
-        container,
-        "--name",
-        f"{path}/a.tmp",
-        "-f",
-        "/dev/null",
-    ]
-
-    try:
-        output = subprocess.run(command, check=True, capture_output=True)
-        return output.stdout.decode(), output.stderr.decode(), output.returncode
-    except subprocess.CalledProcessError as e:
-        return e.stdout.decode(), e.stderr.decode(), e.returncode
-
-
-def create_azure_container(container: str):
-    """Create Azure container."""
-    command = ["azcli", "storage", "container", "create", "--fail-on-exist", "--name", container]
-    try:
-        output = subprocess.run(command, check=True, capture_output=True)
-        return output.stdout.decode(), output.stderr.decode(), output.returncode
-    except subprocess.CalledProcessError as e:
-        return e.stdout.decode(), e.stderr.decode(), e.returncode
-
-
 def delete_azure_container(container: str):
     """Delete azure container."""
     command = ["azcli", "storage", "container", "delete", "--name", container]

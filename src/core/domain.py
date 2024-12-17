@@ -104,6 +104,11 @@ class AzureStorageConnectionInfo:
         return ""
 
     @property
+    def endpoint_http(self) -> str:
+        """Endpoint of the Azure storage container to be used with the SDK."""
+        return f"https://{self.storage_account}.blob.core.windows.net/"
+
+    @property
     def secret_key(self) -> str:
         """Return the secret key."""
         return self.relation_data["secret-key"]

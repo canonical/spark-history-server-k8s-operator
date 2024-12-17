@@ -19,7 +19,6 @@ from pytest_operator.plugin import OpsTest
 from .test_helpers import (
     add_juju_secret,
     delete_azure_container,
-    setup_azure_container_for_history_server,
 )
 
 logger = logging.getLogger(__name__)
@@ -91,11 +90,6 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_credent
     # First delete container
     delete_azure_container(azure_credentials["container"])
     sleep(10)
-    # Setup container
-    setup_azure_container_for_history_server(
-        azure_credentials["container"], azure_credentials["path"]
-    )
-    logger.info("Azure container and path correctly setup!")
 
     # apply new configuration options
     logger.info("Setting up configuration for azure-storage-integrator charm...")
