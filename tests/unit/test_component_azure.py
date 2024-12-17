@@ -19,6 +19,7 @@ class MockTransport(HttpTransport):
 def connection_info() -> AzureStorageConnectionInfo:
     connection_info = Mock(spec=AzureStorageConnectionInfo)
     connection_info.endpoint = ""
+    connection_info.endpoint_http = ""
     connection_info.storage_account = ""
     connection_info.secret_key = ""
     connection_info.container = "test_container"
@@ -35,7 +36,7 @@ def container_client() -> ContainerClient:
 def manager(
     connection_info: AzureStorageConnectionInfo, container_client: ContainerClient
 ) -> Iterable[AzureStorageManager]:
-    with patch("managers.azure_storage.AzureStorageManager.container", container_client):
+    with patch("managers.azure_storage.AzureStorageManager.container_client", container_client):
         yield AzureStorageManager(connection_info)
 
 

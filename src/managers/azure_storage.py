@@ -21,8 +21,6 @@ from tenacity import (
 from common.utils import WithLogging
 from core.domain import AzureStorageConnectionInfo
 
-ACCOUNT_URL_TEMPLATE = "https://{storage_account}.blob.core.windows.net/"
-
 
 class AzureStorageManager(WithLogging):
     """Class exposing business logic for interacting with Azure Storage service."""
@@ -31,29 +29,31 @@ class AzureStorageManager(WithLogging):
         self.config = config
 
     @cached_property
-    def container(self) -> ContainerClient:
+    def container_client(self) -> ContainerClient:
         """Azure container client session."""
         return ContainerClient(
-            account_url=ACCOUNT_URL_TEMPLATE.format(storage_account=self.config.storage_account),
+            account_url=self.config.endpoint_http,
             container_name=self.config.container,
             credential=self.config.secret_key,
         )
 
     def get_or_create_container(self) -> bool:
         """Create container if it does not exists."""
-        if not self.container.exists():
+        if not self.container_client.exists():
             try:
-                self.container.create_container()
+                self.container_client.create_container()
             except ResourceExistsError:
                 # In case of race condition between multiple units
                 pass
 
             try:
-                self._wait_until_exists(self.container)
+                self._wait_until_exists(self.container_client)
             except RetryError:
                 return False
 
-        blob_client = self.container.get_blob_client(os.path.join(self.config.path, ".keep"))
+        blob_client = self.container_client.get_blob_client(
+            os.path.join(self.config.path, ".keep")
+        )
         if not blob_client.exists():
             blob_client.create_append_blob()
             try:
@@ -75,7 +75,7 @@ class AzureStorageManager(WithLogging):
     def verify(self) -> bool:
         """Verify Azure credentials and configuration."""
         try:
-            self.container.get_account_information()
+            self.container_client.get_account_information()
         except ClientAuthenticationError:
             self.logger.error("Invalid Azure credentials")
             return False
