@@ -137,7 +137,7 @@ def azure_storage_relation():
 
     return Relation(
         endpoint=AZURE_RELATION_NAME,
-        interface="azure",
+        interface="azure-storage",
         remote_app_name="azure-storage-integrator",
         relation_id=relation_id,
         local_app_data={"container": f"relation-{relation_id}"},

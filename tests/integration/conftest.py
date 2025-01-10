@@ -97,7 +97,7 @@ def charm_versions() -> IntegrationTestsCharms:
 
 
 @pytest.fixture(scope="module")
-def azure_credentials(ops_test: OpsTest):
+def azure_storage_credentials(ops_test: OpsTest):
     return {
         "container": "test-container",
         "path": "spark-events",
