@@ -170,7 +170,7 @@ def test_s3_relation_broken(
     )
 
     assert state_after_relation_broken.unit_status == BlockedStatus(
-        "Missing relation with storage (s3 or azure)"
+        "Missing relation with storage (s3 or azure storage)"
     )
 
     spark_properties = parse_spark_properties(state_after_relation_broken, tmp_path)
@@ -193,7 +193,7 @@ def test_ingress_relation_creation(
         containers=[history_server_container],
     )
     out = history_server_ctx.run(ingress_relation.changed_event, state)
-    assert out.unit_status == BlockedStatus("Missing relation with storage (s3 or azure)")
+    assert out.unit_status == BlockedStatus("Missing relation with storage (s3 or azure storage)")
 
 
 @patch("managers.s3.S3Manager.verify", return_value=True)
@@ -317,7 +317,7 @@ def test_azure_storage_relation_broken(
     )
 
     assert state_after_relation_broken.unit_status == BlockedStatus(
-        "Missing relation with storage (s3 or azure)"
+        "Missing relation with storage (s3 or azure storage)"
     )
 
     spark_properties = parse_spark_properties(state_after_relation_broken, tmp_path)
