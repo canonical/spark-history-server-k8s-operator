@@ -47,14 +47,17 @@ class HistoryServerConfig(WithLogging):
 
     @property
     def _ingress_proxy_conf(self) -> dict[str, str]:
-        return (
-            {
-                "spark.ui.proxyBase": self._ingress_pattern.sub("/", ingress.url),
-                "spark.ui.proxyRedirectUri": self._ingress_pattern.match(ingress.url).group(),
-            }
-            if (ingress := self.ingress)
-            else {}
+        if not self.ingress:
+            return {}
+
+        # Get DNS and skip the trailing /
+        proxy_dns = self._ingress_pattern.match(f"{self.ingress.url}/").group()[:-1]
+        proxy_base = str(self.ingress.url).removeprefix(proxy_dns)
+
+        return  {"spark.ui.proxyRedirectUri": proxy_dns} | (
+            {"spark.ui.proxyBase": proxy_base} if proxy_base != "/" else {}
         )
+
 
     @property
     def _s3_conf(self) -> dict[str, str]:
@@ -112,6 +115,7 @@ class HistoryServerConfig(WithLogging):
 
     def to_dict(self) -> dict[str, str]:
         """Return the dict representation of the configuration file."""
+
         return (
             self._base_conf
             | self._s3_conf
