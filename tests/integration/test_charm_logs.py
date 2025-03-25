@@ -183,7 +183,7 @@ async def test_loki_integration(ops_test: OpsTest, charm_versions):
     logger.info("Setup a spark to run job")
 
     setup_spark_output = subprocess.check_output(
-        f"./tests/integration/setup/setup_spark.sh {endpoint_url} {access_key} {secret_key}",
+        f"./tests/integration/setup/setup_spark.sh {endpoint_url} {access_key} {secret_key} {image_version}",
         shell=True,
         stderr=None,
     ).decode("utf-8")

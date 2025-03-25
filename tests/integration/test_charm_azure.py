@@ -158,7 +158,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_credent
     logger.info("Setting up spark")
 
     setup_spark_output = subprocess.check_output(
-        f"./tests/integration/setup/setup_spark_azure.sh {azure_credentials['container']} {azure_credentials['path']} {azure_credentials['storage-account']} {azure_credentials['secret-key']}",
+        f"./tests/integration/setup/setup_spark_azure.sh {azure_credentials['container']} {azure_credentials['path']} {azure_credentials['storage-account']} {azure_credentials['secret-key']} {image_version}",
         shell=True,
         stderr=None,
     ).decode("utf-8")

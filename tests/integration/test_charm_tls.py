@@ -148,7 +148,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
     logger.info("Setting up spark")
 
     setup_spark_output = subprocess.check_output(
-        f"./tests/integration/setup/setup_spark.sh {endpoint_url} {access_key} {secret_key}",
+        f"./tests/integration/setup/setup_spark.sh {endpoint_url} {access_key} {secret_key} {image_version}",
         shell=True,
         stderr=None,
     ).decode("utf-8")
