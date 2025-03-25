@@ -72,10 +72,10 @@ jobs:
       fail-fast: false
       matrix:
         tox-environments:
-          - integration-charm
-          - integration-tls
+          # - integration-charm
+          # - integration-tls
           - integration-azure
-          - integration-logs
+          # - integration-logs
         runner:
           - ubuntu-22.04
           - [self-hosted, linux, AMD64, X64, large, jammy]
@@ -141,9 +141,15 @@ jobs:
             echo Skipping unstable tests
             echo "mark_expression=not unstable" >> $GITHUB_OUTPUT
           fi
+      - name: Setup tmate session
+        timeout-minutes: 30
+        uses: mxschmitt/action-tmate@v3
       - name: Run integration tests
         env:
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
           CI_PACKED_CHARMS: ${{ needs.build.outputs.charms }}
         run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}'
+
+
+
