@@ -73,9 +73,9 @@ jobs:
       matrix:
         tox-environments:
           - integration-charm
-          # - integration-tls
-          # - integration-azure
-          # - integration-logs
+          - integration-tls
+          - integration-azure
+          - integration-logs
         runner:
           - ubuntu-22.04
           - [self-hosted, linux, AMD64, X64, large, jammy]
