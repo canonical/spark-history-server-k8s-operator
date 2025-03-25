@@ -78,13 +78,15 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
 
     logger.info(f"Spark version: {spark_version}")
 
-    image_metadata = json.loads(
-        subprocess.check_output(
-            f"./tests/integration/setup/get_image_metadata.sh {image_version}",
-            shell=True,
-            stderr=None,
-        ).decode("utf-8")
-    )
+    shell_output = subprocess.check_output(
+        f"./tests/integration/setup/get_image_metadata.sh {image_version}",
+        shell=True,
+        stderr=None,
+    ).decode("utf-8")
+
+    logger.info(shell_output)
+
+    image_metadata = json.loads(shell_output)
 
     spark_version = image_metadata["org.opencontainers.image.version"]
 
