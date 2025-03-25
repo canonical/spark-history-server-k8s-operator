@@ -68,6 +68,28 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
 
     logger.info(f"Image version: {image_version}")
 
+    spark_version = json.loads(
+        subprocess.check_output(
+            f"./tests/integration/setup/get_image_metadata.sh {image_version}",
+            shell=True,
+            stderr=None,
+        ).decode("utf-8")
+    )
+
+    logger.info(f"Spark version: {spark_version}")
+
+    image_metadata = json.loads(
+        subprocess.check_output(
+            f"./tests/integration/setup/get_image_metadata.sh {image_version}",
+            shell=True,
+            stderr=None,
+        ).decode("utf-8")
+    )
+
+    spark_version = image_metadata["org.opencontainers.image.version"]
+
+    logger.info(f"Spark version: {spark_version}")
+
     resources = {"spark-history-server-image": image_version}
 
     logger.info("Deploying charm")
@@ -126,9 +148,17 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
     status = await ops_test.model.get_status()
     address = status["applications"][APP_NAME]["units"][f"{APP_NAME}/0"]["address"]
 
-    apps = json.loads(urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read())
+    apps = None
 
-    assert len(apps) == 0
+    for i in range(0, 5):
+        try:
+            apps = json.loads(
+                urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read()
+            )
+        except Exception:
+            sleep(3)
+
+    assert apps is not None and len(apps) == 0
 
     logger.info("Setting up spark")
 
@@ -143,7 +173,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
     logger.info("Executing Spark job")
 
     run_spark_output = subprocess.check_output(
-        "./tests/integration/setup/run_spark_job.sh", shell=True, stderr=None
+        f"./tests/integration/setup/run_spark_job.sh {spark_version}", shell=True, stderr=None
     ).decode("utf-8")
 
     logger.info(f"Run spark output:\n{run_spark_output}")
