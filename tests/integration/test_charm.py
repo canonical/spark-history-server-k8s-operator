@@ -79,8 +79,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
     # logger.info(f"Spark version: {spark_version}")
 
     shell_output = subprocess.check_output(
-        f"./tests/integration/setup/get_image_metadata.sh {image_version}",
-        shell=True
+        f"./tests/integration/setup/get_image_metadata.sh {image_version}", shell=True
     ).decode("utf-8")
 
     logger.info(shell_output)
