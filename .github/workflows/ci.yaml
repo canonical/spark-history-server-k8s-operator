@@ -72,10 +72,11 @@ jobs:
       fail-fast: false
       matrix:
         tox-environments:
-          # - integration-charm
-          # - integration-tls
-          - integration-azure
-          # - integration-logs
+          - integration-charm
+          - integration-tls
+          # https://github.com/canonical/spark-history-server-k8s-operator/issues/71
+          # - integration-azure
+          - integration-logs
         runner:
           - ubuntu-22.04
           - [self-hosted, linux, AMD64, X64, large, jammy]
@@ -141,9 +142,6 @@ jobs:
             echo Skipping unstable tests
             echo "mark_expression=not unstable" >> $GITHUB_OUTPUT
           fi
-      - name: Setup tmate session
-        timeout-minutes: 30
-        uses: mxschmitt/action-tmate@v3
       - name: Run integration tests
         env:
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
