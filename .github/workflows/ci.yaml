@@ -74,7 +74,8 @@ jobs:
         tox-environments:
           - integration-charm
           - integration-tls
-          - integration-azure
+          # https://github.com/canonical/spark-history-server-k8s-operator/issues/71
+          # - integration-azure
           - integration-logs
         runner:
           - ubuntu-22.04
@@ -147,3 +148,6 @@ jobs:
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
           CI_PACKED_CHARMS: ${{ needs.build.outputs.charms }}
         run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}'
+
+
+
