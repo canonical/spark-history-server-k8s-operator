@@ -218,6 +218,32 @@ def test_with_ingress(
     spark_properties = parse_spark_properties(out, tmp_path)
 
     assert "spark.ui.proxyRedirectUri" in spark_properties
+    assert "spark.ui.proxyBase" in spark_properties
+
+
+@patch("managers.s3.S3Manager.verify", return_value=True)
+@patch("workload.SparkHistoryServer.exec")
+def test_with_ingress_subdomain(
+    exec_calls,
+    verify_call,
+    tmp_path,
+    history_server_ctx,
+    history_server_container,
+    ingress_subdomain_relation,
+    s3_relation,
+):
+    state = State(
+        relations=[s3_relation, ingress_subdomain_relation],
+        containers=[history_server_container],
+    )
+    out = history_server_ctx.run(ingress_subdomain_relation.changed_event, state)
+
+    assert out.unit_status == ActiveStatus("")
+
+    spark_properties = parse_spark_properties(out, tmp_path)
+
+    assert "spark.ui.proxyRedirectUri" in spark_properties
+    assert "spark.ui.proxyBase" not in spark_properties
 
 
 @patch("managers.s3.S3Manager.verify", return_value=True)
