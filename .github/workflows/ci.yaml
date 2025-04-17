@@ -74,8 +74,7 @@ jobs:
         tox-environments:
           - integration-charm
           - integration-tls
-          # https://github.com/canonical/spark-history-server-k8s-operator/issues/71
-          # - integration-azure
+          - integration-azure
           - integration-logs
         runner:
           - ubuntu-22.04
