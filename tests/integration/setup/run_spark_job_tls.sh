@@ -1,8 +1,12 @@
 #!/bin/bash
+
+SPARK_VERSION=$1
+CA_FILE=$2
+
 set -eux
 sudo apt install s3cmd -y
 echo "Generate truststore"
-keytool -import -alias ceph-cert -file $1 -storetype JKS -keystore cacerts -storepass changeit -noprompt
+keytool -import -alias ceph-cert -file ${CA_FILE} -storetype JKS -keystore cacerts -storepass changeit -noprompt
 mv cacerts spark.truststore
 echo "Create secret for truststore"
 sudo microk8s.kubectl create secret generic spark-truststore --from-file spark.truststore
@@ -13,5 +17,5 @@ spark-client.service-account-registry add-config --username hello \
     --conf spark.kubernetes.executor.secrets.spark-truststore=/spark-truststore \
     --conf spark.kubernetes.driver.secrets.spark-truststore=/spark-truststore 
 echo "Run Spark job"
-spark-client.spark-submit --username hello --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.executor.request.cores=0.1 --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.12-3.4.2.jar 100
+spark-client.spark-submit --username hello --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.executor.request.cores=0.1 --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.12-$SPARK_VERSION.jar 100
 set +e

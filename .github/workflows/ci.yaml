@@ -7,10 +7,15 @@ concurrency:
   cancel-in-progress: true
 
 on:
-  workflow_call:
   pull_request:
   schedule:
-    - cron: '53 0 * * *' # Daily at 00:53 UTC
+    - cron: '53 0 * * *'  # Daily at 00:53 UTC
+  # Triggered on push to branch "main" by .github/workflows/release.yaml
+  workflow_call:
+    outputs:
+      artifact-prefix:
+        description: build_charm.yaml `artifact-prefix` output
+        value: ${{ jobs.build.outputs.artifact-prefix }}
 
 jobs:
   lint:
@@ -60,9 +65,7 @@ jobs:
 
   build:
     name: Build charms
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v24.0.5
-    with:
-      cache: true
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v29.0.0
 
   integration-test:
     strategy:
@@ -144,3 +147,6 @@ jobs:
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
           CI_PACKED_CHARMS: ${{ needs.build.outputs.charms }}
         run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}'
+
+
+

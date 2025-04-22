@@ -131,6 +131,30 @@ def ingress_relation():
 
 
 @pytest.fixture
+def ingress_subdomain_relation():
+    """Provide fixture for the ingress relation."""
+    relation_id = next_relation_id(update=True)
+
+    return Relation(
+        endpoint=INGRESS,
+        interface="ingress",
+        remote_app_name="traefik-k8s",
+        relation_id=relation_id,
+        local_app_data={
+            "model": '"spark"',
+            "name": '"spark-history-server-k8s"',
+            "port": "18080",
+            "redirect-https": "false",
+            "scheme": '"http"',
+            "strip-prefix": "true",
+        },
+        remote_app_data={
+            "ingress": '{"url": "http://spark-history-server-k8s.spark.deusebio.com"}'
+        },
+    )
+
+
+@pytest.fixture
 def azure_storage_relation():
     """Provide fixture for the Azure storage relation."""
     relation_id = next_relation_id(update=True)

@@ -151,6 +151,20 @@ async def test_loki_integration(ops_test: OpsTest, charm_versions):
     access_key = s3_params[1]
     secret_key = s3_params[2]
 
+    image_version = METADATA["resources"]["spark-history-server-image"]["upstream-source"]
+
+    image_metadata = json.loads(
+        subprocess.check_output(
+            f"./tests/integration/setup/get_image_metadata.sh {image_version}",
+            shell=True,
+            stderr=None,
+        ).decode("utf-8")
+    )
+
+    spark_version = image_metadata["org.opencontainers.image.version"]
+
+    logger.info(f"Spark version: {spark_version}")
+
     logger.info("Verifying history server has no app entries")
     status = await ops_test.model.get_status()
     address = status["applications"][APP_NAME]["units"][f"{APP_NAME}/0"]["address"]
@@ -169,7 +183,7 @@ async def test_loki_integration(ops_test: OpsTest, charm_versions):
     logger.info("Setup a spark to run job")
 
     setup_spark_output = subprocess.check_output(
-        f"./tests/integration/setup/setup_spark.sh {endpoint_url} {access_key} {secret_key}",
+        f"./tests/integration/setup/setup_spark.sh {endpoint_url} {access_key} {secret_key} {image_version}",
         shell=True,
         stderr=None,
     ).decode("utf-8")
@@ -179,7 +193,7 @@ async def test_loki_integration(ops_test: OpsTest, charm_versions):
     logger.info("Executing Spark job")
 
     run_spark_output = subprocess.check_output(
-        "./tests/integration/setup/run_spark_job.sh", shell=True, stderr=None
+        f"./tests/integration/setup/run_spark_job.sh {spark_version}", shell=True, stderr=None
     ).decode("utf-8")
 
     logger.info(f"Run spark output:\n{run_spark_output}")

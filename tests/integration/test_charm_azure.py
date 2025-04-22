@@ -45,6 +45,18 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_storage
 
     logger.info(f"Image version: {image_version}")
 
+    image_metadata = json.loads(
+        subprocess.check_output(
+            f"./tests/integration/setup/get_image_metadata.sh {image_version}",
+            shell=True,
+            stderr=None,
+        ).decode("utf-8")
+    )
+
+    spark_version = image_metadata["org.opencontainers.image.version"]
+
+    logger.info(f"Spark version: {spark_version}")
+
     resources = {"spark-history-server-image": image_version}
 
     logger.info("Deploying charm")
@@ -156,7 +168,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_storage
     logger.info("Executing Spark job")
 
     run_spark_output = subprocess.check_output(
-        "./tests/integration/setup/run_spark_job.sh", shell=True, stderr=None
+        f"./tests/integration/setup/run_spark_job.sh {spark_version}", shell=True, stderr=None
     ).decode("utf-8")
 
     logger.info(f"Run spark output:\n{run_spark_output}")

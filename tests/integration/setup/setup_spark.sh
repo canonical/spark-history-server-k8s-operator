@@ -11,6 +11,7 @@ spark-client.service-account-registry create --username hello \
                 --conf spark.hadoop.fs.s3a.access.key=$2 \
                 --conf spark.hadoop.fs.s3a.secret.key=$3 \
                 --conf spark.hadoop.fs.s3a.endpoint=$1 \
+                --conf spark.kubernetes.container.image=$4 \
                 --conf spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider \
                 --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
                 --conf spark.hadoop.fs.s3a.path.style.access=true \
