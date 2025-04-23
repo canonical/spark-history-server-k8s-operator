@@ -29,7 +29,7 @@ requires:
   s3-credentials:
     interface: s3
   azure-storage-credentials:
-    interface: azure-storage
+    interface: azure_storage
   ingress:
     interface: ingress
     limit: 1
