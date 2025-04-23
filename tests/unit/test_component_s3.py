@@ -27,7 +27,7 @@ def aws_credentials():
 
 @pytest.fixture(scope="function")
 def s3(aws_credentials):
-    """Return a mocked S3 client.
+    """Return a mocked S3 clients.
 
     All boto3 call will be mocked from this point.
     """
