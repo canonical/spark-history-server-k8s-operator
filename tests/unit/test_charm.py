@@ -44,7 +44,7 @@ def test_pebble_ready(exec_calls, history_server_ctx, history_server_container):
         containers=[history_server_container],
     )
     out = history_server_ctx.run(history_server_container.pebble_ready_event, state)
-    assert out.unit_status == BlockedStatus("Missing relation with storage (s3 or azure)")
+    assert out.unit_status == BlockedStatus("Missing relation with storage (s3 or azure storage)")
 
 
 @patch("managers.s3.S3Manager.verify", return_value=True)
