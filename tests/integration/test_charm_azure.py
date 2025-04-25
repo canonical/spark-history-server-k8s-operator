@@ -29,7 +29,7 @@ BUCKET_NAME = "history-server"
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_credentials):
+async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_storage_credentials):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
@@ -81,26 +81,26 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_credent
         ops_test,
         charm_versions.azure_storage.application_name,
         "iamsecret",
-        {"secret-key": azure_credentials["secret-key"]},
+        {"secret-key": azure_storage_credentials["secret-key"]},
     )
     logger.info(
         f"Juju secret for secret-key config option for azure-storage-integrator added. Secret URI: {credentials_secret_uri}"
     )
 
     configuration_parameters = {
-        "container": azure_credentials["container"],
-        "path": azure_credentials["path"],
-        "storage-account": azure_credentials["storage-account"],
-        "connection-protocol": azure_credentials["connection-protocol"],
+        "container": azure_storage_credentials["container"],
+        "path": azure_storage_credentials["path"],
+        "storage-account": azure_storage_credentials["storage-account"],
+        "connection-protocol": azure_storage_credentials["connection-protocol"],
         "credentials": credentials_secret_uri,
     }
 
     # create azure container
     logger.info(
-        f"Creating container {azure_credentials['container']} with path {azure_credentials['path']}"
+        f"Creating container {azure_storage_credentials['container']} with path {azure_storage_credentials['path']}"
     )
     # First delete container
-    delete_azure_container(azure_credentials["container"])
+    delete_azure_container(azure_storage_credentials["container"])
     sleep(10)
 
     # apply new configuration options
@@ -158,7 +158,13 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_credent
     logger.info("Setting up spark")
 
     setup_spark_output = subprocess.check_output(
-        f"./tests/integration/setup/setup_spark_azure.sh {azure_credentials['container']} {azure_credentials['path']} {azure_credentials['storage-account']} {azure_credentials['secret-key']} {image_version}",
+        (
+            f"./tests/integration/setup/setup_spark_azure.sh "
+            f"{azure_storage_credentials['container']} "
+            f"{azure_storage_credentials['path']} "
+            f"{azure_storage_credentials['storage-account']} "
+            f"{azure_storage_credentials['secret-key']} {image_version}"
+        ),
         shell=True,
         stderr=None,
     ).decode("utf-8")
@@ -192,4 +198,4 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_credent
     assert len(apps) == 1
 
     logger.info("Delete azure container!")
-    delete_azure_container(azure_credentials["container"])
+    delete_azure_container(azure_storage_credentials["container"])

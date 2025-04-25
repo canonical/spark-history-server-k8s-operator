@@ -163,7 +163,7 @@ class Status(Enum):
     """Class bundling all statuses that the charm may fall into."""
 
     WAITING_PEBBLE = MaintenanceStatus("Waiting for Pebble")
-    MISSING_STORAGE_RELATION = BlockedStatus("Missing relation with storage (s3 or azure)")
+    MISSING_STORAGE_RELATION = BlockedStatus("Missing relation with storage (s3 or azure storage)")
     INVALID_S3_CREDENTIALS = BlockedStatus("Invalid S3 credentials")
     MISSING_INGRESS_RELATION = BlockedStatus("Missing INGRESS relation")
     NOT_RUNNING = BlockedStatus("History server not running. Please check logs.")

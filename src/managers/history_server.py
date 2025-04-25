@@ -171,7 +171,7 @@ class HistoryServerManager(WithLogging):
         if (not s3_manager or not s3_manager.verify()) and (
             not azure_manager or not azure_manager.verify()
         ):
-            self.logger.info("Nor s3 or azure are ready")
+            self.logger.info("Neither S3 nor Azure Storage are ready")
             return
         if s3:
             if tls_ca_chain := s3.tls_ca_chain:
