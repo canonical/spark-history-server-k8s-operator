@@ -230,7 +230,7 @@
         "targets": [
           {
             "exemplar": true,
-            "expr": "up{job=\"$job\", instance=\"$app$node\"}",
+            "expr": "sum_over_time(up{job=\"$job\", instance=\"$app$node\"}[1m])",
             "format": "time_series",
             "instant": true,
             "interval": "",
