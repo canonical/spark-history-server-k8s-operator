@@ -8,6 +8,8 @@ on:
   schedule:
     - cron: "0 2 * * 6" # Every Saturday 2:00 AM UTC
   workflow_dispatch:
+  # just for testing
+  pull_request:
 
 
 jobs:
