@@ -8,8 +8,6 @@ on:
   schedule:
     - cron: "0 2 * * 6" # Every Saturday 2:00 AM UTC
   workflow_dispatch:
-  # just for testing
-  pull_request:
 
 
 jobs:
@@ -41,7 +39,7 @@ jobs:
       - name: Move results to necessary folder for TICS
         run: |
           mkdir -p cover
-          mv coverage.xml cover/cobertura.xml
+          mv coverage.xml cover/coverage.xml
 
       - name: Run TICS analysis with github-action
         uses: tiobe/tics-github-action@v3
