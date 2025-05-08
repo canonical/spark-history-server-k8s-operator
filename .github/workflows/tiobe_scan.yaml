@@ -33,7 +33,7 @@ jobs:
         run: |
           pipx install tox
           pipx install poetry
-          poetry install --all-group
+          poetry install --all-groups
 
       - name: Run tox tests to create coverage.xml
         run: tox run -e unit
