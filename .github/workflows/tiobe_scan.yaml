@@ -8,6 +8,7 @@ on:
   schedule:
     - cron: "0 2 * * 6" # Every Saturday 2:00 AM UTC
   workflow_dispatch:
+  pull_request:
 
 
 jobs:
@@ -32,6 +33,7 @@ jobs:
         run: |
           pipx install tox
           pipx install poetry
+          poetry install --all-group
 
       - name: Run tox tests to create coverage.xml
         run: tox run -e unit
