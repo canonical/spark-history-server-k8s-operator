@@ -42,7 +42,7 @@ class HistoryServerPaths:
 
         Used for scraping and exposing mBeans of a JMX target.
         """
-        return self.lib_path / "jmx_prometheus_javaagent-0.15.0.jar"
+        return self.lib_path / "jmx_prometheus_javaagent-0.20.0.jar"
 
     @property
     def jmx_prometheus_config(self):
