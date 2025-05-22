@@ -145,7 +145,8 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
             apps = json.loads(
                 urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read()
             )
-        except Exception:
+        except Exception as e:
+            logger.error(e)
             sleep(3)
 
     assert apps is not None and len(apps) == 0
