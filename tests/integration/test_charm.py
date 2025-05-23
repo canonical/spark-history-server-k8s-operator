@@ -145,7 +145,8 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
             apps = json.loads(
                 urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read()
             )
-        except Exception:
+        except Exception as e:
+            logger.error(e)
             sleep(3)
 
     assert apps is not None and len(apps) == 0
@@ -163,7 +164,9 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
     logger.info("Executing Spark job")
 
     run_spark_output = subprocess.check_output(
-        f"./tests/integration/setup/run_spark_job.sh {spark_version}", shell=True, stderr=None
+        f"./tests/integration/setup/run_spark_job.sh {spark_version} {image_version}",
+        shell=True,
+        stderr=None,
     ).decode("utf-8")
 
     logger.info(f"Run spark output:\n{run_spark_output}")
