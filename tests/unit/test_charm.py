@@ -1,13 +1,19 @@
 # Copyright 2023 Canonical Limited
 # See LICENSE file for licensing details.
+from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 from ops import ActiveStatus, BlockedStatus, MaintenanceStatus
-from scenario import Container, State
+from ops.testing import Container, Context, Relation, State
 
 from constants import CONTAINER
+
+if TYPE_CHECKING:
+    from charm import SparkHistoryServerCharm
 
 
 def parse_spark_properties(out: State, tmp_path: Path) -> dict[str, str]:
@@ -28,34 +34,45 @@ def parse_spark_properties(out: State, tmp_path: Path) -> dict[str, str]:
         )
 
 
-def test_start_history_server(history_server_ctx):
+def test_start_history_server(history_server_ctx: Context[SparkHistoryServerCharm]) -> None:
     state = State(
         config={},
         containers=[Container(name=CONTAINER, can_connect=False)],
     )
-    out = history_server_ctx.run("install", state)
+    out = history_server_ctx.run(history_server_ctx.on.install(), state)
     assert out.unit_status == MaintenanceStatus("Waiting for Pebble")
 
 
 @patch("workload.SparkHistoryServer.exec")
-def test_pebble_ready(exec_calls, history_server_ctx, history_server_container):
+def test_pebble_ready(
+    exec_calls,
+    history_server_ctx: Context[SparkHistoryServerCharm],
+    history_server_container: Container,
+) -> None:
     state = State(
         containers=[history_server_container],
     )
-    out = history_server_ctx.run(history_server_container.pebble_ready_event, state)
+    out = history_server_ctx.run(
+        history_server_ctx.on.pebble_ready(history_server_container), state
+    )
     assert out.unit_status == BlockedStatus("Missing relation with storage (s3 or azure storage)")
 
 
 @patch("managers.s3.S3Manager.verify", return_value=True)
 @patch("workload.SparkHistoryServer.exec")
 def test_s3_relation_connection_ok(
-    exec_calls, verify_call, tmp_path, history_server_ctx, history_server_container, s3_relation
-):
+    exec_calls,
+    verify_call,
+    tmp_path: Path,
+    history_server_ctx: Context[SparkHistoryServerCharm],
+    history_server_container: Container,
+    s3_relation: Relation,
+) -> None:
     state = State(
         relations=[s3_relation],
         containers=[history_server_container],
     )
-    out = history_server_ctx.run(s3_relation.changed_event, state)
+    out = history_server_ctx.run(history_server_ctx.on.relation_changed(s3_relation), state)
     assert out.unit_status == ActiveStatus("")
 
     # Check containers modifications
@@ -86,17 +103,17 @@ def test_s3_relation_connection_ok(
 def test_s3_relation_connection_ok_tls(
     exec_calls,
     verify_call,
-    tmp_path,
-    history_server_ctx,
-    history_server_container,
-    s3_relation_tls,
-    s3_relation,
-):
+    tmp_path: Path,
+    history_server_ctx: Context[SparkHistoryServerCharm],
+    history_server_container: Container,
+    s3_relation_tls: Relation,
+    s3_relation: Relation,
+) -> None:
     state = State(
         relations=[s3_relation_tls],
         containers=[history_server_container],
     )
-    inter = history_server_ctx.run(s3_relation_tls.changed_event, state)
+    inter = history_server_ctx.run(history_server_ctx.on.relation_changed(s3_relation_tls), state)
     assert inter.unit_status == ActiveStatus("")
 
     # Check containers modifications
@@ -123,7 +140,8 @@ def test_s3_relation_connection_ok_tls(
     )
 
     out = history_server_ctx.run(
-        s3_relation_tls.changed_event, inter.replace(relations=[s3_relation])
+        history_server_ctx.on.relation_changed(s3_relation),
+        replace(inter, relations=[s3_relation]),
     )
 
     assert len(out.get_container(CONTAINER).layers) == 2
@@ -143,29 +161,40 @@ def test_s3_relation_connection_ok_tls(
 @patch("managers.s3.S3Manager.verify", return_value=False)
 @patch("workload.SparkHistoryServer.exec")
 def test_s3_relation_connection_ko(
-    exec_calls, verify_call, tmp_path, history_server_ctx, history_server_container, s3_relation
-):
+    exec_calls,
+    verify_call,
+    history_server_ctx: Context[SparkHistoryServerCharm],
+    history_server_container: Container,
+    s3_relation: Relation,
+) -> None:
     state = State(
         relations=[s3_relation],
         containers=[history_server_container],
     )
-    out = history_server_ctx.run(s3_relation.changed_event, state)
+    out = history_server_ctx.run(history_server_ctx.on.relation_changed(s3_relation), state)
     assert out.unit_status == BlockedStatus("Invalid S3 credentials")
 
 
 @patch("managers.s3.S3Manager.verify", return_value=True)
 @patch("workload.SparkHistoryServer.exec")
 def test_s3_relation_broken(
-    exec_calls, verify_call, history_server_ctx, history_server_container, s3_relation, tmp_path
+    exec_calls,
+    verify_call,
+    tmp_path: Path,
+    history_server_ctx: Context[SparkHistoryServerCharm],
+    history_server_container: Container,
+    s3_relation: Relation,
 ):
     initial_state = State(
         relations=[s3_relation],
         containers=[history_server_container],
     )
 
-    state_after_relation_changed = history_server_ctx.run(s3_relation.changed_event, initial_state)
+    state_after_relation_changed = history_server_ctx.run(
+        history_server_ctx.on.relation_changed(s3_relation), initial_state
+    )
     state_after_relation_broken = history_server_ctx.run(
-        s3_relation.broken_event, state_after_relation_changed
+        history_server_ctx.on.relation_broken(s3_relation), state_after_relation_changed
     )
 
     assert state_after_relation_broken.unit_status == BlockedStatus(
@@ -181,17 +210,16 @@ def test_s3_relation_broken(
 @patch("workload.SparkHistoryServer.exec")
 def test_ingress_relation_creation(
     exec_calls,
-    tmp_path,
-    history_server_ctx,
-    history_server_container,
-    ingress_relation,
-):
+    history_server_ctx: Context[SparkHistoryServerCharm],
+    history_server_container: Container,
+    ingress_relation: Relation,
+) -> None:
     state = State(
         leader=True,
         relations=[ingress_relation],
         containers=[history_server_container],
     )
-    out = history_server_ctx.run(ingress_relation.changed_event, state)
+    out = history_server_ctx.run(history_server_ctx.on.relation_changed(ingress_relation), state)
     assert out.unit_status == BlockedStatus("Missing relation with storage (s3 or azure storage)")
 
 
@@ -200,17 +228,17 @@ def test_ingress_relation_creation(
 def test_with_ingress(
     exec_calls,
     verify_call,
-    tmp_path,
-    history_server_ctx,
-    history_server_container,
-    ingress_relation,
-    s3_relation,
-):
+    tmp_path: Path,
+    history_server_ctx: Context[SparkHistoryServerCharm],
+    history_server_container: Container,
+    ingress_relation: Relation,
+    s3_relation: Relation,
+) -> None:
     state = State(
         relations=[s3_relation, ingress_relation],
         containers=[history_server_container],
     )
-    out = history_server_ctx.run(ingress_relation.changed_event, state)
+    out = history_server_ctx.run(history_server_ctx.on.relation_changed(ingress_relation), state)
 
     assert out.unit_status == ActiveStatus("")
 
@@ -225,17 +253,19 @@ def test_with_ingress(
 def test_with_ingress_subdomain(
     exec_calls,
     verify_call,
-    tmp_path,
-    history_server_ctx,
-    history_server_container,
-    ingress_subdomain_relation,
-    s3_relation,
-):
+    tmp_path: Path,
+    history_server_ctx: Context[SparkHistoryServerCharm],
+    history_server_container: Container,
+    ingress_subdomain_relation: Relation,
+    s3_relation: Relation,
+) -> None:
     state = State(
         relations=[s3_relation, ingress_subdomain_relation],
         containers=[history_server_container],
     )
-    out = history_server_ctx.run(ingress_subdomain_relation.changed_event, state)
+    out = history_server_ctx.run(
+        history_server_ctx.on.relation_changed(ingress_subdomain_relation), state
+    )
 
     assert out.unit_status == ActiveStatus("")
 
@@ -250,17 +280,17 @@ def test_with_ingress_subdomain(
 def test_remove_ingress(
     exec_calls,
     verify_call,
-    tmp_path,
-    history_server_ctx,
-    history_server_container,
-    ingress_relation,
-    s3_relation,
-):
+    tmp_path: Path,
+    history_server_ctx: Context[SparkHistoryServerCharm],
+    history_server_container: Container,
+    ingress_relation: Relation,
+    s3_relation: Relation,
+) -> None:
     state = State(
         relations=[s3_relation, ingress_relation],
         containers=[history_server_container],
     )
-    out = history_server_ctx.run(ingress_relation.broken_event, state)
+    out = history_server_ctx.run(history_server_ctx.on.relation_broken(ingress_relation), state)
 
     assert out.unit_status == ActiveStatus("")
 
@@ -271,22 +301,22 @@ def test_remove_ingress(
 
 @patch("managers.azure_storage.AzureStorageManager.verify", return_value=True)
 @patch("workload.SparkHistoryServer.exec")
-@patch("ops.JujuVersion.has_secrets", return_value=True)
 def test_azure_storage_relation(
-    mock_has_secrets,
     exec_calls,
     verify_call,
-    tmp_path,
-    history_server_ctx,
-    history_server_container,
-    azure_storage_relation,
-):
+    tmp_path: Path,
+    history_server_ctx: Context[SparkHistoryServerCharm],
+    history_server_container: Container,
+    azure_storage_relation: Relation,
+) -> None:
     state = State(
         relations=[azure_storage_relation],
         containers=[history_server_container],
     )
 
-    out = history_server_ctx.run(azure_storage_relation.changed_event, state)
+    out = history_server_ctx.run(
+        history_server_ctx.on.relation_changed(azure_storage_relation), state
+    )
     assert out.unit_status == ActiveStatus("")
 
     # Check containers modifications
@@ -319,26 +349,28 @@ def test_azure_storage_relation(
 
 @patch("managers.s3.S3Manager.verify", return_value=True)
 @patch("workload.SparkHistoryServer.exec")
-@patch("ops.JujuVersion.has_secrets", return_value=True)
 def test_azure_storage_relation_broken(
-    mock_has_secrets,
     exec_calls,
     verify_call,
-    tmp_path,
-    history_server_ctx,
-    history_server_container,
-    azure_storage_relation,
-):
+    tmp_path: Path,
+    history_server_ctx: Context[SparkHistoryServerCharm],
+    history_server_container: Container,
+    azure_storage_relation: Relation,
+) -> None:
     state = State(
         relations=[azure_storage_relation],
         containers=[history_server_container],
     )
 
     state_after_relation_changed = history_server_ctx.run(
-        azure_storage_relation.changed_event, state
+        history_server_ctx.on.relation_changed(azure_storage_relation), state
+    )
+    azure_storage_relation_changed = state_after_relation_changed.get_relation(
+        azure_storage_relation.id
     )
     state_after_relation_broken = history_server_ctx.run(
-        azure_storage_relation.broken_event, state_after_relation_changed
+        history_server_ctx.on.relation_broken(azure_storage_relation_changed),
+        state_after_relation_changed,
     )
 
     assert state_after_relation_broken.unit_status == BlockedStatus(
@@ -356,22 +388,21 @@ def test_azure_storage_relation_broken(
 
 @patch("managers.s3.S3Manager.verify", return_value=True)
 @patch("workload.SparkHistoryServer.exec")
-@patch("ops.JujuVersion.has_secrets", return_value=True)
 def test_both_azure_storage_and_s3_relation_together(
-    mock_has_secrets,
     exec_calls,
     verify_call,
-    tmp_path,
-    history_server_ctx,
-    history_server_container,
-    s3_relation,
-    azure_storage_relation,
-):
+    history_server_ctx: Context[SparkHistoryServerCharm],
+    history_server_container: Container,
+    s3_relation: Relation,
+    azure_storage_relation: Relation,
+) -> None:
     state = State(
         relations=[s3_relation, azure_storage_relation],
         containers=[history_server_container],
     )
-    out = history_server_ctx.run(azure_storage_relation.changed_event, state)
+    out = history_server_ctx.run(
+        history_server_ctx.on.relation_changed(azure_storage_relation), state
+    )
     assert out.unit_status == BlockedStatus(
         "Spark History Server can be related to only one storage backend at a time."
     )
