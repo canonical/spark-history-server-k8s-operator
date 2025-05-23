@@ -47,7 +47,12 @@ async def fetch_action_sync_s3_credentials(unit: Unit, access_key: str, secret_k
 def setup_s3_bucket_for_history_server(
     endpoint_url: str, aws_access_key: str, aws_secret_key: str, bucket_str: str, verify=False
 ):
-    config = Config(connect_timeout=60, retries={"max_attempts": 0})
+    config = Config(
+        connect_timeout=60,
+        retries={"max_attempts": 0},
+        response_checksum_validation="when_supported",
+        request_checksum_calculation="when_supported",
+    )
     session = boto3.session.Session(
         aws_access_key_id=aws_access_key, aws_secret_access_key=aws_secret_key
     )
@@ -59,8 +64,9 @@ def setup_s3_bucket_for_history_server(
         if bucket_name == bucket_str:
             logger.info(f"Deleting bucket: {bucket_name}")
             objects = s3.list_objects_v2(Bucket=bucket_str)["Contents"]
-            objs = [{"Key": x["Key"]} for x in objects]
-            s3.delete_objects(Bucket=bucket_str, Delete={"Objects": objs})
+            objs = [x["Key"] for x in objects]
+            for obj in objs:
+                s3.delete_object(Bucket=bucket_str, Key=obj)
             s3.delete_bucket(Bucket=bucket_str)
 
 

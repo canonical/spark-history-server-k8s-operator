@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 """Module containing all business logic related to the workload."""
+
 import json
 
 import ops.pebble

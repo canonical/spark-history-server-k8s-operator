@@ -358,7 +358,6 @@ async def test_history_server_cos_integration(ops_test: OpsTest, charm_versions)
     # We should leave time for Prometheus data to be published
     for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(30)):
         with attempt:
-
             # Data got published to Prometheus
             cos_address = await get_cos_address(ops_test)
             assert published_prometheus_data(ops_test, cos_address, "jmx_scrape_duration_seconds")

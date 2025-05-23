@@ -1,11 +1,13 @@
 # Copyright 2023 Canonical Limited
 # See LICENSE file for licensing details.
 
+from dataclasses import replace
+
 import pytest
 from ops import pebble
-from scenario import Container, Context, Model, Mount, Relation
-from scenario.state import next_relation_id
+from ops.testing import Container, Context, Model, Mount, Relation
 
+# from scenario.state import next_relation_id
 from charm import SparkHistoryServerCharm
 from constants import AZURE_RELATION_NAME, CONTAINER
 from core.context import INGRESS, S3
@@ -50,13 +52,13 @@ def history_server_container(tmp_path):
         }
     )
 
-    etc = Mount("/etc/", tmp_path)
+    etc = Mount(location="/etc/", source=tmp_path)
 
     return Container(
         name=CONTAINER,
         can_connect=True,
         layers={"base": layer},
-        service_status={"history-server": pebble.ServiceStatus.ACTIVE},
+        service_statuses={"history-server": pebble.ServiceStatus.ACTIVE},
         mounts={"etc": etc},
     )
 
@@ -64,13 +66,15 @@ def history_server_container(tmp_path):
 @pytest.fixture
 def s3_relation():
     """Provide fixture for the S3 relation."""
-    relation_id = next_relation_id(update=True)
-
-    return Relation(
+    relation = Relation(
         endpoint=S3,
         interface="s3",
         remote_app_name="s3-integrator",
-        relation_id=relation_id,
+    )
+    relation_id = relation.id
+
+    return replace(
+        relation,
         local_app_data={"bucket": f"relation-{relation_id}"},
         remote_app_data={
             "access-key": "access-key",
@@ -86,13 +90,15 @@ def s3_relation():
 @pytest.fixture
 def s3_relation_tls():
     """Provide fixture for the S3 relation."""
-    relation_id = next_relation_id(update=True)
-
-    return Relation(
+    relation = Relation(
         endpoint=S3,
         interface="s3",
         remote_app_name="s3-integrator",
-        relation_id=relation_id,
+    )
+    relation_id = relation.id
+
+    return replace(
+        relation,
         local_app_data={"bucket": f"relation-{relation_id}"},
         remote_app_data={
             "access-key": "access-key",
@@ -109,13 +115,10 @@ def s3_relation_tls():
 @pytest.fixture
 def ingress_relation():
     """Provide fixture for the ingress relation."""
-    relation_id = next_relation_id(update=True)
-
     return Relation(
         endpoint=INGRESS,
         interface="ingress",
         remote_app_name="traefik-k8s",
-        relation_id=relation_id,
         local_app_data={
             "model": '"spark"',
             "name": '"spark-history-server-k8s"',
@@ -133,13 +136,10 @@ def ingress_relation():
 @pytest.fixture
 def ingress_subdomain_relation():
     """Provide fixture for the ingress relation."""
-    relation_id = next_relation_id(update=True)
-
     return Relation(
         endpoint=INGRESS,
         interface="ingress",
         remote_app_name="traefik-k8s",
-        relation_id=relation_id,
         local_app_data={
             "model": '"spark"',
             "name": '"spark-history-server-k8s"',
@@ -157,13 +157,15 @@ def ingress_subdomain_relation():
 @pytest.fixture
 def azure_storage_relation():
     """Provide fixture for the Azure storage relation."""
-    relation_id = next_relation_id(update=True)
-
-    return Relation(
+    relation = Relation(
         endpoint=AZURE_RELATION_NAME,
         interface="azure_storage",
         remote_app_name="azure-storage-integrator",
-        relation_id=relation_id,
+    )
+    relation_id = relation.id
+
+    return replace(
+        relation,
         local_app_data={"container": f"relation-{relation_id}"},
         remote_app_data={
             "container": "my-bucket",
