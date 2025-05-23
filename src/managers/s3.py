@@ -12,6 +12,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING
 
 import boto3
+from botocore.client import Config
 from botocore.exceptions import ClientError, SSLError
 from tenacity import retry, retry_if_exception_cause_type, stop_after_attempt, wait_fixed
 
@@ -82,6 +83,10 @@ class S3Manager(WithLogging):
                 "s3",
                 endpoint_url=self.config.endpoint or "https://s3.amazonaws.com",
                 verify=ca_file.name if self.config.tls_ca_chain else None,
+                config=Config(
+                    request_checksum_calculation="when_supported",
+                    response_checksum_validation="when_supported",
+                ),
             )
 
             try:
