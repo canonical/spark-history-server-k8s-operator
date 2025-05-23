@@ -1,24 +1,6 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-# Testing tools configuration
-[tool.coverage.run]
-branch = true
-
-[tool.coverage.report]
-show_missing = true
-
-[tool.pytest.ini_options]
-minversion = "6.0"
-log_cli_level = "INFO"
-asyncio_mode = "auto"
-markers = ["unstable"]
-
-# Formatting tools configuration
-[tool.black]
-line-length = 99
-target-version = ["py310"]
-
 [tool.poetry]
 package-mode = false
 requires-poetry = ">=2.0.0"
@@ -53,15 +35,13 @@ cosl = "*"
 optional = true
 
 [tool.poetry.group.format.dependencies]
-black = ">=22.3.0"
-ruff = ">=0.2.2"
+ruff = ">=0.8.0"
 
 [tool.poetry.group.lint]
 optional = true
 
 [tool.poetry.group.lint.dependencies]
-black = ">=22.3.0"
-ruff = ">=0.2.2"
+ruff = ">=0.8.0"
 codespell = ">=2.2.2"
 boto3-stubs = { extras = ["s3"], version = "^1.35.8" }
 
@@ -113,6 +93,19 @@ extend-ignore = [
 ignore = ["E501", "D107"]
 per-file-ignores = { "tests/*" = ["D100", "D101", "D102", "D103", "D104", "E999"], "src/literals.py" = ["D101"] }
 mccabe.max-complexity = 10
+
+# Testing tools configuration
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+log_cli_level = "INFO"
+asyncio_mode = "auto"
+markers = ["unstable"]
 
 [tool.pyright]
 include = ["src"]

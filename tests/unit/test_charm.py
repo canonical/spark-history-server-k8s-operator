@@ -11,7 +11,6 @@ from constants import CONTAINER
 
 
 def parse_spark_properties(out: State, tmp_path: Path) -> dict[str, str]:
-
     spark_properties_path = (
         out.get_container(CONTAINER)
         .layers["base"]

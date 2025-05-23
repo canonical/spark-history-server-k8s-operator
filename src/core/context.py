@@ -32,7 +32,6 @@ class Context(WithLogging):
     """Properties and relations of the charm."""
 
     def __init__(self, charm: CharmBase):
-
         self.charm = charm
         self.model = charm.model
 

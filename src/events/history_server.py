@@ -63,5 +63,8 @@ class HistoryServerEvents(BaseEventHandler, WithLogging):
         )
         if self.charm.unit.is_leader():
             self.charm.app.status = self.get_app_status(
-                self.context.s3, self.context.azure_storage, self.context.ingress, self.context.authorized_users  # type: ignore
+                self.context.s3,
+                self.context.azure_storage,
+                self.context.ingress,
+                self.context.authorized_users,  # type: ignore
             )

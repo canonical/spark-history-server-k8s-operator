@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 """S3 manager."""
+
 from __future__ import annotations
 
 import os
@@ -73,7 +74,6 @@ class S3Manager(WithLogging):
     def verify(self) -> bool:
         """Verify S3 credentials and configuration."""
         with tempfile.NamedTemporaryFile() as ca_file:
-
             if config := self.config.tls_ca_chain:
                 ca_file.write("\n".join(config).encode())
                 ca_file.flush()

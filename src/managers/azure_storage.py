@@ -4,7 +4,6 @@
 
 """Azure storage manager."""
 
-
 import os
 from functools import cached_property
 
