@@ -4,7 +4,6 @@
 
 # Integration Tests TBD separately in next pulse
 
-import asyncio
 import json
 import logging
 import subprocess
@@ -12,14 +11,18 @@ import urllib.request
 from pathlib import Path
 from time import sleep
 
+import jubilant
 import pytest
 import yaml
-from pytest_operator.plugin import OpsTest
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from core.context import AUTH_PROXY_HEADERS
 
-from .test_helpers import fetch_action_sync_s3_credentials, setup_s3_bucket_for_history_server
+from .test_helpers import (
+    set_s3_credentials,
+    setup_s3_bucket_for_history_server,
+)
+from .types import IntegrationTestsCharms
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +31,9 @@ APP_NAME = METADATA["name"]
 BUCKET_NAME = "history-server"
 
 
-@pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
+def test_build_and_deploy(
+    juju: jubilant.Juju, charm_versions: IntegrationTestsCharms, history_server_charm: Path
+) -> None:
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
@@ -59,10 +63,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
 
     logger.info("Bucket setup complete")
 
-    logger.info("Building charm")
-    # Build and deploy charm from local source folder
-
-    charm = await ops_test.build_charm(".")
+    # Deploy charm from local source folder
 
     image_version = METADATA["resources"]["spark-history-server-image"]["upstream-source"]
 
@@ -85,28 +86,16 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
     logger.info("Deploying charm")
 
     # Deploy the charm and wait for waiting status
-    await asyncio.gather(
-        ops_test.model.deploy(**charm_versions.s3.deploy_dict()),
-        ops_test.model.deploy(
-            charm, resources=resources, application_name=APP_NAME, num_units=1, series="jammy"
-        ),
+    juju.deploy(**charm_versions.s3.deploy_dict())
+    juju.deploy(
+        history_server_charm, resources=resources, app=APP_NAME, num_units=1, base="ubuntu@22.04"
     )
-
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME, charm_versions.s3.application_name], timeout=1000
-    )
-
-    s3_integrator_unit = ops_test.model.applications[charm_versions.s3.application_name].units[0]
+    juju.wait(jubilant.all_agents_idle, timeout=1000)
 
     logger.info("Setting up s3 credentials in s3-integrator charm")
+    set_s3_credentials(juju, access_key, secret_key)
 
-    await fetch_action_sync_s3_credentials(
-        s3_integrator_unit, access_key=access_key, secret_key=secret_key
-    )
-    async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(
-            apps=[charm_versions.s3.application_name], status="active"
-        )
+    juju.wait(lambda status: jubilant.all_active(status, charm_versions.s3.application_name))
 
     configuration_parameters = {
         "bucket": "history-server",
@@ -114,33 +103,20 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
         "endpoint": endpoint_url,
     }
     # apply new configuration options
-    await ops_test.model.applications[charm_versions.s3.application_name].set_config(
-        configuration_parameters
-    )
+    juju.config(charm_versions.s3.application_name, configuration_parameters)
 
     logger.info("Relating history server charm with s3-integrator charm")
 
-    await ops_test.model.add_relation(charm_versions.s3.application_name, APP_NAME)
+    juju.integrate(APP_NAME, charm_versions.s3.application_name)
 
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME, charm_versions.s3.application_name], timeout=1000
-    )
-
-    # wait for active status
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME],
-        status="active",
-        timeout=1000,
-    )
+    status = juju.wait(jubilant.all_active)
 
     logger.info("Verifying history server has no app entries")
 
-    status = await ops_test.model.get_status()
-    address = status["applications"][APP_NAME]["units"][f"{APP_NAME}/0"]["address"]
-
+    address = status.apps[APP_NAME].units[f"{APP_NAME}/0"].address
     apps = None
 
-    for i in range(0, 5):
+    for _ in range(0, 5):
         try:
             apps = json.loads(
                 urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read()
@@ -170,7 +146,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
 
     logger.info("Verifying history server has 1 app entry")
 
-    for i in range(0, 5):
+    for _ in range(0, 5):
         try:
             apps = json.loads(
                 urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read()
@@ -186,42 +162,32 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
     assert len(apps) == 1
 
 
-@pytest.mark.abort_on_fail
-async def test_ingress(ops_test: OpsTest, charm_versions):
+def test_ingress(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) -> None:
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
     """
     # Deploy the charm and wait for waiting status
-    _ = await ops_test.model.deploy(**charm_versions.ingress.deploy_dict())
-
-    await ops_test.model.wait_for_idle(
-        apps=[charm_versions.ingress.application_name],
-        status="active",
-        timeout=300,
-        idle_period=30,
+    juju.deploy(**charm_versions.ingress.deploy_dict())
+    juju.wait(
+        lambda status: jubilant.all_active(status, charm_versions.ingress.application_name),
+        delay=10,
     )
 
     logger.info("Relating history server charm with ingress")
 
-    await ops_test.model.add_relation(charm_versions.ingress.application_name, APP_NAME)
-
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME, charm_versions.ingress.application_name],
-        status="active",
-        timeout=300,
-        idle_period=30,
+    juju.integrate(charm_versions.ingress.application_name, APP_NAME)
+    juju.wait(
+        lambda status: jubilant.all_active(
+            status, APP_NAME, charm_versions.ingress.application_name
+        ),
+        delay=10,
     )
 
-    action = await ops_test.model.units.get(
-        f"{charm_versions.ingress.application_name}/0"
-    ).run_action(
-        "show-proxied-endpoints",
-    )
+    task = juju.run(f"{charm_versions.ingress.application_name}/0", "show-proxied-endpoints")
+    assert task.return_code == 0
 
-    ingress_endpoint = json.loads((await action.wait()).results["proxied-endpoints"])[APP_NAME][
-        "url"
-    ]
+    ingress_endpoint = json.loads(task.results["proxied-endpoints"])[APP_NAME]["url"]
 
     logger.info(f"Querying endpoint: {ingress_endpoint}/api/v1/applications")
 
@@ -232,103 +198,70 @@ async def test_ingress(ops_test: OpsTest, charm_versions):
     logger.info(f"Number of apps: {len(apps)}")
 
 
-@pytest.mark.abort_on_fail
-async def test_oathkeeper(ops_test: OpsTest, charm_versions):
+def test_oathkeeper(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) -> None:
     """Test the integration of the spark history server with Oathkeeper.
 
     Assert that the proxied-enpoints of the ingress are protected (err code 401).
     """
     # remove relation between ingress and spark-history server
-    await ops_test.model.applications[APP_NAME].remove_relation(
+    juju.remove_relation(
         f"{APP_NAME}:ingress", f"{charm_versions.ingress.application_name}:ingress"
     )
-
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME, charm_versions.ingress.application_name],
-        status="active",
-        timeout=300,
-        idle_period=30,
-    )
+    juju.wait(jubilant.all_active)
 
     # Deploy the oathkeeper charm and wait for waiting status
-    _ = await ops_test.model.deploy(**charm_versions.oathkeeper.deploy_dict())
-
-    await ops_test.model.wait_for_idle(
-        apps=[charm_versions.oathkeeper.application_name],
-        status="active",
-        timeout=300,
-        idle_period=30,
-    )
+    juju.deploy(**charm_versions.oathkeeper.deploy_dict())
+    juju.wait(jubilant.all_active, delay=10)
 
     # configure Oathkeeper charm
     oathkeeper_configuration_parameters = {"dev": "True"}
-    await ops_test.model.applications[charm_versions.oathkeeper.application_name].set_config(
-        oathkeeper_configuration_parameters
-    )
+    juju.config(charm_versions.oathkeeper.application_name, oathkeeper_configuration_parameters)
 
-    await ops_test.model.wait_for_idle(
-        apps=[charm_versions.oathkeeper.application_name],
-        status="active",
-        timeout=300,
-        idle_period=30,
-    )
+    juju.wait(jubilant.all_active, delay=5)
+
     # configure ingress to work with Oathkeeper
     ingress_configuration_parameters = {"enable_experimental_forward_auth": "True"}
     # apply new configuration options
-    await ops_test.model.applications[charm_versions.ingress.application_name].set_config(
-        ingress_configuration_parameters
-    )
+    juju.config(charm_versions.ingress.application_name, ingress_configuration_parameters)
 
-    await ops_test.model.wait_for_idle(
-        apps=[charm_versions.ingress.application_name],
-        status="active",
-        timeout=300,
-        idle_period=30,
-    )
+    juju.wait(jubilant.all_active, delay=5)
+
     # Relate Oathkeeper with the Spark history server charm
     logger.info("Relating the spark history server charm with oathkeeper.")
-    await ops_test.model.add_relation(charm_versions.oathkeeper.application_name, APP_NAME)
+    juju.integrate(charm_versions.oathkeeper.application_name, APP_NAME)
 
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME],
-        status="blocked",
-        timeout=300,
-        idle_period=30,
-    )
+    juju.wait(lambda status: jubilant.all_blocked(status, APP_NAME), delay=5)
+
     # relate spark-history-server and ingress
-    await ops_test.model.add_relation(charm_versions.ingress.application_name, APP_NAME)
-
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME, charm_versions.ingress.application_name],
-        status="active",
-        timeout=300,
-        idle_period=30,
+    juju.integrate(charm_versions.ingress.application_name, APP_NAME)
+    juju.wait(
+        lambda status: jubilant.all_active(
+            status, APP_NAME, charm_versions.ingress.application_name
+        ),
+        delay=5,
     )
 
     # Relate Oathkeeper with the Ingress charm
     logger.info("Relating the oathkeeper charm with the ingress.")
-    await ops_test.model.add_relation(
+
+    juju.integrate(
         f"{charm_versions.ingress.application_name}:experimental-forward-auth",
         charm_versions.oathkeeper.application_name,
     )
 
-    await ops_test.model.wait_for_idle(
-        apps=[charm_versions.oathkeeper.application_name, charm_versions.ingress.application_name],
-        status="active",
-        timeout=300,
-        idle_period=30,
+    juju.wait(
+        lambda status: jubilant.all_active(
+            status,
+            charm_versions.oathkeeper.application_name,
+            charm_versions.ingress.application_name,
+        ),
+        delay=10,
     )
 
     # get proxied endpoint
-    action = await ops_test.model.units.get(
-        f"{charm_versions.ingress.application_name}/0"
-    ).run_action(
-        "show-proxied-endpoints",
-    )
-
-    ingress_endpoint = json.loads((await action.wait()).results["proxied-endpoints"])[APP_NAME][
-        "url"
-    ]
+    task = juju.run(f"{charm_versions.ingress.application_name}/0", "show-proxied-endpoints")
+    assert task.return_code == 0
+    ingress_endpoint = json.loads(task.results["proxied-endpoints"])[APP_NAME]["url"]
 
     # check that the ingress endpoint is not authorized!
     logger.info(f"Querying endpoint: {ingress_endpoint}")
@@ -346,8 +279,8 @@ async def test_oathkeeper(ops_test: OpsTest, charm_versions):
     logger.info(f"Endpoint: {ingress_endpoint} successfully protected.")
 
     # check that servlet filter is enabled on the unit endpoint
-    status = await ops_test.model.get_status()
-    address = status["applications"][APP_NAME]["units"][f"{APP_NAME}/0"]["address"]
+    status = juju.status()
+    address = status.apps[APP_NAME].units[f"{APP_NAME}/0"].address
     try:
         _ = urllib.request.urlopen(f"http://{address}:18080/api/v1/applications")
         raise Exception(
@@ -360,8 +293,6 @@ async def test_oathkeeper(ops_test: OpsTest, charm_versions):
         # check that the endopoint respond with code 500
         assert e.code == 500
 
-    status = await ops_test.model.get_status()
-    address = status["applications"][APP_NAME]["units"][f"{APP_NAME}/0"]["address"]
     req = urllib.request.Request(f"http://{address}:18080/api/v1/applications")
     req.add_header(AUTH_PROXY_HEADERS[1], "xxx")
     apps = json.loads(urllib.request.urlopen(req).read())
@@ -369,15 +300,10 @@ async def test_oathkeeper(ops_test: OpsTest, charm_versions):
 
     # configure the history server charm with a new authorized user yyy
     authorized_user = "test-user"
-    authorized_users = {"authorized-users": authorized_user}
-    await ops_test.model.applications[APP_NAME].set_config(authorized_users)
+    config = {"authorized-users": authorized_user}
+    juju.config(APP_NAME, config)
 
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME],
-        status="active",
-        timeout=300,
-        idle_period=30,
-    )
+    juju.wait(lambda status: jubilant.all_active(status, APP_NAME), delay=10)
 
     # check that user admin is not authorized
     try:
@@ -402,35 +328,31 @@ async def test_oathkeeper(ops_test: OpsTest, charm_versions):
 
 
 @pytest.mark.skip
-async def test_remove_oathkeeper(ops_test: OpsTest, charm_versions):
+def test_remove_oathkeeper(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) -> None:
     """Test the removal of integration between the spark history server and Oathkeeper.
 
     Assert that the proxied-enpoints of the ingress are not protected.
     """
     # Remove of the relation between oathkeeper and spark-history server
-    await ops_test.model.applications[APP_NAME].remove_relation(
+    juju.remove_relation(
         f"{APP_NAME}:auth-proxy", f"{charm_versions.oathkeeper.application_name}:auth-proxy"
     )
 
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME, charm_versions.oathkeeper.application_name],
-        status="active",
-        timeout=300,
-        idle_period=30,
+    juju.wait(
+        lambda status: jubilant.all_active(
+            status, APP_NAME, charm_versions.oathkeeper.application_name
+        ),
+        delay=10,
     )
 
     try:
         for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(30)):
             with attempt:
-                action = await ops_test.model.units.get(
-                    f"{charm_versions.ingress.application_name}/0"
-                ).run_action(
-                    "show-proxied-endpoints",
+                task = juju.run(
+                    f"{charm_versions.ingress.application_name}/0", "show-proxied-endpoints"
                 )
-
-                ingress_endpoint = json.loads((await action.wait()).results["proxied-endpoints"])[
-                    APP_NAME
-                ]["url"]
+                assert task.return_code == 0
+                ingress_endpoint = task.results["proxied-endpoints"][APP_NAME]["url"]
 
                 logger.info(f"Trying to querying endpoint: {ingress_endpoint}/api/v1/applications")
 

@@ -50,7 +50,6 @@ optional = true
 
 [tool.poetry.group.unit.dependencies]
 pytest = "^8.0.0"
-# pytest-asyncio = ">=0.21"
 coverage = { extras = ["toml"], version = ">7.0" }
 ops = { version = "^2.17.0", extras = ["testing"] }
 moto = { extras = ["s3"], version = "^5.0.22" }
@@ -60,13 +59,9 @@ optional = true
 
 [tool.poetry.group.integration.dependencies]
 pytest = "^8.0.0"
-juju = ">=3.0"
 coverage = { extras = ["toml"], version = ">7.0" }
-pytest-operator = "==0.36.0"
 tenacity = "^9.0.0"
-pytest-operator-cache = { git = "https://github.com/canonical/data-platform-workflows", tag = "v29.0.0", subdirectory = "python/pytest_plugins/pytest_operator_cache" }
-# To be enabled if we are using groups on integration tests
-# pytest-operator-groups = {git = "https://github.com/canonical/data-platform-workflows", tag = "v6.1.1", subdirectory = "python/pytest_plugins/pytest_operator_groups"}
+jubilant = "^1.0.1"
 
 [tool.ruff]
 line-length = 99
