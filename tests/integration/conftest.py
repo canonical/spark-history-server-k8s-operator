@@ -55,7 +55,7 @@ def charm_versions() -> IntegrationTestsCharms:
         ),
         loki=CharmVersion(
             name="loki-k8s",
-            channel="latest/edge",
+            channel="1/stable",
             base="ubuntu@20.04",
             alias="loki",
             trust=True,

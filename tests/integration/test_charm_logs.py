@@ -270,8 +270,7 @@ def test_history_server_cos_integration(
         delay=10,
     )
 
-    # Cannot deploy with base using .deploy()
-    juju.cli("deploy", "cos-lite", "--base", "ubuntu@22.04", "--trust")
+    juju.cli("deploy", "cos-lite", "--trust")
 
     juju.wait(
         lambda status: jubilant.all_active(
