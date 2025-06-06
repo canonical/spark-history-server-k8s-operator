@@ -2,7 +2,6 @@
 # Copyright 2024 Canonical Limited
 # See LICENSE file for licensing details.
 
-import asyncio
 import json
 import logging
 import subprocess
@@ -11,21 +10,20 @@ from pathlib import Path
 from time import sleep
 from urllib.parse import urlencode
 
-import juju
-import pytest
+import jubilant
 import yaml
-from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_fixed
 
 from .test_helpers import (
     all_prometheus_exporters_data,
-    fetch_action_sync_s3_credentials,
     get_cos_address,
     published_grafana_dashboards,
     published_prometheus_alerts,
     published_prometheus_data,
+    set_s3_credentials,
     setup_s3_bucket_for_history_server,
 )
+from .types import IntegrationTestsCharms
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +32,9 @@ APP_NAME = METADATA["name"]
 BUCKET_NAME = "history-server"
 
 
-@pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
+def test_build_and_deploy(
+    juju: jubilant.Juju, charm_versions: IntegrationTestsCharms, history_server_charm: Path
+) -> None:
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the output of collected Loki labels and logs.
@@ -65,43 +64,23 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
 
     logger.info("Bucket setup complete")
 
-    logger.info("Building charm")
-    # Build and deploy charm from local source folder
-
-    charm = await ops_test.build_charm(".")
-
     image_version = METADATA["resources"]["spark-history-server-image"]["upstream-source"]
 
     logger.info(f"Image version: {image_version}")
 
     resources = {"spark-history-server-image": image_version}
 
-    logger.info("Deploying charm")
-
+    logger.info("Deploying charms")
     # Deploy the charm and wait for waiting status
-    await asyncio.gather(
-        ops_test.model.deploy(**charm_versions.s3.deploy_dict()),
-        ops_test.model.deploy(
-            charm, resources=resources, application_name=APP_NAME, num_units=1, series="jammy"
-        ),
-        ops_test.model.deploy(**charm_versions.loki.deploy_dict()),
+    juju.deploy(**charm_versions.s3.deploy_dict())
+    juju.deploy(**charm_versions.loki.deploy_dict())
+    juju.deploy(
+        history_server_charm, resources=resources, app=APP_NAME, num_units=1, base="ubuntu@22.04"
     )
-
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME, charm_versions.s3.application_name], timeout=1000
-    )
-
-    s3_integrator_unit = ops_test.model.applications[charm_versions.s3.application_name].units[0]
+    juju.wait(jubilant.all_agents_idle, timeout=1000)
 
     logger.info("Setting up s3 credentials in s3-integrator charm")
-
-    await fetch_action_sync_s3_credentials(
-        s3_integrator_unit, access_key=access_key, secret_key=secret_key
-    )
-    async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(
-            apps=[charm_versions.s3.application_name], status="active"
-        )
+    set_s3_credentials(juju, access_key, secret_key)
 
     configuration_parameters = {
         "bucket": "history-server",
@@ -109,28 +88,19 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions):
         "endpoint": endpoint_url,
     }
     # apply new configuration options
-    await ops_test.model.applications[charm_versions.s3.application_name].set_config(
-        configuration_parameters
-    )
+    juju.config(charm_versions.s3.application_name, configuration_parameters)
+    juju.wait(jubilant.all_agents_idle)
 
     logger.info("Relating history server charm with s3-integrator charm")
 
-    await ops_test.model.add_relation(charm_versions.s3.application_name, APP_NAME)
-
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME, charm_versions.s3.application_name], timeout=1000
-    )
-
-    # wait for active status
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME],
-        status="active",
-        timeout=1000,
+    juju.integrate(charm_versions.s3.application_name, APP_NAME)
+    juju.wait(
+        lambda status: jubilant.all_active(status, APP_NAME, charm_versions.s3.application_name),
+        delay=5,
     )
 
 
-@pytest.mark.abort_on_fail
-async def test_loki_integration(ops_test: OpsTest, charm_versions):
+def test_loki_integration(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) -> None:
     """Check that logs are forwarded to Loki.
 
     Assert on the unit status before any relations/configurations take place.
@@ -166,8 +136,8 @@ async def test_loki_integration(ops_test: OpsTest, charm_versions):
     logger.info(f"Spark version: {spark_version}")
 
     logger.info("Verifying history server has no app entries")
-    status = await ops_test.model.get_status()
-    address = status["applications"][APP_NAME]["units"][f"{APP_NAME}/0"]["address"]
+    status = juju.status()
+    address = status.apps[APP_NAME].units[f"{APP_NAME}/0"].address
 
     apps = json.loads(urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read())
 
@@ -175,10 +145,8 @@ async def test_loki_integration(ops_test: OpsTest, charm_versions):
 
     logger.info("Integrate spark-history-server with Loki-k8s ")
 
-    await ops_test.model.integrate(charm_versions.loki.application_name, APP_NAME)
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME, charm_versions.loki.application_name], timeout=1000
-    )
+    juju.integrate(charm_versions.loki.application_name, APP_NAME)
+    juju.wait(jubilant.all_agents_idle)
 
     logger.info("Setup a spark to run job")
 
@@ -200,7 +168,7 @@ async def test_loki_integration(ops_test: OpsTest, charm_versions):
 
     logger.info("Verifying history server has 1 app entry")
 
-    for i in range(0, 5):
+    for _ in range(0, 5):
         try:
             apps = json.loads(
                 urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read()
@@ -217,8 +185,8 @@ async def test_loki_integration(ops_test: OpsTest, charm_versions):
 
     logger.info("Verifying Loki has received the logs.")
     loki_app_name = charm_versions.loki.application_name
-    status = await ops_test.model.get_status()
-    loki_address = status["applications"][loki_app_name]["units"][f"{loki_app_name}/0"]["address"]
+    status = juju.status()
+    loki_address = status.apps[loki_app_name].units[f"{loki_app_name}/0"].address
 
     logger.info("Verifying loki labels")
     try:
@@ -275,96 +243,61 @@ async def test_loki_integration(ops_test: OpsTest, charm_versions):
     assert c > 0
 
 
-@pytest.mark.abort_on_fail
-async def test_history_server_cos_integration(ops_test: OpsTest, charm_versions):
+def test_history_server_cos_integration(
+    juju: jubilant.Juju, charm_versions: IntegrationTestsCharms
+) -> None:
     """Check that the integration with cos work correctly.
 
     Assert on absences of labels/dashboards/alert rules.
     """
     # Prometheus data is being published by the app
-    assert await all_prometheus_exporters_data(ops_test, check_field="jmx_scrape_duration_seconds")
+    assert all_prometheus_exporters_data(juju, check_field="jmx_scrape_duration_seconds")
 
     # Deploying and relating to grafana-agent
     logger.info("Deploying grafana-agent-k8s charm...")
-    await ops_test.model.deploy(**charm_versions.grafana_agent.deploy_dict())
+    juju.deploy(**charm_versions.grafana_agent.deploy_dict())
 
     logger.info("Waiting for test charm to be idle...")
-    await ops_test.model.wait_for_idle(
-        apps=[charm_versions.grafana_agent.name], timeout=1000, status="blocked"
+    juju.wait(
+        lambda status: jubilant.all_blocked(status, charm_versions.grafana_agent.application_name)
     )
 
-    await ops_test.model.integrate(
-        charm_versions.grafana_agent.name, f"{APP_NAME}:metrics-endpoint"
-    )
-    await ops_test.model.integrate(
-        charm_versions.grafana_agent.name, f"{APP_NAME}:grafana-dashboard"
-    )
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status="active", timeout=1000, idle_period=30
-    )
-    await ops_test.model.wait_for_idle(
-        apps=[charm_versions.grafana_agent.name], status="blocked", timeout=1000, idle_period=30
+    juju.integrate(charm_versions.grafana_agent.name, f"{APP_NAME}:metrics-endpoint")
+    juju.integrate(charm_versions.grafana_agent.name, f"{APP_NAME}:grafana-dashboard")
+    juju.wait(lambda status: jubilant.all_active(status, APP_NAME), delay=10)
+    juju.wait(
+        lambda status: jubilant.all_blocked(status, charm_versions.grafana_agent.application_name),
+        delay=10,
     )
 
-    await ops_test.model.deploy(
-        "cos-lite",
-        series="jammy",
-        trust=True,
+    juju.cli("deploy", "cos-lite", "--trust")
+
+    juju.wait(
+        lambda status: jubilant.all_active(
+            status, "prometheus", "alertmanager", "loki", "grafana"
+        ),
+        delay=10,
+    )
+    juju.wait(
+        lambda status: jubilant.all_blocked(status, charm_versions.grafana_agent.application_name),
+        delay=10,
     )
 
-    await ops_test.model.wait_for_idle(
-        apps=["prometheus", "alertmanager", "loki", "grafana"],
-        status="active",
-        timeout=1000,
-        idle_period=30,
-    )
-    await ops_test.model.wait_for_idle(
-        apps=[charm_versions.grafana_agent.name],
-        status="blocked",
-        timeout=1000,
-        idle_period=30,
-    )
+    juju.integrate(f"{charm_versions.grafana_agent.name}:grafana-dashboards-provider", "grafana")
+    juju.integrate(f"{charm_versions.grafana_agent.name}:send-remote-write", "prometheus")
 
-    # These two relations --though essential to publishing-- are not set.
-    # (May change in the future?)
-    try:
-        await ops_test.model.integrate(
-            f"{charm_versions.grafana_agent.name}:grafana-dashboards-provider", "grafana"
-        )
-    except juju.errors.JujuAPIError:
-        pass
-
-    try:
-        await ops_test.model.integrate(
-            f"{charm_versions.grafana_agent.name}:send-remote-write", "prometheus"
-        )
-    except juju.errors.JujuAPIError:
-        pass
-
-    await ops_test.model.wait_for_idle(
-        apps=[
-            APP_NAME,
-            charm_versions.grafana_agent.name,
-            "prometheus",
-            "alertmanager",
-            "loki",
-            "grafana",
-        ],
-        status="active",
-        timeout=1000,
-        idle_period=30,
-    )
+    juju.wait(jubilant.all_active, delay=10)
 
     # We should leave time for Prometheus data to be published
     for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(30)):
         with attempt:
-
             # Data got published to Prometheus
-            cos_address = await get_cos_address(ops_test)
-            assert published_prometheus_data(ops_test, cos_address, "jmx_scrape_duration_seconds")
+            cos_address = get_cos_address(juju)
+            assert published_prometheus_data(juju, cos_address, "jmx_scrape_duration_seconds")
 
             # Alerts got published to Prometheus
-            alerts_data = published_prometheus_alerts(ops_test, cos_address)
+            alerts_data = published_prometheus_alerts(juju, cos_address)
+            assert alerts_data is not None
             logger.info(f"Alerts data: {alerts_data}")
 
             logger.info("Rules: ")
@@ -384,8 +317,9 @@ async def test_history_server_cos_integration(ops_test: OpsTest, charm_versions)
                 )
 
             # Grafana dashboard got published
-            dashboards_info = await published_grafana_dashboards(ops_test)
+            dashboards_info = published_grafana_dashboards(juju)
             logger.info(f"Dashboard info {dashboards_info}")
+            assert dashboards_info is not None
             assert any(
                 board["title"] == "Spark History Server JMX Dashboard" for board in dashboards_info
             )

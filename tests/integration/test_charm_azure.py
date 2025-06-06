@@ -4,7 +4,6 @@
 
 # Integration Tests TBD separately in next pulse
 
-import asyncio
 import json
 import logging
 import subprocess
@@ -12,14 +11,13 @@ import urllib.request
 from pathlib import Path
 from time import sleep
 
-import pytest
+import jubilant
 import yaml
-from pytest_operator.plugin import OpsTest
 
 from .test_helpers import (
-    add_juju_secret,
     delete_azure_container,
 )
+from .types import AzureInfo, IntegrationTestsCharms
 
 logger = logging.getLogger(__name__)
 
@@ -28,19 +26,16 @@ APP_NAME = METADATA["name"]
 BUCKET_NAME = "history-server"
 
 
-@pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_storage_credentials):
+def test_build_and_deploy(
+    juju: jubilant.Juju,
+    charm_versions: IntegrationTestsCharms,
+    azure_storage_credentials: AzureInfo,
+    history_server_charm: Path,
+) -> None:
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
     """
-    logger.info("Setting up azure storage container.....")
-
-    logger.info("Building charm")
-    # Build and deploy charm from local source folder
-
-    charm = await ops_test.build_charm(".")
-
     image_version = METADATA["resources"]["spark-history-server-image"]["upstream-source"]
 
     logger.info(f"Image version: {image_version}")
@@ -62,40 +57,37 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_storage
     logger.info("Deploying charm")
 
     # Deploy the charm and wait for waiting status
-    await asyncio.gather(
-        ops_test.model.deploy(**charm_versions.azure_storage.deploy_dict()),
-        ops_test.model.deploy(
-            charm, resources=resources, application_name=APP_NAME, num_units=1, series="jammy"
-        ),
+    juju.deploy(**charm_versions.azure_storage.deploy_dict())
+    juju.deploy(
+        history_server_charm,
+        resources=resources,
+        app=APP_NAME,
+        num_units=1,
+        base="ubuntu@22.04",
     )
 
-    await ops_test.model.wait_for_idle(
-        apps=[charm_versions.azure_storage.application_name],
-        timeout=1000,
-        status="blocked",
-        idle_period=30,
+    juju.wait(
+        lambda status: jubilant.all_blocked(status, charm_versions.azure_storage.application_name),
+        delay=5,
     )
 
     logger.info("Adding Juju secret for secret-key config option for azure-storage-integrator")
-    credentials_secret_uri = await add_juju_secret(
-        ops_test,
-        charm_versions.azure_storage.application_name,
+    secret_id = juju.add_secret(
         "iamsecret",
         {"secret-key": azure_storage_credentials["secret-key"]},
     )
-    logger.info(
-        f"Juju secret for secret-key config option for azure-storage-integrator added. Secret URI: {credentials_secret_uri}"
-    )
+    logger.info(f"Created secret {secret_id}")
+    juju.cli("grant-secret", "iamsecret", charm_versions.azure_storage.application_name)
 
+    # create azure container
     configuration_parameters = {
         "container": azure_storage_credentials["container"],
         "path": azure_storage_credentials["path"],
         "storage-account": azure_storage_credentials["storage-account"],
         "connection-protocol": azure_storage_credentials["connection-protocol"],
-        "credentials": credentials_secret_uri,
+        "credentials": secret_id,
     }
 
-    # create azure container
     logger.info(
         f"Creating container {azure_storage_credentials['container']} with path {azure_storage_credentials['path']}"
     )
@@ -105,42 +97,22 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_storage
 
     # apply new configuration options
     logger.info("Setting up configuration for azure-storage-integrator charm...")
-    await ops_test.model.applications[charm_versions.azure_storage.application_name].set_config(
-        configuration_parameters
+    juju.config(charm_versions.azure_storage.application_name, configuration_parameters)
+    juju.wait(
+        lambda status: jubilant.all_active(status, charm_versions.azure_storage.application_name)
     )
-
-    logger.info(
-        "Waiting for azure-storage-integrator and history-server charm to be idle and active..."
-    )
-    async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(
-            apps=[
-                charm_versions.azure_storage.application_name,
-            ],
-            status="active",
-        )
 
     logger.info("Relating history server charm with azure-storage-integrator charm")
 
-    await ops_test.model.add_relation(charm_versions.azure_storage.application_name, APP_NAME)
-
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME, charm_versions.azure_storage.application_name], timeout=1000
-    )
-
-    # wait for active status
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME],
-        status="active",
-        timeout=1000,
-    )
+    juju.integrate(charm_versions.azure_storage.application_name, APP_NAME)
+    status = juju.wait(jubilant.all_active, delay=5)
 
     logger.info("Verifying history server has no app entries")
 
-    status = await ops_test.model.get_status()
-    address = status["applications"][APP_NAME]["units"][f"{APP_NAME}/0"]["address"]
+    address = status.apps[APP_NAME].units[f"{APP_NAME}/0"].address
 
-    for i in range(0, 5):
+    apps = []
+    for _ in range(0, 5):
         try:
             apps = json.loads(
                 urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read()
@@ -181,7 +153,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm_versions, azure_storage
 
     logger.info("Verifying history server has 1 app entry")
 
-    for i in range(0, 5):
+    for _ in range(0, 5):
         try:
             apps = json.loads(
                 urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read()
