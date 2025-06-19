@@ -16,10 +16,13 @@ from core.domain import User
 class HistoryServerPaths:
     """Object to store common paths for Kafka."""
 
-    def __init__(self, conf_path: Path | str, lib_path: Path | str, keytool: str):
+    def __init__(
+        self, conf_path: Path | str, lib_path: Path | str, keytool: str, jmx_exporter: str
+    ):
         self.conf_path = conf_path if isinstance(conf_path, Path) else Path(conf_path)
         self.lib_path = lib_path if isinstance(lib_path, Path) else Path(lib_path)
         self.keytool = keytool
+        self.jmx_exporter = jmx_exporter
 
     @property
     def spark_properties(self) -> Path:
@@ -42,7 +45,8 @@ class HistoryServerPaths:
 
         Used for scraping and exposing mBeans of a JMX target.
         """
-        return self.lib_path / "jmx_prometheus_javaagent-0.15.0.jar"
+        # return self.lib_path / "jmx_prometheus_javaagent-0.15.0.jar"
+        return self.lib_path / self.jmx_exporter
 
     @property
     def jmx_prometheus_config(self):
