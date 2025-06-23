@@ -32,18 +32,24 @@ class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
         self.container = container
         self.user = user
 
-        jmx_file = self.container.list_files(
-            self.LIB_PATH, pattern="jmx_prometheus_javaagent*.jar"
-        )[0]
-
         self.paths = HistoryServerPaths(
             conf_path=self.CONFS_PATH,
             lib_path=self.LIB_PATH,
             keytool="keytool",
-            jmx_exporter=jmx_file.name,
+            jmx_exporter=self.jmx_file,
         )
 
         self._envs = None
+
+    @property
+    def jmx_file(self):
+        """Return the jmx_exporter library file name."""
+        if self.ready():
+            return self.container.list_files(
+                self.LIB_PATH, pattern="jmx_prometheus_javaagent*.jar"
+            )[0].name
+        else:
+            return "jmx_prometheus_javaagent_0.20.jar"
 
     @property
     def envs(self):
