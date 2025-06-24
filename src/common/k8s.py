@@ -63,11 +63,11 @@ class K8sWorkload(AbstractWorkload, ABC):
 
     @override
     def exec(
-        self, command: str, env: dict[str, str] | None = None, working_dir: str | None = None
+        self, command: list[str], env: dict[str, str] | None = None, working_dir: str | None = None
     ) -> str:
         try:
             process = self.container.exec(
-                command=command.split(),
+                command=command,
                 environment=env,
                 working_dir=working_dir,
                 combine_stderr=True,
