@@ -46,9 +46,9 @@ class TLSManager(WithLogging):
             "-import",
             "-v",
             "-aliasca-file",
-            self.workload.paths.cert,
+            str(self.workload.paths.cert),
             "-keystore",
-            self.workload.paths.truststore,
+            str(self.workload.paths.truststore),
             "-storepass",
             self.truststore_password,
             "-noprompt",
@@ -61,10 +61,10 @@ class TLSManager(WithLogging):
                     "chown",
                     "-R",
                     f"{self.workload.user.name}:{self.workload.user.group}",
-                    self.workload.paths.truststore,
+                    str(self.workload.paths.truststore),
                 ]
             )
-            self.workload.exec(["chmod", "-R", "660", self.workload.paths.truststore])
+            self.workload.exec(["chmod", "-R", "660", str(self.workload.paths.truststore)])
         except (subprocess.CalledProcessError, ExecError) as e:
             # in case this reruns and fails
             if e.stdout and "already exists" in e.stdout:
@@ -74,5 +74,5 @@ class TLSManager(WithLogging):
 
     def reset(self):
         """Remove all files related to TLS configuration."""
-        self.workload.exec(["rm", "-f", self.workload.paths.truststore])
-        self.workload.exec(["rm", "-f", self.workload.paths.cert])
+        self.workload.exec(["rm", "-f", str(self.workload.paths.truststore)])
+        self.workload.exec(["rm", "-f", str(self.workload.paths.cert)])
