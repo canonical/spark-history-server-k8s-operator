@@ -33,10 +33,23 @@ class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
         self.user = user
 
         self.paths = HistoryServerPaths(
-            conf_path=self.CONFS_PATH, lib_path=self.LIB_PATH, keytool="keytool"
+            conf_path=self.CONFS_PATH,
+            lib_path=self.LIB_PATH,
+            keytool="keytool",
+            jmx_exporter=self.jmx_file,
         )
 
         self._envs = None
+
+    @property
+    def jmx_file(self):
+        """Return the jmx_exporter library file name."""
+        if self.ready():
+            return self.container.list_files(
+                self.LIB_PATH, pattern="jmx_prometheus_javaagent*.jar"
+            )[0].name
+        else:
+            return "jmx_prometheus_javaagent_0.20.jar"
 
     @property
     def envs(self):
@@ -62,9 +75,6 @@ class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
             "description": "pebble config layer for spark history server",
             "services": {
                 self.HISTORY_SERVER_SERVICE: {
-                    # "override": "merge",
-                    # "summary": "spark history server",
-                    # "startup": "enabled",
                     "environment": self.envs,
                 }
             },

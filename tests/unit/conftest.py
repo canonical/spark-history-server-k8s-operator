@@ -53,13 +53,13 @@ def history_server_container(tmp_path):
     )
 
     etc = Mount(location="/etc/", source=tmp_path)
-
+    jmx = Mount(location="/opt/spark/jars/jmx_prometheus_javaagent_0.20.jar", source=tmp_path)
     return Container(
         name=CONTAINER,
         can_connect=True,
         layers={"base": layer},
         service_statuses={"history-server": pebble.ServiceStatus.ACTIVE},
-        mounts={"etc": etc},
+        mounts={"etc": etc, "jmx": jmx},
     )
 
 
