@@ -14,6 +14,15 @@ description: |
 
   Apache Spark is a free, open source software project by the Apache Software Foundation. 
   Users can find out more at the [Spark project page](https://spark.apache.org/).
+source: https://github.com/canonical/spark-history-server-k8s-operator
+issues: https://github.com/canonical/spark-history-server-k8s-operator/issues
+website:
+  - https://ubuntu.com/data/spark
+  - https://charmhub.io/spark-k8s-bundle
+  - https://github.com/canonical/spark-history-server-k8s-operator
+  - https://matrix.to/#/%23charmhub-data-platform%3Aubuntu.com
+maintainers:
+  - Canonical Data Platform <data-platform@lists.launchpad.net>
 
 containers:
   spark-history-server:
@@ -28,22 +37,29 @@ resources:
 requires:
   s3-credentials:
     interface: s3
+    optional: true
   azure-storage-credentials:
     interface: azure_storage
+    optional: true
   ingress:
     interface: ingress
     limit: 1
+    optional: true
   auth-proxy:
     interface: auth_proxy
     limit: 1
+    optional: true
   logging:
     interface: loki_push_api
     description: |
       Receives Loki's push api endpoint address to push logs to, and forwards charm's built-in alert rules to Loki.
+    optional: true
 
 provides:
   metrics-endpoint:
     interface: prometheus_scrape
+    optional: true
   grafana-dashboard:
     interface: grafana_dashboard
+    optional: true
   

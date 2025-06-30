@@ -62,7 +62,7 @@ def charm_versions() -> IntegrationTestsCharms:
         ),
         grafana_agent=CharmVersion(
             name="grafana-agent-k8s",
-            channel="latest/stable",
+            channel="1/stable",
             base="ubuntu@22.04",
             alias="grafana-agent-k8s",
             trust=True,

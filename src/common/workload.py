@@ -22,7 +22,7 @@ class AbstractWorkload(ABC):
 
     @abstractmethod
     def exec(
-        self, command: str, env: dict[str, str] | None = None, working_dir: str | None = None
+        self, command: list[str], env: dict[str, str] | None = None, working_dir: str | None = None
     ) -> str:
         """Runs a command on the workload substrate."""
         ...
