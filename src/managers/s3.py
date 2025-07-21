@@ -81,6 +81,7 @@ class S3Manager(WithLogging):
 
             s3 = self.session.client(
                 "s3",
+                region_name=self.config.region or "us-east-1",
                 endpoint_url=self.config.endpoint or "https://s3.amazonaws.com",
                 verify=ca_file.name if self.config.tls_ca_chain else None,
                 config=Config(
@@ -91,11 +92,11 @@ class S3Manager(WithLogging):
 
             try:
                 s3.list_buckets()
-            except ClientError:
-                self.logger.error("Invalid S3 credentials...")
+            except ClientError as client_error:
+                self.logger.error(f"Invalid S3 credentials...{client_error}")
                 return False
-            except SSLError:
-                self.logger.error("SSL validation failed...")
+            except SSLError as ssl_error:
+                self.logger.error(f"SSL validation failed... {ssl_error}")
                 return False
             except Exception as e:
                 self.logger.error(f"S3 related error {e}")
