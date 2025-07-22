@@ -69,6 +69,11 @@ class S3ConnectionInfo(StateBase):
         return self.relation_data["path"]
 
     @property
+    def region(self) -> str:
+        """Return the region of the S3 bucket."""
+        return self.relation_data.get("region", "")
+
+    @property
     def bucket(self) -> str:
         """Return the name of the S3 bucket."""
         return self.relation_data["bucket"]
