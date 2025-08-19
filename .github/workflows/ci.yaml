@@ -131,4 +131,5 @@ jobs:
           CI_PACKED_CHARMS: ${{ needs.build.outputs.charms }}
         run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}' --keep-models
       - name: Setup tmate session
+        if: failure()
         uses: mxschmitt/action-tmate@v3
