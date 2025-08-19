@@ -59,7 +59,7 @@ jobs:
           - integration-logs
         runner:
           - ubuntu-22.04
-          - [self-hosted, linux, AMD64, X64, large, jammy]
+          # - [self-hosted, linux, AMD64, X64, large, jammy]
         exclude:
           - tox-environments: integration-azure # Don't test azure twice
             runner: [self-hosted, linux, AMD64, X64, large, jammy]
@@ -89,7 +89,7 @@ jobs:
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@main
         with:
-          juju-channel: 3.6/stable
+          juju-channel: 4.0/beta
           provider: microk8s
           channel: 1.32-strict/stable
           microk8s-group: snap_microk8s
@@ -129,4 +129,7 @@ jobs:
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
           CI_PACKED_CHARMS: ${{ needs.build.outputs.charms }}
-        run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}'
+        run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}' --keep-models
+      - name: Setup tmate session
+        if: failure()
+        uses: mxschmitt/action-tmate@v3
