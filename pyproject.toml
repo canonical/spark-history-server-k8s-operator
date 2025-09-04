@@ -7,13 +7,13 @@ requires-poetry = ">=2.0.0"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<4.0"
-ops = "^2.17.0"
-pydantic = "^1.10.7"
-pyyaml = ">=6.0.1"
-boto3 = "^1.36"
-jsonschema = "^4.19.1"
-tenacity = ">=8.0.1"
-azure-storage-blob = "^12.24.0"
+ops = "^2.23.1"
+pydantic = "^1.10.22"
+pyyaml = ">=6.0.2"
+boto3 = "^1.40.23"
+jsonschema = "^4.25.1"
+tenacity = ">=8.5.0"
+azure-storage-blob = "^12.26.0"
 
 [tool.poetry.group.charm-libs.dependencies]
 ops = "^2.17.0"
@@ -35,33 +35,33 @@ cosl = "*"
 optional = true
 
 [tool.poetry.group.format.dependencies]
-ruff = ">=0.8.0"
+ruff = ">=0.12.11"
 
 [tool.poetry.group.lint]
 optional = true
 
 [tool.poetry.group.lint.dependencies]
-ruff = ">=0.8.0"
-codespell = ">=2.2.2"
-boto3-stubs = { extras = ["s3"], version = "^1.36" }
+ruff = ">=0.12.11"
+codespell = ">=2.4.1"
+boto3-stubs = { extras = ["s3"], version = "^1.40.23" }
 
 [tool.poetry.group.unit]
 optional = true
 
 [tool.poetry.group.unit.dependencies]
-pytest = "^8.0.0"
+pytest = "^8.4.1"
 coverage = { extras = ["toml"], version = ">7.0" }
-ops = { version = "^2.17.0", extras = ["testing"] }
-moto = { extras = ["s3"], version = "^5.0.22" }
+ops = { version = "^2.23.1", extras = ["testing"] }
+moto = { extras = ["s3"], version = "^5.1.11" }
 
 [tool.poetry.group.integration]
 optional = true
 
 [tool.poetry.group.integration.dependencies]
-pytest = "^8.0.0"
+pytest = "^8.4.1"
 coverage = { extras = ["toml"], version = ">7.0" }
-tenacity = "^9.0.0"
-jubilant = "^1.0.1"
+tenacity = "^9.1.2"
+jubilant = "^1.4.0"
 
 [tool.ruff]
 line-length = 99
