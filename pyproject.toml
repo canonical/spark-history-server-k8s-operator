@@ -10,7 +10,7 @@ python = ">=3.10,<4.0"
 ops = "^3.3.1"
 pydantic = "^1.10.24"
 pyyaml = ">=6.0.3"
-boto3 = "^1.40.53"
+boto3 = "^1.40.54"
 jsonschema = "^4.25.1"
 tenacity = ">=9.1.2"
 azure-storage-blob = "^12.27.0"
@@ -35,15 +35,15 @@ cosl = "*"
 optional = true
 
 [tool.poetry.group.format.dependencies]
-ruff = ">=0.14.0"
+ruff = ">=0.14.1"
 
 [tool.poetry.group.lint]
 optional = true
 
 [tool.poetry.group.lint.dependencies]
-ruff = ">=0.14.0"
+ruff = ">=0.14.1"
 codespell = ">=2.4.1"
-boto3-stubs = { extras = ["s3"], version = "^1.40.53" }
+boto3-stubs = { extras = ["s3"], version = "^1.40.54" }
 
 [tool.poetry.group.unit]
 optional = true
