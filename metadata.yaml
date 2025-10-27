@@ -5,14 +5,14 @@ name: spark-history-server-k8s
 display-name: Spark History Server
 summary: Kubernetes based charm for Spark History Server.
 description: |
-  Apache Spark is a multi-language engine for executing data engineering, 
+  Apache Spark is a multi-language engine for executing data engineering,
   data science, and machine learning on single-node machines or clusters.
-  History Server is a Spark component that allows the users to view and 
+  History Server is a Spark component that allows the users to view and
   analyze their completed Spark application logs.
-   
+
   This charm packages Apache Spark's History Server for Kubernetes environments.
 
-  Apache Spark is a free, open source software project by the Apache Software Foundation. 
+  Apache Spark is a free, open source software project by the Apache Software Foundation.
   Users can find out more at the [Spark project page](https://spark.apache.org/).
 source: https://github.com/canonical/spark-history-server-k8s-operator
 issues: https://github.com/canonical/spark-history-server-k8s-operator/issues
@@ -32,7 +32,8 @@ resources:
   spark-history-server-image:
     type: oci-image
     description: OCI image for Spark History Server
-    upstream-source: ghcr.io/canonical/charmed-spark@sha256:f1f944369108c0b0112212fb0242f3c314dfad362926c234857029f13c5de2c0 # spark-version: 3.5.5 revision: c9fe483160d8aad5d23260af98c18e2653720c8e
+    # 4.0.1-22.04, release date 03/10/2025
+    upstream-source: ghcr.io/canonical/charmed-spark@sha256:22eae73b12cda8b7c89a7dc2c49eda557f211d29b21dff5f704b641e662e4b2d
 
 requires:
   s3-credentials:
@@ -62,4 +63,3 @@ provides:
   grafana-dashboard:
     interface: grafana_dashboard
     optional: true
-  

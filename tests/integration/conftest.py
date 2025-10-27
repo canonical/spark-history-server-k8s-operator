@@ -83,8 +83,8 @@ def azure_storage_credentials() -> AzureInfo:
 
 @pytest.fixture(scope="module")
 def history_server_charm() -> Path:
-    """Path to the packed kyuubi charm."""
+    """Path to the packed history-server charm."""
     if not (path := next(iter(Path.cwd().glob("*.charm")), None)):
-        raise FileNotFoundError("Could not find packed kyuubi charm.")
+        raise FileNotFoundError("Could not find packed history-server charm.")
 
     return path

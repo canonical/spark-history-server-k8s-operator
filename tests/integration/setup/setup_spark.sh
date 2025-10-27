@@ -17,6 +17,7 @@ spark-client.service-account-registry create --username hello \
                 --conf spark.hadoop.fs.s3a.path.style.access=true \
                 --conf spark.eventLog.enabled=true \
                 --conf spark.eventLog.dir=s3a://history-server/spark-events/ \
-                --conf spark.history.fs.logDirectory=s3a://history-server/spark-events/
+                --conf spark.history.fs.logDirectory=s3a://history-server/spark-events/ \
+                --conf spark.kubernetes.container.image=ghcr.io/canonical/charmed-spark@sha256:22eae73b12cda8b7c89a7dc2c49eda557f211d29b21dff5f704b641e662e4b2d 
 
 spark-client.service-account-registry get-config --username hello
