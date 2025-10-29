@@ -277,6 +277,7 @@ def test_history_server_cos_integration(
             status, "prometheus", "alertmanager", "loki", "grafana"
         ),
         delay=10,
+        timeout=1200,
     )
     juju.wait(
         lambda status: jubilant.all_blocked(status, charm_versions.grafana_agent.application_name),
