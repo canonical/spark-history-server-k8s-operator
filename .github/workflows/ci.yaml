@@ -96,7 +96,7 @@ jobs:
           microk8s-addons: "hostpath-storage dns metallb:${{ env.IPADDR }}-${{ env.IPADDR }}"
       - name: Setup microceph by action
         id: microceph-action
-        if: ${{ matrix.tox-environments }} == 'integration-tls'
+        if: ${{ matrix.tox-environments == 'integration-tls' }}
         uses: canonical/microceph-action@v0.2
         with:
           channel: "latest/edge"
@@ -106,7 +106,7 @@ jobs:
           osdsize: "3G"
       - name: Setup microceph by hand
         id: microceph-manual
-        if: ${{ matrix.tox-environments }} != 'integration-tls'
+        if: ${{ matrix.tox-environments != 'integration-tls' }}
         run: |
           sudo snap install microceph
           sudo microceph cluster bootstrap
