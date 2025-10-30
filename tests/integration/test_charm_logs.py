@@ -82,26 +82,18 @@ def test_build_and_deploy(
     )
 
 
-def test_loki_integration(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) -> None:
+def test_loki_integration(
+    juju: jubilant.Juju,
+    charm_versions: IntegrationTestsCharms,
+    s3_bucket_and_creds: S3Info,
+) -> None:
     """Check that logs are forwarded to Loki.
 
     Assert on the unit status before any relations/configurations take place.
     """
-    # Get minio credentials
-    setup_minio_output = (
-        subprocess.check_output(
-            "./tests/integration/setup/setup_minio.sh | tail -n 1", shell=True, stderr=None
-        )
-        .decode("utf-8")
-        .strip()
-    )
-
-    logger.info(f"Minio output:\n{setup_minio_output}")
-
-    s3_params = setup_minio_output.strip().split(",")
-    endpoint_url = s3_params[0]
-    access_key = s3_params[1]
-    secret_key = s3_params[2]
+    access_key = s3_bucket_and_creds["access_key"]
+    secret_key = s3_bucket_and_creds["secret_key"]
+    endpoint = s3_bucket_and_creds["endpoint"]
 
     image_version = METADATA["resources"]["spark-history-server-image"]["upstream-source"]
 
@@ -133,7 +125,7 @@ def test_loki_integration(juju: jubilant.Juju, charm_versions: IntegrationTestsC
     logger.info("Setup a spark to run job")
 
     setup_spark_output = subprocess.check_output(
-        f"./tests/integration/setup/setup_spark.sh {endpoint_url} {access_key} {secret_key} {image_version}",
+        f"./tests/integration/setup/setup_spark.sh {endpoint} {access_key} {secret_key} {image_version}",
         shell=True,
         stderr=None,
     ).decode("utf-8")
