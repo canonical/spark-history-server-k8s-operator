@@ -3,9 +3,9 @@
 # See LICENSE file for licensing details.
 import logging
 import os
-import shutil
 import subprocess
 from pathlib import Path
+from typing import Iterable
 
 import boto3
 import boto3.session
@@ -14,7 +14,7 @@ import pytest
 from botocore.client import Config
 from dotenv import load_dotenv
 
-from .types import AzureInfo, CharmVersion, IntegrationTestsCharms
+from .types import AzureInfo, CharmVersion, IntegrationTestsCharms, S3Info
 
 load_dotenv()
 
@@ -95,7 +95,7 @@ def azure_storage_credentials() -> AzureInfo:
 
 
 @pytest.fixture(scope="module")
-def s3_bucket_and_creds(request: pytest.FixtureRequest):
+def s3_bucket_and_creds(request: pytest.FixtureRequest) -> Iterable[S3Info]:
     keep_models = bool(request.config.getoption("--keep-models"))
 
     if any(
@@ -147,9 +147,9 @@ def s3_bucket_and_creds(request: pytest.FixtureRequest):
     logger.info(f"Created bucket: {BUCKET_NAME}")
     test_bucket.put_object(Key=PATH_NAME)
     yield {
-        "endpoint": endpoint_url,
-        "access_key": access_key,
-        "secret_key": secret_key,
+        "endpoint": str(endpoint_url),
+        "access_key": str(access_key),
+        "secret_key": str(secret_key),
         "bucket": BUCKET_NAME,
         "path": PATH_NAME,
     }
@@ -170,14 +170,3 @@ def history_server_charm() -> Path:
         raise FileNotFoundError("Could not find packed history server charm.")
 
     return path
-
-
-@pytest.fixture(scope="session")
-def skopeo() -> str:
-    """Check that skopeo is in path and runnable."""
-    if (skopeo_path := shutil.which("skopeo")) is None:
-        if (skopeo_path := shutil.which("rockcraft.skopeo")) is None:
-            raise FileNotFoundError("Could not find 'skopeo' in PATH.")
-
-    subprocess.check_output([skopeo_path, "-v"])
-    return skopeo_path
