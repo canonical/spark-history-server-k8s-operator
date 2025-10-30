@@ -105,6 +105,7 @@ def s3_bucket_and_creds(request: pytest.FixtureRequest) -> Iterable[S3Info]:
             (endpoint_url := os.environ.get("S3_SERVER_URL", None)) is None,
         )
     ):
+        logger.info("Cannot find object storage information in environment, looking into minio.")
         setup_minio_output = (
             subprocess.check_output(
                 "./tests/integration/setup/setup_minio.sh | tail -n 1", shell=True, stderr=None
@@ -145,7 +146,7 @@ def s3_bucket_and_creds(request: pytest.FixtureRequest) -> Iterable[S3Info]:
     # Create the test bucket
     s3.create_bucket(Bucket=BUCKET_NAME)
     logger.info(f"Created bucket: {BUCKET_NAME}")
-    test_bucket.put_object(Key=PATH_NAME)
+    test_bucket.put_object(Key=os.path.join(PATH_NAME, "touch"))
     yield {
         "endpoint": str(endpoint_url),
         "access_key": str(access_key),
