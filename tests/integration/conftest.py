@@ -16,7 +16,9 @@ from dotenv import load_dotenv
 
 from .types import AzureInfo, CharmVersion, IntegrationTestsCharms, S3Info
 
+load_dotenv("microceph.source")
 load_dotenv()
+
 
 logger = logging.getLogger(__name__)
 BUCKET_NAME = "history-server"
@@ -153,6 +155,7 @@ def s3_bucket_and_creds(request: pytest.FixtureRequest) -> Iterable[S3Info]:
         "secret_key": str(secret_key),
         "bucket": BUCKET_NAME,
         "path": PATH_NAME,
+        "ca_bundle_path": os.environ.get("S3_CA_BUNDLE_PATH", ""),
     }
 
     if not keep_models:
