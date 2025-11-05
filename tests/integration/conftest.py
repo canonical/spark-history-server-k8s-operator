@@ -1,13 +1,28 @@
 #!/usr/bin/env python3
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
+import logging
 import os
+import subprocess
 from pathlib import Path
+from typing import Iterable
 
+import boto3
+import boto3.session
 import jubilant
 import pytest
+from botocore.client import Config
+from dotenv import load_dotenv
 
-from .types import AzureInfo, CharmVersion, IntegrationTestsCharms
+from .types import AzureInfo, CharmVersion, IntegrationTestsCharms, S3Info
+
+load_dotenv("microceph.source")
+load_dotenv()
+
+
+logger = logging.getLogger(__name__)
+BUCKET_NAME = "history-server"
+PATH_NAME = "spark-events"
 
 
 @pytest.fixture(scope="module")
@@ -82,9 +97,80 @@ def azure_storage_credentials() -> AzureInfo:
 
 
 @pytest.fixture(scope="module")
+def s3_bucket_and_creds(request: pytest.FixtureRequest) -> Iterable[S3Info]:
+    keep_models = bool(request.config.getoption("--keep-models"))
+
+    if any(
+        (
+            (access_key := os.environ.get("S3_ACCESS_KEY", None)) is None,
+            (secret_key := os.environ.get("S3_SECRET_KEY", None)) is None,
+            (endpoint_url := os.environ.get("S3_SERVER_URL", None)) is None,
+        )
+    ):
+        logger.info("Cannot find object storage information in environment, looking into minio.")
+        setup_minio_output = (
+            subprocess.check_output(
+                "./tests/integration/setup/setup_minio.sh | tail -n 1", shell=True, stderr=None
+            )
+            .decode("utf-8")
+            .strip()
+        )
+
+        logger.info(f"Minio output:\n{setup_minio_output}")
+
+        s3_params = setup_minio_output.strip().split(",")
+        endpoint_url = s3_params[0]
+        access_key = s3_params[1]
+        secret_key = s3_params[2]
+
+    session = boto3.session.Session(aws_access_key_id=access_key, aws_secret_access_key=secret_key)
+    s3 = session.resource(
+        service_name="s3",
+        endpoint_url=endpoint_url,
+        verify=False,
+        config=Config(
+            connect_timeout=60,
+            retries={"max_attempts": 4},
+            request_checksum_calculation="when_supported",
+            response_checksum_validation="when_supported",
+        ),
+    )
+    test_bucket = s3.Bucket(BUCKET_NAME)
+
+    # Delete test bucket if it exists
+    if test_bucket in s3.buckets.all():
+        logger.info(f"The bucket {BUCKET_NAME} already exists. Deleting it...")
+        for obj in test_bucket.objects.all():
+            # We need to iterate over keys because delete_objects (plural) has mandatory checksum
+            obj.delete()
+        test_bucket.delete()
+
+    # Create the test bucket
+    s3.create_bucket(Bucket=BUCKET_NAME)
+    logger.info(f"Created bucket: {BUCKET_NAME}")
+    test_bucket.put_object(Key=os.path.join(PATH_NAME, "touch"))
+    yield {
+        "endpoint": str(endpoint_url),
+        "access_key": str(access_key),
+        "secret_key": str(secret_key),
+        "bucket": BUCKET_NAME,
+        "path": PATH_NAME,
+        "ca_bundle_path": os.environ.get("S3_CA_BUNDLE_PATH", ""),
+    }
+
+    if not keep_models:
+        logger.info("Tearing down test bucket...")
+        for obj in test_bucket.objects.all():
+            # We need to iterate over keys because delete_objects (plural) has mandatory checksum
+            obj.delete()
+
+        test_bucket.delete()
+
+
+@pytest.fixture(scope="module")
 def history_server_charm() -> Path:
-    """Path to the packed kyuubi charm."""
+    """Path to the packed history server charm."""
     if not (path := next(iter(Path.cwd().glob("*.charm")), None)):
-        raise FileNotFoundError("Could not find packed kyuubi charm.")
+        raise FileNotFoundError("Could not find packed history server charm.")
 
     return path

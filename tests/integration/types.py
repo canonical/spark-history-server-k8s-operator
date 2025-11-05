@@ -58,3 +58,16 @@ AzureInfo = TypedDict(
         "secret-key": str,
     },
 )
+
+
+S3Info = TypedDict(
+    "S3Info",
+    {
+        "endpoint": str,
+        "access_key": str,
+        "secret_key": str,
+        "bucket": str,
+        "path": str,
+        "ca_bundle_path": str,
+    },
+)

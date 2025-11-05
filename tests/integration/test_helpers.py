@@ -8,11 +8,9 @@ import subprocess
 from pathlib import Path
 from typing import cast
 
-import boto3
 import jubilant
 import requests
 import yaml
-from botocore.client import Config
 
 from constants import JMX_EXPORTER_PORT
 
@@ -38,32 +36,6 @@ def set_s3_credentials(
 
     task = juju.run("s3-integrator/0", "sync-s3-credentials", params)
     assert task.return_code == 0
-
-
-def setup_s3_bucket_for_history_server(
-    endpoint_url: str, aws_access_key: str, aws_secret_key: str, bucket_str: str, verify=False
-):
-    config = Config(
-        connect_timeout=60,
-        retries={"max_attempts": 0},
-        response_checksum_validation="when_supported",
-        request_checksum_calculation="when_supported",
-    )
-    session = boto3.session.Session(
-        aws_access_key_id=aws_access_key, aws_secret_access_key=aws_secret_key
-    )
-    s3 = session.client("s3", endpoint_url=endpoint_url, config=config, verify=verify)
-    # delete test bucket and its content if it already exist
-    buckets = s3.list_buckets()
-    for bucket in buckets["Buckets"]:
-        bucket_name = bucket["Name"]
-        if bucket_name == bucket_str:
-            logger.info(f"Deleting bucket: {bucket_name}")
-            objects = s3.list_objects_v2(Bucket=bucket_str)["Contents"]
-            objs = [x["Key"] for x in objects]
-            for obj in objs:
-                s3.delete_object(Bucket=bucket_str, Key=obj)
-            s3.delete_bucket(Bucket=bucket_str)
 
 
 def delete_azure_container(container: str):
