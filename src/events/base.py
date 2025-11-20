@@ -27,7 +27,7 @@ class BaseEventHandler(Object):
         s3: S3ConnectionInfo | None,
         azure: AzureStorageConnectionInfo | None,
         ingress: IngressUrl | None,
-        oathkeeper: AuthProxyConfig | None,
+        auth_proxy: AuthProxyConfig | None,
     ) -> StatusBase:
         """Return the status of the charm."""
         if not self.workload.ready():
@@ -49,7 +49,7 @@ class BaseEventHandler(Object):
         if not self.workload.active():
             return Status.NOT_RUNNING.value
 
-        if oathkeeper and not ingress:
+        if auth_proxy and not ingress:
             return Status.MISSING_INGRESS_RELATION.value
 
         return Status.ACTIVE.value

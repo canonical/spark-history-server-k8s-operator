@@ -7,7 +7,7 @@
 from enum import Enum
 
 from charms.data_platform_libs.v0.data_interfaces import RequirerData
-from charms.oathkeeper.v0.auth_proxy import AuthProxyConfig
+from charms.oauth2_proxy_k8s.v0.auth_proxy import AuthProxyConfig
 from charms.traefik_k8s.v2.ingress import IngressProviderAppData, IngressUrl
 from ops import ActiveStatus, BlockedStatus, CharmBase, MaintenanceStatus, ModelError, Relation
 
@@ -17,9 +17,9 @@ from core.domain import AzureStorageConnectionInfo, S3ConnectionInfo
 
 S3 = "s3-credentials"
 INGRESS = "ingress"
-OATHKEEPER = "auth-proxy"
+AUTH_PROXY = "auth-proxy"
 AUTHORIZED_USERS = "authorized-users"
-AUTH_PROXY_HEADERS = ["X-User", "X-Email"]
+AUTH_PROXY_HEADERS = ["X-Auth-Request-User", "X-Auth-Request-Email"]
 AZURE_MANDATORY_OPTIONS = [
     "secret-key",
     "container",
@@ -49,7 +49,7 @@ class Context(WithLogging):
     @property
     def authorized_users(self) -> str | None:
         """The comma-separated list of authorized users."""
-        return self.charm.config[AUTHORIZED_USERS] if self._oathkeeper_relation else None
+        return self.charm.config[AUTHORIZED_USERS] if self._auth_proxy_relation else None
 
     # -----------------
     # --- RELATIONS ---
@@ -71,14 +71,14 @@ class Context(WithLogging):
         return self.charm.model.get_relation(INGRESS)
 
     @property
-    def _oathkeeper_relation(self) -> Relation | None:
-        """Checks if oathkeeper is related."""
-        relations = list(self.model.relations[OATHKEEPER])
+    def _auth_proxy_relation(self) -> Relation | None:
+        """Checks if oauth2_proxy is related."""
+        relations = list(self.model.relations[AUTH_PROXY])
 
         if len(relations) > 1:
             # This should be prevented by endpoint specification which limits
             # number of units to 1
-            raise ValueError("Cannot handle more than one oathkeeper relation")
+            raise ValueError("Cannot handle more than one oauth2_proxy relation")
 
         return relations[0] if relations else None
 
@@ -114,12 +114,20 @@ class Context(WithLogging):
     @property
     def auth_proxy_config(self) -> AuthProxyConfig | None:
         """Configure the auth proxy relation."""
-        if self._oathkeeper_relation:
+        if self._auth_proxy_relation:
             return AuthProxyConfig(
                 protected_urls=[self.ingress.url] if self.ingress else [],
-                headers=AUTH_PROXY_HEADERS,
                 allowed_endpoints=[],
+                headers=AUTH_PROXY_HEADERS,
+                # authenticated_emails=AUTH_PROXY_AUTHENTICATED_EMAILS,
+                # authenticated_email_domains=AUTH_PROXY_AUTHENTICATED_EMAIL_DOMAINS
             )
+
+            # return AuthProxyConfig(
+            #     protected_urls=[self.ingress.url] if self.ingress else [],
+            #     headers=AUTH_PROXY_HEADERS,
+            #     allowed_endpoints=[],
+            # )
         else:
             return None
 

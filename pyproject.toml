@@ -25,7 +25,7 @@ pydantic = "^1.10.17, <2"
 # loki_k8s/v1/loki_push_api.py
 # prometheus_k8s/v0/prometheus_scrape.py
 pyyaml = "*"
-# oathkeeper/v0/auth_proxy.py
+# oauth2_proxy_k8s/v0/auth_proxy.py
 jsonschema = "*"
 # loki_k8s/v1/loki_push_api.py
 # prometheus_k8s/v0/prometheus_scrape.py

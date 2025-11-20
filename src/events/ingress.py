@@ -4,7 +4,7 @@
 
 """Ingress related event handlers."""
 
-from charms.oathkeeper.v0.auth_proxy import (
+from charms.oauth2_proxy_k8s.v0.auth_proxy import (
     AuthProxyRelationRemovedEvent,
     AuthProxyRequirer,
 )
@@ -16,7 +16,7 @@ from charms.traefik_k8s.v2.ingress import (
 from ops import CharmBase, RelationChangedEvent
 
 from common.utils import WithLogging
-from core.context import INGRESS, OATHKEEPER, Context
+from core.context import AUTH_PROXY, INGRESS, Context
 from core.workload import SparkHistoryWorkloadBase
 from events.base import BaseEventHandler, compute_status, defer_when_not_ready
 from managers.history_server import HistoryServerManager
@@ -40,12 +40,12 @@ class IngressEvents(BaseEventHandler, WithLogging):
         self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
         self.framework.observe(self.ingress.on.revoked, self._on_ingress_revoked)
 
-        self.auth_proxy = AuthProxyRequirer(charm, self.context.auth_proxy_config, OATHKEEPER)
+        self.auth_proxy = AuthProxyRequirer(charm, self.context.auth_proxy_config, AUTH_PROXY)
         self.framework.observe(
             self.auth_proxy.on.auth_proxy_relation_removed, self._on_auth_proxy_removed
         )
         self.framework.observe(
-            self.charm.on[OATHKEEPER].relation_changed, self._on_auth_proxy_changed
+            self.charm.on[AUTH_PROXY].relation_changed, self._on_auth_proxy_changed
         )
 
     @compute_status
