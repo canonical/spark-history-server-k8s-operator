@@ -6,6 +6,7 @@
 
 import json
 import logging
+import ssl
 import subprocess
 import urllib.request
 from pathlib import Path
@@ -176,8 +177,8 @@ def test_ingress(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) ->
     logger.info(f"Number of apps: {len(apps)}")
 
 
-def test_oathkeeper(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) -> None:
-    """Test the integration of the spark history server with Oathkeeper.
+def test_oauth2proxy(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) -> None:
+    """Test the integration of the spark history server with Oauth2proxy.
 
     Assert that the proxied-enpoints of the ingress are protected (err code 401).
     """
@@ -185,28 +186,38 @@ def test_oathkeeper(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms)
     juju.remove_relation(
         f"{APP_NAME}:ingress", f"{charm_versions.ingress.application_name}:ingress"
     )
-    juju.wait(jubilant.all_active)
-
-    # Deploy the oathkeeper charm and wait for waiting status
-    juju.deploy(**charm_versions.oathkeeper.deploy_dict())
     juju.wait(jubilant.all_active, delay=10)
 
-    # configure Oathkeeper charm
-    oathkeeper_configuration_parameters = {"dev": "True"}
-    juju.config(charm_versions.oathkeeper.application_name, oathkeeper_configuration_parameters)
+    # Deploy the self-signed-certificates charm
+    juju.deploy(**charm_versions.self_signed_certificate.deploy_dict())
+    juju.wait(jubilant.all_active, delay=10)
+
+    # Deploy the oauth2proxy charm and wait for waiting status
+    juju.deploy(**charm_versions.oauth2proxy.deploy_dict())
+    juju.wait(jubilant.all_active, delay=10)
+
+    # configure Oauth2proxy charm
+    oauth2proxy_configuration_parameters = {"dev": "True"}
+    juju.config(charm_versions.oauth2proxy.application_name, oauth2proxy_configuration_parameters)
 
     juju.wait(jubilant.all_active, delay=5)
 
-    # configure ingress to work with Oathkeeper
+    # configure ingress to work with Oauth2proxy
     ingress_configuration_parameters = {"enable_experimental_forward_auth": "True"}
     # apply new configuration options
     juju.config(charm_versions.ingress.application_name, ingress_configuration_parameters)
 
     juju.wait(jubilant.all_active, delay=5)
 
-    # Relate Oathkeeper with the Spark history server charm
-    logger.info("Relating the spark history server charm with oathkeeper.")
-    juju.integrate(charm_versions.oathkeeper.application_name, APP_NAME)
+    # relate ingress with self-signed-certificates
+    juju.integrate(
+        charm_versions.self_signed_certificate.application_name,
+        f"{charm_versions.ingress.application_name}:certificates",
+    )
+
+    # Relate Oauth2proxy with the Spark history server charm
+    logger.info("Relating the spark history server charm with Oauth2proxy.")
+    juju.integrate(charm_versions.oauth2proxy.application_name, APP_NAME)
 
     juju.wait(lambda status: jubilant.all_blocked(status, APP_NAME), delay=5)
 
@@ -219,18 +230,24 @@ def test_oathkeeper(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms)
         delay=5,
     )
 
-    # Relate Oathkeeper with the Ingress charm
-    logger.info("Relating the oathkeeper charm with the ingress.")
+    # Relate Oauth2proxy with the Ingress charm
+    logger.info("Relating the oauth2proxy charm with the ingress.")
 
     juju.integrate(
         f"{charm_versions.ingress.application_name}:experimental-forward-auth",
-        charm_versions.oathkeeper.application_name,
+        charm_versions.oauth2proxy.application_name,
+    )
+
+    # juju integrate oauth2-proxy-k8s:receive-ca-cert self-signed-certificates
+    juju.integrate(
+        f"{charm_versions.oauth2proxy.application_name}:receive-ca-cert",
+        charm_versions.self_signed_certificate.application_name,
     )
 
     juju.wait(
         lambda status: jubilant.all_active(
             status,
-            charm_versions.oathkeeper.application_name,
+            charm_versions.oauth2proxy.application_name,
             charm_versions.ingress.application_name,
         ),
         delay=10,
@@ -241,18 +258,21 @@ def test_oathkeeper(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms)
     assert task.return_code == 0
     ingress_endpoint = json.loads(task.results["proxied-endpoints"])[APP_NAME]["url"]
 
+    # ignore SSL certificate verification
+    ssl_context = ssl._create_unverified_context()
+
     # check that the ingress endpoint is not authorized!
     logger.info(f"Querying endpoint: {ingress_endpoint}")
     try:
-        _ = urllib.request.urlopen(ingress_endpoint)
+        _ = urllib.request.urlopen(ingress_endpoint, context=ssl_context)
         raise Exception(
             "Successful request.... something is wrong with the protection of the endpoints."
         )
     except urllib.error.HTTPError as e:  # type: ignore
         # Return code error (e.g. 404, 501, ...)
         logger.info("HTTPError: {}".format(e.code))
-        # check that the endopoint respond with code 401
-        assert e.code == 401
+        # check that the endopoint respond with code 403
+        assert e.code == 403
 
     logger.info(f"Endpoint: {ingress_endpoint} successfully protected.")
 
@@ -306,19 +326,19 @@ def test_oathkeeper(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms)
 
 
 @pytest.mark.skip
-def test_remove_oathkeeper(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) -> None:
-    """Test the removal of integration between the spark history server and Oathkeeper.
+def test_remove_oauth2proxy(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) -> None:
+    """Test the removal of integration between the spark history server and Oauth2proxy.
 
     Assert that the proxied-enpoints of the ingress are not protected.
     """
-    # Remove of the relation between oathkeeper and spark-history server
+    # Remove of the relation between oauth2proxy and spark-history server
     juju.remove_relation(
-        f"{APP_NAME}:auth-proxy", f"{charm_versions.oathkeeper.application_name}:auth-proxy"
+        f"{APP_NAME}:auth-proxy", f"{charm_versions.oauth2proxy.application_name}:auth-proxy"
     )
 
     juju.wait(
         lambda status: jubilant.all_active(
-            status, APP_NAME, charm_versions.oathkeeper.application_name
+            status, APP_NAME, charm_versions.oauth2proxy.application_name
         ),
         delay=10,
     )

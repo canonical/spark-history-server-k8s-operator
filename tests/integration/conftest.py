@@ -39,13 +39,13 @@ def juju(request: pytest.FixtureRequest):
             print(log, end="")
 
 
-def pytest_addoption(parser):
-    parser.addoption(
-        "--keep-models",
-        action="store_true",
-        default=False,
-        help="keep temporarily-created models",
-    )
+# def pytest_addoption(parser):
+#     parser.addoption(
+#         "--keep-models",
+#         action="store_true",
+#         default=False,
+#         help="keep temporarily-created models",
+#     )
 
 
 @pytest.fixture
@@ -56,10 +56,16 @@ def charm_versions() -> IntegrationTestsCharms:
             channel="edge",
             base="ubuntu@22.04",
         ),
-        ingress=CharmVersion(name="traefik-k8s", channel="edge", base="ubuntu@20.04", trust=True),
-        oathkeeper=CharmVersion(
-            name="oathkeeper",
-            channel="edge",
+        ingress=CharmVersion(
+            name="traefik-k8s",
+            channel="latest/edge",
+            base="ubuntu@20.04",
+            alias="traefik-k8s",
+            trust=True,
+        ),
+        oauth2proxy=CharmVersion(
+            name="oauth2-proxy-k8s",
+            channel="latest/stable",
             base="ubuntu@22.04",
         ),
         azure_storage=CharmVersion(
@@ -80,6 +86,48 @@ def charm_versions() -> IntegrationTestsCharms:
             channel="1/stable",
             base="ubuntu@22.04",
             alias="grafana-agent-k8s",
+            trust=True,
+        ),
+        self_signed_certificate=CharmVersion(
+            name="self-signed-certificates",
+            channel="1/stable",
+            base="ubuntu@24.04",
+            alias="self-signed-certificates",
+            trust=True,
+        ),
+        postgresql=CharmVersion(
+            name="postgresql-k8s",
+            channel="14/stable",
+            base="ubuntu@22.04",
+            alias="postgresql",
+            trust=True,
+        ),
+        hydra=CharmVersion(
+            name="hydra",
+            channel="0.5/edge",
+            base="ubuntu@22.04",
+            alias="hydra",
+            trust=True,
+        ),
+        kratos=CharmVersion(
+            name="kratos",
+            channel="0.5/edge",
+            base="ubuntu@22.04",
+            alias="kratos",
+            trust=True,
+        ),
+        identity_platform_login_ui_operator=CharmVersion(
+            name="identity-platform-login-ui-operator",
+            channel="0.5/edge",
+            base="ubuntu@22.04",
+            alias="identity-platform-login-ui-operator",
+            trust=True,
+        ),
+        kratos_external_idp_integrator=CharmVersion(
+            name="kratos-external-idp-integrator",
+            channel="latest/edge",
+            base="ubuntu@22.04",
+            alias="kratos-external-idp-integrator",
             trust=True,
         ),
     )

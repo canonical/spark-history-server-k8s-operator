@@ -42,10 +42,16 @@ class CharmVersion(BaseModel):
 class IntegrationTestsCharms(BaseModel):
     s3: CharmVersion
     ingress: CharmVersion
-    oathkeeper: CharmVersion
+    oauth2proxy: CharmVersion
     azure_storage: CharmVersion
     loki: CharmVersion
     grafana_agent: CharmVersion
+    self_signed_certificate: CharmVersion
+    postgresql: CharmVersion
+    hydra: CharmVersion
+    kratos: CharmVersion
+    identity_platform_login_ui_operator: CharmVersion
+    kratos_external_idp_integrator: CharmVersion
 
 
 AzureInfo = TypedDict(
