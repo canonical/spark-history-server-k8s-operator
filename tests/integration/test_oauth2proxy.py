@@ -25,9 +25,8 @@ from playwright.async_api._generated import Playwright as AsyncPlaywright
 from .oauth_tools.external_idp import DexIdpService, ExternalIdpService
 from .test_helpers import (
     set_s3_credentials,
-    setup_s3_bucket_for_history_server,
 )
-from .types import IntegrationTestsCharms
+from .types import IntegrationTestsCharms, S3Info
 
 logger = logging.getLogger(__name__)
 
@@ -232,33 +231,20 @@ async def page(context: BrowserContext) -> AsyncGenerator[Page, None]:
 
 
 def test_build_and_deploy(
-    juju: jubilant.Juju, charm_versions: IntegrationTestsCharms, history_server_charm: Path
+    juju: jubilant.Juju,
+    charm_versions: IntegrationTestsCharms,
+    history_server_charm: Path,
+    s3_bucket_and_creds: S3Info,
 ) -> None:
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
     """
-    logger.info("Setting up minio.....")
-
-    setup_minio_output = (
-        subprocess.check_output(
-            "./tests/integration/setup/setup_minio.sh | tail -n 1", shell=True, stderr=None
-        )
-        .decode("utf-8")
-        .strip()
-    )
-
-    logger.info(f"Minio output:\n{setup_minio_output}")
-
-    s3_params = setup_minio_output.strip().split(",")
-    endpoint_url = s3_params[0]
-    access_key = s3_params[1]
-    secret_key = s3_params[2]
-
-    logger.info("Setting up s3 credentials in s3-integrator charm")
-    setup_s3_bucket_for_history_server(endpoint_url, access_key, secret_key, BUCKET_NAME)
-
-    logger.info("Bucket setup complete")
+    bucket = s3_bucket_and_creds["bucket"]
+    access_key = s3_bucket_and_creds["access_key"]
+    secret_key = s3_bucket_and_creds["secret_key"]
+    endpoint = s3_bucket_and_creds["endpoint"]
+    path = s3_bucket_and_creds["path"]
 
     # Deploy charm from local source folder
 
@@ -295,12 +281,13 @@ def test_build_and_deploy(
     juju.wait(lambda status: jubilant.all_active(status, charm_versions.s3.application_name))
 
     configuration_parameters = {
-        "bucket": "history-server",
-        "path": "spark-events",
-        "endpoint": endpoint_url,
+        "bucket": bucket,
+        "path": path,
+        "endpoint": endpoint,
     }
     # apply new configuration options
     juju.config(charm_versions.s3.application_name, configuration_parameters)
+    juju.wait(jubilant.all_agents_idle)
 
     logger.info("Relating history server charm with s3-integrator charm")
 
@@ -326,7 +313,7 @@ def test_build_and_deploy(
     logger.info("Setting up spark")
 
     setup_spark_output = subprocess.check_output(
-        f"./tests/integration/setup/setup_spark.sh {endpoint_url} {access_key} {secret_key} {image_version}",
+        f"./tests/integration/setup/setup_spark.sh {endpoint} {access_key} {secret_key} {image_version}",
         shell=True,
         stderr=None,
     ).decode("utf-8")
