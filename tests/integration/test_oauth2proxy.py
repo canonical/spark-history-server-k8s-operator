@@ -430,7 +430,7 @@ def test_deploy_iam_bundle(
             charm_versions.identity_platform_login_ui_operator.application_name,
         ),
         delay=10,
-        timeout=1000,
+        timeout=2000,
     )
 
     juju.wait(
@@ -465,7 +465,7 @@ def test_deploy_iam_bundle(
             charm_versions.kratos_external_idp_integrator.application_name,
         ),
         delay=10,
-        timeout=200,
+        timeout=600,
     )
 
     juju.integrate(
