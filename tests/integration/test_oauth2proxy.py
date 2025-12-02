@@ -2,10 +2,10 @@
 # Copyright 2025 Canonical Limited
 # See LICENSE file for licensing details.
 
+import asyncio
 import json
 import logging
 import os
-import re
 import subprocess
 import urllib.request
 from pathlib import Path
@@ -18,17 +18,11 @@ import pytest_asyncio
 import requests
 import yaml
 from lightkube import Client, KubeConfig
-from oauth_tools import (
-    ExternalIdpService,
-    click_on_sign_in_button_by_text,
-    verify_page_loads,
-    # get_cookie_from_browser_by_name,
-)
-from oauth_tools.external_idp import DexIdpService
-from playwright.async_api import async_playwright, expect
+from playwright.async_api import async_playwright
 from playwright.async_api._generated import Browser, BrowserContext, BrowserType, Page
 from playwright.async_api._generated import Playwright as AsyncPlaywright
 
+from .oauth_tools.external_idp import DexIdpService, ExternalIdpService
 from .test_helpers import (
     set_s3_credentials,
     setup_s3_bucket_for_history_server,
@@ -55,6 +49,35 @@ def client() -> Client:
 #     yield page
 #     await page.close()
 
+
+@pytest.fixture(scope="module")
+def event_loop():
+    loop = asyncio.get_event_loop()
+    yield loop
+    loop.close()
+
+
+async def verify_page_loads(page: Page, url: str):
+    """Verify that the correct url has been loaded.
+
+    Args:
+        page (page): The page fixture.
+        url (str): The url to go to.
+    """
+    await page.wait_for_url(url)
+
+
+async def click_on_sign_in_button_by_text(page: Page, text: str):
+    """Find and click on a button by its displayed text.
+
+    Args:
+        page (page): The page fixture.
+        text (str): The button's text to search for.
+    """
+    async with page.expect_navigation():
+        await page.get_by_text(text).click()
+
+
 async def get_cookie_from_browser_by_name(
     browser_context: BrowserContext, name: str
 ) -> Optional[str]:
@@ -66,10 +89,10 @@ async def get_cookie_from_browser_by_name(
     """
     cookies = await browser_context.cookies()
     for cookie in cookies:
-        logger.info(f"Cookie found: {cookie['name']}")
         if cookie["name"] == name:
             return cookie["value"]
     return None
+
 
 async def access_application_login_page(
     page: Page, url: str, redirect_login_url: Optional[str] = None
@@ -93,39 +116,23 @@ async def access_application_login_page(
     # if redirect_login_url:
     #     await expect(page).to_have_url(re.compile(rf"{redirect_login_url}*"))
 
+
 async def complete_auth_code_login(
-    page: Page, identity_platform_login_ui_operator_url: str, external_idp_service: ExternalIdpService
+    page: Page,
+    external_idp_service: Optional[ExternalIdpService],
 ) -> None:
     """Take a page that is in the identity-platform's login page and login the user.
 
     Args:
         page (page): The page fixture.
-        ops_test (OpsTest): The ops_test fixture.
-        ext_idp_service (ExternalIdpService): The ExternalIdpService.
+        identity_platform_login_ui_operator_url (str): The identity platform login UI operator URL.
+        external_idp_service (ExternalIdpService): The external IdP service.
     """
-    if not isinstance(external_idp_service, ExternalIdpService):
-        raise ValueError(
-            f"Invalid ext_idp_service type: {type(external_idp_service)}, MUST be ExternalIdpManager or None"
-        )
-
-    expected_url = os.path.join(
-        # await get_reverse_proxy_app_url(
-        #     ops_test, APPS.TRAEFIK_PUBLIC, APPS.IDENTITY_PLATFORM_LOGIN_UI_OPERATOR
-        # ),
-        identity_platform_login_ui_operator_url,
-        "ui/login",
-    )
-    logger.info(f"Expected URL for identity platform login UI: {expected_url}")
-    logger.info("Choose external provider")
-    logger.info(f"Current page URL before clicking sign-in button: {page.url}")
-    logger.info(f"Current page content before clicking sign-in button: {await page.content()}")
-    # await expect(page).to_have_url(re.compile(rf"{expected_url}*"))
     async with page.expect_navigation():
-        # await page.get_by_role("button")
-        await page.get_by_role("button", name="Login").click()
+        await external_idp_service.complete_user_login(page)
+    logger.info(f"Login flow completed: {page.url}")
+    # logger.info(f"Page content after login flow: {await page.content()}")
 
-    logger.info("Completing the login flow on the external provider")
-    await external_idp_service.complete_user_login(page)
 
 @pytest.fixture(scope="module")
 def external_idp_service(
@@ -355,12 +362,10 @@ def test_build_and_deploy(
     assert len(apps) == 1
 
 
-async def test_deploy_iam_bundle(
+def test_deploy_iam_bundle(
     juju: jubilant.Juju,
     charm_versions: IntegrationTestsCharms,
     external_idp_service: ExternalIdpService,
-    page: Page,
-    context: BrowserContext,
 ) -> None:
     """Deploy the iam bundle."""
     # Deploy all charms necessary for Oauth2proxy integration
@@ -524,288 +529,58 @@ async def test_deploy_iam_bundle(
             charm_versions.kratos_external_idp_integrator.application_name,
         ),
         delay=10,
-        timeout=200,
+        timeout=600,
     )
 
-    task = juju.run(f"{charm_versions.kratos_external_idp_integrator.application_name}/0", "get-redirect-uri")
+    task = juju.run(
+        f"{charm_versions.kratos_external_idp_integrator.application_name}/0", "get-redirect-uri"
+    )
     assert task.return_code == 0
 
     logger.info("Configuring the external provider")
-    external_idp_service.update_redirect_uri(redirect_uri=
-                                        task.results["redirect-uri"])
+    external_idp_service.update_redirect_uri(redirect_uri=task.results["redirect-uri"])
 
     logger.info("IAM bundle deployed successfully.")
+
+
+async def test_login(
+    juju: jubilant.Juju,
+    charm_versions: IntegrationTestsCharms,
+    external_idp_service: ExternalIdpService,
+    page: Page,
+    context: BrowserContext,
+) -> None:
+    """Test deploying the identity platform with external IdP and logging into the application."""
     # get proxied endpoint
     task = juju.run(f"{charm_versions.ingress.application_name}/0", "show-proxied-endpoints")
     assert task.return_code == 0
     history_server_proxy_endpoint = json.loads(task.results["proxied-endpoints"])[APP_NAME]["url"]
+
     logger.info(f"History server proxy endpoint: {history_server_proxy_endpoint}")
-    # grafana_proxy = await get_reverse_proxy_app_url(ops_test, public_traefik_app_name, "grafana")
-    redirect_login = os.path.join(history_server_proxy_endpoint, "login")
-    logger.info(f"Redirect login url: {redirect_login}")
 
-    # sleep(360)
-    # variable = input('input something!: ')
-    await access_application_login_page(
-        page=page, url=history_server_proxy_endpoint, redirect_login_url=redirect_login
-    )
-    logger.info("Application login page accessed successfully.")
-    logger.info(page.url)
-    logger.info(await page.content())
-    await click_on_sign_in_button_by_text(
-        page=page, text="Sign in with Generic"
-    )
+    await page.goto(history_server_proxy_endpoint)
+    logger.info(f"Navigated to {history_server_proxy_endpoint}")
 
-    # HERE
-    task = juju.run(f"{charm_versions.ingress.application_name}/0", "show-proxied-endpoints")
-    assert task.return_code == 0
-    logger.info(f"Proxied endpoints: {task.results['proxied-endpoints']}")
+    logger.info("Clicking on Sign in with Generic identity provider.")
+    await click_on_sign_in_button_by_text(page=page, text="Sign in with Generic")
 
-    # a
-    variable = input('input something!: ')
-    status = juju.status()
-    identity_platform_login_ui_operator_url =json.loads(task.results["proxied-endpoints"])[charm_versions.ingress.application_name]["url"]
-    # json.loads(task.results["proxied-endpoints"])[charm_versions.identity_platform_login_ui_operator.application_name]["url"]
-    logger.info(f"Identity platform login ui operator url: {identity_platform_login_ui_operator_url}")
-    await complete_auth_code_login(page=page,
-                                   identity_platform_login_ui_operator_url=identity_platform_login_ui_operator_url, external_idp_service=external_idp_service)
+    # complete login in the external identity provider
+    await complete_auth_code_login(page=page, external_idp_service=external_idp_service)
 
-    redirect_url = os.path.join(history_server_proxy_endpoint, "?*")
-    await verify_page_loads(page=page, url=redirect_url)
+    # verify the correct redirect after login
+    await verify_page_loads(page=page, url=history_server_proxy_endpoint)
 
     # Verifying that the login flow was successful is application specific.
-    # The test uses Grafana's /api/user endpoint to verify the session cookie is valid
+    # The test uses Spark history server's /api/user endpoint to verify the session cookie is valid
     history_server_session_cookie = await get_cookie_from_browser_by_name(
-        browser_context=context, name="history_server_session"
+        browser_context=context, name="_oauth2_proxy"
     )
     request = requests.get(
         os.path.join(history_server_proxy_endpoint, "api/v1/applications"),
-        headers={"Cookie": f"history_server_session={history_server_session_cookie}"},
+        headers={"Cookie": f"_oauth2_proxy={history_server_session_cookie}"},
         verify=False,
     )
     assert request.status_code == 200
-    # assert request.json()["email"] == user_email
-
-
-# def test_ingress(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) -> None:
-#     """Build the charm-under-test and deploy it together with related charms.
-
-#     Assert on the unit status before any relations/configurations take place.
-#     """
-#     # Deploy the charm and wait for waiting status
-#     juju.deploy(**charm_versions.ingress.deploy_dict())
-#     juju.wait(
-#         lambda status: jubilant.all_active(status, charm_versions.ingress.application_name),
-#         delay=10,
-#     )
-
-#     logger.info("Relating history server charm with ingress")
-
-#     juju.integrate(charm_versions.ingress.application_name, APP_NAME)
-#     juju.wait(
-#         lambda status: jubilant.all_active(
-#             status, APP_NAME, charm_versions.ingress.application_name
-#         ),
-#         delay=10,
-#     )
-
-#     task = juju.run(f"{charm_versions.ingress.application_name}/0", "show-proxied-endpoints")
-#     assert task.return_code == 0
-
-#     ingress_endpoint = json.loads(task.results["proxied-endpoints"])[APP_NAME]["url"]
-
-#     logger.info(f"Querying endpoint: {ingress_endpoint}/api/v1/applications")
-
-#     apps = json.loads(urllib.request.urlopen(f"{ingress_endpoint}/api/v1/applications").read())
-
-#     assert len(apps) == 1
-
-#     logger.info(f"Number of apps: {len(apps)}")
-
-
-# def test_oauth2proxy(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) -> None:
-#     """Test the integration of the spark history server with Oauth2proxy.
-
-#     Assert that the proxied-enpoints of the ingress are protected (err code 401).
-#     """
-#     # remove relation between ingress and spark-history server
-#     juju.remove_relation(
-#         f"{APP_NAME}:ingress", f"{charm_versions.ingress.application_name}:ingress"
-#     )
-#     juju.wait(jubilant.all_active, delay=10)
-
-#     # Deploy the self-signed-certificates charm
-#     juju.deploy(**charm_versions.self_signed_certificate.deploy_dict())
-#     juju.wait(jubilant.all_active, delay=10)
-
-#     # Deploy the oauth2proxy charm and wait for waiting status
-#     juju.deploy(**charm_versions.oauth2proxy.deploy_dict())
-#     juju.wait(jubilant.all_active, delay=10)
-
-#     # configure Oauth2proxy charm
-#     oauth2proxy_configuration_parameters = {"dev": "True"}
-#     juju.config(charm_versions.oauth2proxy.application_name, oauth2proxy_configuration_parameters)
-
-#     juju.wait(jubilant.all_active, delay=5)
-
-#     # configure ingress to work with Oauth2proxy
-#     ingress_configuration_parameters = {"enable_experimental_forward_auth": "True"}
-#     # apply new configuration options
-#     juju.config(charm_versions.ingress.application_name, ingress_configuration_parameters)
-
-#     juju.wait(jubilant.all_active, delay=5)
-
-#     # relate ingress with self-signed-certificates
-#     juju.integrate(
-#         charm_versions.self_signed_certificate.application_name,
-#         f"{charm_versions.ingress.application_name}:certificates",
-#     )
-
-#     # Relate Oauth2proxy with the Spark history server charm
-#     logger.info("Relating the spark history server charm with Oauth2proxy.")
-#     juju.integrate(charm_versions.oauth2proxy.application_name, APP_NAME)
-
-#     juju.wait(lambda status: jubilant.all_blocked(status, APP_NAME), delay=5)
-
-#     # relate spark-history-server and ingress
-#     juju.integrate(charm_versions.ingress.application_name, APP_NAME)
-#     juju.wait(
-#         lambda status: jubilant.all_active(
-#             status, APP_NAME, charm_versions.ingress.application_name
-#         ),
-#         delay=5,
-#     )
-
-#     # Relate Oauth2proxy with the Ingress charm
-#     logger.info("Relating the oauth2proxy charm with the ingress.")
-
-#     juju.integrate(
-#         f"{charm_versions.ingress.application_name}:experimental-forward-auth",
-#         charm_versions.oauth2proxy.application_name,
-#     )
-
-#     # juju integrate oauth2-proxy-k8s:receive-ca-cert self-signed-certificates
-#     juju.integrate(
-#         f"{charm_versions.oauth2proxy.application_name}:receive-ca-cert",
-#         charm_versions.self_signed_certificate.application_name,
-#     )
-
-#     juju.wait(
-#         lambda status: jubilant.all_active(
-#             status,
-#             charm_versions.oauth2proxy.application_name,
-#             charm_versions.ingress.application_name,
-#         ),
-#         delay=10,
-#     )
-
-#     # get proxied endpoint
-#     task = juju.run(f"{charm_versions.ingress.application_name}/0", "show-proxied-endpoints")
-#     assert task.return_code == 0
-#     ingress_endpoint = json.loads(task.results["proxied-endpoints"])[APP_NAME]["url"]
-
-#     # ignore SSL certificate verification
-#     ssl_context = ssl._create_unverified_context()
-
-#     # check that the ingress endpoint is not authorized!
-#     logger.info(f"Querying endpoint: {ingress_endpoint}")
-#     try:
-#         _ = urllib.request.urlopen(ingress_endpoint, context=ssl_context)
-#         raise Exception(
-#             "Successful request.... something is wrong with the protection of the endpoints."
-#         )
-#     except urllib.error.HTTPError as e:  # type: ignore
-#         # Return code error (e.g. 404, 501, ...)
-#         logger.info("HTTPError: {}".format(e.code))
-#         # check that the endopoint respond with code 403
-#         assert e.code == 403
-
-#     logger.info(f"Endpoint: {ingress_endpoint} successfully protected.")
-
-#     # check that servlet filter is enabled on the unit endpoint
-#     status = juju.status()
-#     address = status.apps[APP_NAME].units[f"{APP_NAME}/0"].address
-#     try:
-#         _ = urllib.request.urlopen(f"http://{address}:18080/api/v1/applications")
-#         raise Exception(
-#             "Successful request.... something is wrong with the servlet filter configuration..."
-#         )
-
-#     except urllib.error.HTTPError as e:  # type: ignore
-#         # Return code error (e.g. 404, 501, ...)
-#         logger.info("HTTPError: {}".format(e.code))
-#         # check that the endopoint respond with code 500
-#         assert e.code == 500
-
-#     req = urllib.request.Request(f"http://{address}:18080/api/v1/applications")
-#     req.add_header(AUTH_PROXY_HEADERS[1], "xxx")
-#     apps = json.loads(urllib.request.urlopen(req).read())
-#     assert len(apps) == 1
-
-#     # configure the history server charm with a new authorized user yyy
-#     authorized_user = "test-user"
-#     config = {"authorized-users": authorized_user}
-#     juju.config(APP_NAME, config)
-
-#     juju.wait(lambda status: jubilant.all_active(status, APP_NAME), delay=10)
-
-#     # check that user admin is not authorized
-#     try:
-#         req = urllib.request.Request(f"http://{address}:18080/api/v1/applications")
-#         req.add_header(AUTH_PROXY_HEADERS[1], "admin")
-#         _ = urllib.request.urlopen(req)
-#         raise Exception(
-#             "Successful request.... something is wrong with the servlet filter configuration..."
-#         )
-
-#     except urllib.error.HTTPError as e:  # type: ignore
-#         # Return code error (e.g. 404, 501, ...)
-#         logger.info("HTTPError: {}".format(e.code))
-#         # check that the endopoint respond with code 401
-#         assert e.code == 401
-
-#     # check that user is authorized
-#     req1 = urllib.request.Request(f"http://{address}:18080/api/v1/applications")
-#     req1.add_header(AUTH_PROXY_HEADERS[1], authorized_user)
-#     apps = json.loads(urllib.request.urlopen(req1).read())
-#     assert len(apps) == 1
-
-
-# @pytest.mark.skip
-# def test_remove_oauth2proxy(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) -> None:
-#     """Test the removal of integration between the spark history server and Oauth2proxy.
-
-#     Assert that the proxied-enpoints of the ingress are not protected.
-#     """
-#     # Remove of the relation between oauth2proxy and spark-history server
-#     juju.remove_relation(
-#         f"{APP_NAME}:auth-proxy", f"{charm_versions.oauth2proxy.application_name}:auth-proxy"
-#     )
-
-#     juju.wait(
-#         lambda status: jubilant.all_active(
-#             status, APP_NAME, charm_versions.oauth2proxy.application_name
-#         ),
-#         delay=10,
-#     )
-
-#     try:
-#         for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(30)):
-#             with attempt:
-#                 task = juju.run(
-#                     f"{charm_versions.ingress.application_name}/0", "show-proxied-endpoints"
-#                 )
-#                 assert task.return_code == 0
-#                 ingress_endpoint = task.results["proxied-endpoints"][APP_NAME]["url"]
-
-#                 logger.info(f"Trying to querying endpoint: {ingress_endpoint}/api/v1/applications")
-
-#                 apps = json.loads(
-#                     urllib.request.urlopen(f"{ingress_endpoint}/api/v1/applications").read()
-#                 )
-
-#                 assert len(apps) == 1
-
-#                 logger.info(f"Number of apps: {len(apps)}")
-#     except RetryError:
-#         raise Exception("Failed to reach the endpoint!")
+    apps = request.json()
+    logger.info(f"Response JSON from application: {request.json()}")
+    assert len(apps) == 1

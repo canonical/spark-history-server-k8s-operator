@@ -65,7 +65,8 @@ jubilant = "^1.6.1"
 python-dotenv = "^1.2.1"
 pytest-asyncio = "0.20.2"
 pytest-playwright = "*"
-
+lightkube = "^0.18.0"
+jinja2 = "*"
 
 [tool.ruff]
 line-length = 99
