@@ -255,10 +255,7 @@ def test_build_and_deploy(
     access_key = s3_params[1]
     secret_key = s3_params[2]
 
-    logger.info(
-        f"Setting up s3 bucket with endpoint_url={endpoint_url}, access_key={access_key}, secret_key={secret_key}"
-    )
-
+    logger.info("Setting up s3 credentials in s3-integrator charm")
     setup_s3_bucket_for_history_server(endpoint_url, access_key, secret_key, BUCKET_NAME)
 
     logger.info("Bucket setup complete")

@@ -57,6 +57,7 @@ jobs:
           - integration-tls
           - integration-azure
           - integration-logs
+          - integration-auth
         runner:
           - ubuntu-22.04
           - [self-hosted, linux, AMD64, X64, large, jammy]
@@ -64,6 +65,8 @@ jobs:
           - tox-environments: integration-azure # Don't test azure twice
             runner: [self-hosted, linux, AMD64, X64, large, jammy]
           - tox-environments: integration-charm # Don't test charm twice
+            runner: [self-hosted, linux, AMD64, X64, large, jammy]
+          - tox-environments: integration-auth # Don't test auth twice
             runner: [self-hosted, linux, AMD64, X64, large, jammy]
 
     name: ${{ matrix.tox-environments }}
