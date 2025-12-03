@@ -20,15 +20,6 @@ from playwright.async_api import expect
 from playwright.async_api._generated import Page
 from requests.exceptions import RequestException
 
-# from oauth_tools.constants import (
-#     DEX_CLIENT_ID,
-#     DEX_CLIENT_SECRET,
-#     DEX_MANIFESTS,
-#     EXTERNAL_USER_EMAIL,
-#     EXTERNAL_USER_PASSWORD,
-#     KUBECONFIG,
-# )
-
 DEX_MANIFESTS = Path(__file__).parent / "dex.yaml"
 KUBECONFIG = os.environ.get("TESTING_KUBECONFIG", "~/.kube/config")
 

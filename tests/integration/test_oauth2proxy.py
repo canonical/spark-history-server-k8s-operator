@@ -28,20 +28,6 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
 BUCKET_NAME = "history-server"
 
-# KUBECONFIG = os.environ.get("TESTING_KUBECONFIG", "~/.kube/config")
-
-
-# @pytest.fixture(scope="session")
-# def client() -> Client:
-#     return Client(config=KubeConfig.from_file(KUBECONFIG), field_manager="dex-test")
-
-
-# @pytest.fixture(scope="module")
-# def event_loop():
-#     loop = asyncio.get_event_loop()
-#     yield loop
-#     loop.close()
-
 
 async def verify_page_loads(page: Page, url: str):
     """Verify that the correct url has been loaded.
@@ -94,104 +80,6 @@ async def complete_auth_code_login(
     async with page.expect_navigation():
         await external_idp_service.complete_user_login(page)
     logger.info(f"Login flow completed: {page.url}")
-    # logger.info(f"Page content after login flow: {await page.content()}")
-
-
-# @pytest.fixture(scope="module")
-# def external_idp_service(
-#     request: pytest.FixtureRequest, client: Client
-# ) -> Generator[DexIdpService, None, None]:
-#     """Deploy and manage the lifecycle of an Dex service."""
-#     logger.info("Deploying dex resources")
-#     ext_idp_manager = DexIdpService(client=client)
-#     try:
-#         yield ext_idp_manager
-#     finally:
-#         keep_models = bool(request.config.getoption("--keep-models"))
-#         if keep_models:
-#             return
-#         logger.info("Deleting dex resources")
-#         ext_idp_manager.remove_idp_service()
-
-
-# @pytest.fixture(scope="module")
-# def launch_arguments(pytestconfig: Any) -> Dict:
-#     return {
-#         "headless": not (pytestconfig.getoption("--headed") or os.getenv("HEADFUL", False)),
-#         "channel": pytestconfig.getoption("--browser-channel"),
-#     }
-
-
-# @pytest_asyncio.fixture(scope="module")
-# async def playwright() -> AsyncGenerator[AsyncPlaywright, None]:
-#     async with async_playwright() as playwright_object:
-#         yield playwright_object
-
-
-# @pytest.fixture(scope="module")
-# def browser_type(playwright: AsyncPlaywright, browser_name: str) -> BrowserType:
-#     if browser_name == "firefox":
-#         return playwright.firefox
-#     if browser_name == "webkit":
-#         return playwright.webkit
-#     return playwright.chromium
-
-
-# @pytest_asyncio.fixture(scope="module")
-# async def browser_factory(
-#     launch_arguments: Dict, browser_type: BrowserType
-# ) -> AsyncGenerator[Callable[..., Coroutine[Any, Any, Browser]], None]:
-#     browsers = []
-
-#     async def launch(**kwargs: Any) -> Browser:
-#         browser = await browser_type.launch(**launch_arguments, **kwargs)
-#         browsers.append(browser)
-#         return browser
-
-#     yield launch
-#     for browser in browsers:
-#         await browser.close()
-
-
-# @pytest_asyncio.fixture(scope="module")
-# async def browser(
-#     browser_factory: Callable[..., Coroutine[Any, Any, Browser]],
-# ) -> AsyncGenerator[Browser, None]:
-#     browser = await browser_factory()
-#     yield browser
-#     await browser.close()
-
-
-# @pytest_asyncio.fixture
-# async def context_factory(
-#     browser: Browser,
-# ) -> AsyncGenerator[Callable[..., Coroutine[Any, Any, BrowserContext]], None]:
-#     contexts = []
-
-#     async def launch(**kwargs: Any) -> BrowserContext:
-#         context = await browser.new_context(**kwargs)
-#         contexts.append(context)
-#         return context
-
-#     yield launch
-#     for context in contexts:
-#         await context.close()
-
-
-# @pytest_asyncio.fixture
-# async def context(
-#     context_factory: Callable[..., Coroutine[Any, Any, BrowserContext]],
-# ) -> AsyncGenerator[BrowserContext, None]:
-#     context = await context_factory(ignore_https_errors=True)
-#     yield context
-#     await context.close()
-
-
-# @pytest_asyncio.fixture
-# async def page(context: BrowserContext) -> AsyncGenerator[Page, None]:
-#     page = await context.new_page()
-#     yield page
-#     await page.close()
 
 
 def test_build_and_deploy(
