@@ -77,7 +77,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     steps:
-      - name: Disk usage
+      - name: Disk cleanup
+        if: ${{ matrix.runner == 'ubuntu-22.04' }}
         shell: bash
         run: |
           sudo rm -rf \
