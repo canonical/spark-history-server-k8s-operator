@@ -241,7 +241,7 @@ def test_history_server_cos_integration(
     juju.wait(lambda status: jubilant.all_active(status, APP_NAME), delay=10)
     juju.wait(
         lambda status: jubilant.all_blocked(status, charm_versions.grafana_agent.application_name),
-        delay=10,
+        delay=30,
     )
 
     juju.cli("deploy", "cos-lite", "--trust")
@@ -250,17 +250,17 @@ def test_history_server_cos_integration(
         lambda status: jubilant.all_active(
             status, "prometheus", "alertmanager", "loki", "grafana"
         ),
-        delay=10,
+        delay=30,
     )
     juju.wait(
         lambda status: jubilant.all_blocked(status, charm_versions.grafana_agent.application_name),
-        delay=10,
+        delay=30,
     )
 
     juju.integrate(f"{charm_versions.grafana_agent.name}:grafana-dashboards-provider", "grafana")
     juju.integrate(f"{charm_versions.grafana_agent.name}:send-remote-write", "prometheus")
 
-    juju.wait(jubilant.all_active, delay=10)
+    juju.wait(jubilant.all_active, delay=30)
 
     # We should leave time for Prometheus data to be published
     for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(30)):
