@@ -17,7 +17,7 @@ import pytest
 import yaml
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
-from core.context import AUTH_PROXY_HEADERS
+from core.context import OAUTH2_PROXY_HEADERS
 
 from .test_helpers import set_s3_credentials
 from .types import IntegrationTestsCharms, S3Info
@@ -292,7 +292,7 @@ def test_oauth2proxy(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms
         assert e.code == 500
 
     req = urllib.request.Request(f"http://{address}:18080/api/v1/applications")
-    req.add_header(AUTH_PROXY_HEADERS[1], "xxx")
+    req.add_header(OAUTH2_PROXY_HEADERS[1], "xxx")
     apps = json.loads(urllib.request.urlopen(req).read())
     assert len(apps) == 1
 
@@ -306,7 +306,7 @@ def test_oauth2proxy(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms
     # check that user admin is not authorized
     try:
         req = urllib.request.Request(f"http://{address}:18080/api/v1/applications")
-        req.add_header(AUTH_PROXY_HEADERS[1], "admin")
+        req.add_header(OAUTH2_PROXY_HEADERS[1], "admin")
         _ = urllib.request.urlopen(req)
         raise Exception(
             "Successful request.... something is wrong with the servlet filter configuration..."
@@ -320,7 +320,7 @@ def test_oauth2proxy(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms
 
     # check that user is authorized
     req1 = urllib.request.Request(f"http://{address}:18080/api/v1/applications")
-    req1.add_header(AUTH_PROXY_HEADERS[1], authorized_user)
+    req1.add_header(OAUTH2_PROXY_HEADERS[1], authorized_user)
     apps = json.loads(urllib.request.urlopen(req1).read())
     assert len(apps) == 1
 
