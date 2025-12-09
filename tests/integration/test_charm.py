@@ -217,7 +217,7 @@ def test_oauth2proxy(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms
 
     # Relate Oauth2proxy with the Spark history server charm
     logger.info("Relating the spark history server charm with Oauth2proxy.")
-    juju.integrate(charm_versions.oauth2proxy.application_name, APP_NAME)
+    juju.integrate(charm_versions.oauth2proxy.application_name, f"{APP_NAME}:oauth2-proxy")
 
     juju.wait(lambda status: jubilant.all_blocked(status, APP_NAME), delay=5)
 

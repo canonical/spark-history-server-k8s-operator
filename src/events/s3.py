@@ -28,7 +28,7 @@ class S3Events(BaseEventHandler, WithLogging):
         self.context = context
         self.workload = workload
 
-        self.history_server = HistoryServerManager(self.workload)
+        self.history_server = HistoryServerManager(self.context, self.workload)
 
         self.s3_requirer = S3Requirer(self.charm, self.context.s3_endpoint.relation_name)
         self.framework.observe(

@@ -28,7 +28,7 @@ class AzureStorageEvents(BaseEventHandler, WithLogging):
         self.context = context
         self.workload = workload
 
-        self.history_server = HistoryServerManager(self.workload)
+        self.history_server = HistoryServerManager(self.context, self.workload)
 
         self.azure_storage_requirer = AzureStorageRequires(
             self.charm, self.context.azure_storage_endpoint.relation_name

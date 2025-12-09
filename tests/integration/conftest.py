@@ -76,7 +76,7 @@ def charm_versions() -> IntegrationTestsCharms:
         ),
         oauth2proxy=CharmVersion(
             name="oauth2-proxy-k8s",
-            channel="latest/stable",
+            channel="latest/edge",
             base="ubuntu@22.04",
         ),
         azure_storage=CharmVersion(

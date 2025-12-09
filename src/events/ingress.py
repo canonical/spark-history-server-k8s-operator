@@ -35,7 +35,7 @@ class IngressEvents(BaseEventHandler, WithLogging):
         self.context = context
         self.workload = workload
 
-        self.history_server = HistoryServerManager(self.workload)
+        self.history_server = HistoryServerManager(self.context, self.workload)
 
         self.ingress = IngressPerAppRequirer(
             charm, relation_name=INGRESS, port=18080, strip_prefix=True

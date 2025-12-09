@@ -7,7 +7,13 @@
 import re
 
 from common.utils import WithLogging
-from core.context import AUTH_PROXY_HEADERS, IngressUrl, S3ConnectionInfo
+from core.context import (
+    AUTH_PROXY_HEADERS,
+    OAUTH2_PROXY_HEADERS,
+    Context,
+    IngressUrl,
+    S3ConnectionInfo,
+)
 from core.domain import AzureStorageConnectionInfo
 from core.workload import SparkHistoryWorkloadBase
 from managers.azure_storage import AzureStorageManager
@@ -27,11 +33,13 @@ class HistoryServerConfig(WithLogging):
 
     def __init__(
         self,
+        context: Context,
         s3: S3Manager | None,
         azure: AzureStorageManager | None,
         ingress: IngressUrl | None,
         authorized_users: str | None,
     ):
+        self.context = context
         self.s3 = s3
         self.azure_storage = azure
         self.ingress = ingress
@@ -105,7 +113,9 @@ class HistoryServerConfig(WithLogging):
                 "spark.ui.filters": "com.canonical.charmedspark.history.AuthorizationServletFilter",
                 "spark.com.canonical.charmedspark.history.AuthorizationServletFilter.param.authorizedParameter": AUTH_PROXY_HEADERS[
                     1
-                ],
+                ]
+                if (self.context._oathkeeper_relation)
+                else OAUTH2_PROXY_HEADERS[1],
                 "spark.com.canonical.charmedspark.history.AuthorizationServletFilter.param.authorizedEntities": users,
             }
             if (users := self.authorized_users)
@@ -139,7 +149,8 @@ class HistoryServerConfig(WithLogging):
 class HistoryServerManager(WithLogging):
     """Class exposing general functionalities of the SparkHistoryServer workload."""
 
-    def __init__(self, workload: SparkHistoryWorkloadBase):
+    def __init__(self, context: Context, workload: SparkHistoryWorkloadBase):
+        self.context = context
         self.workload = workload
 
         self.tls = TLSManager(workload)
@@ -159,7 +170,9 @@ class HistoryServerManager(WithLogging):
 
         s3_manager = S3Manager(s3) if s3 else None
         azure_manager = AzureStorageManager(azure) if azure else None
-        config = HistoryServerConfig(s3_manager, azure_manager, ingress, authorized_users)
+        config = HistoryServerConfig(
+            self.context, s3_manager, azure_manager, ingress, authorized_users
+        )
 
         self.workload.write(config.contents, str(self.workload.paths.spark_properties))
         self.workload.set_environment(

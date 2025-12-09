@@ -24,7 +24,7 @@ class HistoryServerEvents(BaseEventHandler, WithLogging):
         self.context = context
         self.workload = workload
 
-        self.history_server = HistoryServerManager(self.workload)
+        self.history_server = HistoryServerManager(self.context, self.workload)
 
         self.framework.observe(
             self.charm.on.spark_history_server_pebble_ready,

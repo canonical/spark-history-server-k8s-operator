@@ -416,6 +416,8 @@ async def test_login(
         headers={"Cookie": f"_oauth2_proxy={history_server_session_cookie}"},
         verify=False,
     )
+    logger.info(f"Response status code from application: {request.status_code}")
+    logger.info(f"Response text from application: {request.text}")
     assert request.status_code == 200
     apps = request.json()
     logger.info(f"Response JSON from application: {request.json()}")
