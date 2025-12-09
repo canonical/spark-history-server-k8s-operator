@@ -66,9 +66,17 @@ class AzureStorageEvents(BaseEventHandler, WithLogging):
         )
 
         self.charm.unit.status = self.get_app_status(
-            self.context.s3, None, self.context.ingress, self.context.auth_proxy_config
+            self.context.s3,
+            None,
+            self.context.ingress,
+            self.context.auth_proxy_config,
+            self.context.oauth2_proxy_config,
         )
         if self.charm.unit.is_leader():
             self.charm.app.status = self.get_app_status(
-                self.context.s3, None, self.context.ingress, self.context.auth_proxy_config
+                self.context.s3,
+                None,
+                self.context.ingress,
+                self.context.auth_proxy_config,
+                self.context.oauth2_proxy_config,
             )

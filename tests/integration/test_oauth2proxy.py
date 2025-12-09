@@ -349,7 +349,7 @@ def test_deploy_iam_bundle(
         timeout=200,
     )
 
-    juju.integrate(charm_versions.oauth2proxy.application_name, f"{APP_NAME}:auth-proxy")
+    juju.integrate(charm_versions.oauth2proxy.application_name, f"{APP_NAME}:oauth2-proxy")
     juju.integrate(f"{APP_NAME}:ingress", charm_versions.ingress.application_name)
 
     juju.wait(

@@ -1,9 +1,13 @@
+# Create a dex deployment for testing purposes
+
+# Create a namespace for dex
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: {{ namespace | d("dex") }}
 ---
+# Create a deployment for dex
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -48,6 +52,7 @@ spec:
           - key: config.yaml
             path: config.yaml
 ---
+# Create a config map with the dex configuration
 kind: ConfigMap
 apiVersion: v1
 metadata:
@@ -79,6 +84,7 @@ data:
       hash: "$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
       username: {{ username | d("admin", true) }}
 ---
+# Create a service to expose dex
 apiVersion: v1
 kind: Service
 metadata:
@@ -94,6 +100,7 @@ spec:
   selector:
     app: dex
 ---
+# Create a service account for dex
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -102,6 +109,7 @@ metadata:
   name: dex
   namespace: {{ namespace | d("dex") }}
 ---
+# Create a cluster role and cluster role binding for dex
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:

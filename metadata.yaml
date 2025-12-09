@@ -49,6 +49,10 @@ requires:
     interface: auth_proxy
     limit: 1
     optional: true
+  oauth2-proxy:
+    interface: auth_proxy
+    limit: 1
+    optional: true
   logging:
     interface: loki_push_api
     description: |

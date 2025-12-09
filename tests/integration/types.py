@@ -42,6 +42,7 @@ class CharmVersion(BaseModel):
 class IntegrationTestsCharms(BaseModel):
     s3: CharmVersion
     ingress: CharmVersion
+    oathkeeper: CharmVersion
     oauth2proxy: CharmVersion
     azure_storage: CharmVersion
     loki: CharmVersion

@@ -7,6 +7,7 @@
 from enum import Enum
 
 from charms.data_platform_libs.v0.data_interfaces import RequirerData
+from charms.oathkeeper.v0.auth_proxy import AuthProxyConfig as OathkeeperAuthProxyConfig
 from charms.oauth2_proxy_k8s.v0.auth_proxy import AuthProxyConfig
 from charms.traefik_k8s.v2.ingress import IngressProviderAppData, IngressUrl
 from ops import ActiveStatus, BlockedStatus, CharmBase, MaintenanceStatus, ModelError, Relation
@@ -16,10 +17,12 @@ from constants import AZURE_RELATION_NAME
 from core.domain import AzureStorageConnectionInfo, S3ConnectionInfo
 
 S3 = "s3-credentials"
+OATHKEEPER = "auth-proxy"
 INGRESS = "ingress"
-AUTH_PROXY = "auth-proxy"
+OAUTH2_PROXY = "oauth2-proxy"
 AUTHORIZED_USERS = "authorized-users"
-AUTH_PROXY_HEADERS = ["X-Auth-Request-User", "X-Auth-Request-Email"]
+AUTH_PROXY_HEADERS = ["X-User", "X-Email"]
+OAUTH2_PROXY_HEADERS = ["X-Auth-Request-User", "X-Auth-Request-Email"]
 AZURE_MANDATORY_OPTIONS = [
     "secret-key",
     "container",
@@ -49,7 +52,11 @@ class Context(WithLogging):
     @property
     def authorized_users(self) -> str | None:
         """The comma-separated list of authorized users."""
-        return self.charm.config[AUTHORIZED_USERS] if self._auth_proxy_relation else None
+        return (
+            self.charm.config[AUTHORIZED_USERS]
+            if (self._oathkeeper_relation or self._oauth2_proxy_relation)
+            else None
+        )
 
     # -----------------
     # --- RELATIONS ---
@@ -71,9 +78,20 @@ class Context(WithLogging):
         return self.charm.model.get_relation(INGRESS)
 
     @property
-    def _auth_proxy_relation(self) -> Relation | None:
+    def _oathkeeper_relation(self) -> Relation | None:
+        """Checks if oathkeeper is related."""
+        relations = list(self.model.relations[OATHKEEPER])
+        if len(relations) > 1:
+            # This should be prevented by endpoint specification which limits
+            # number of units to 1
+            raise ValueError("Cannot handle more than one oathkeeper relation")
+
+        return relations[0] if relations else None
+
+    @property
+    def _oauth2_proxy_relation(self) -> Relation | None:
         """Checks if oauth2_proxy is related."""
-        relations = list(self.model.relations[AUTH_PROXY])
+        relations = list(self.model.relations[OAUTH2_PROXY])
 
         if len(relations) > 1:
             # This should be prevented by endpoint specification which limits
@@ -112,22 +130,26 @@ class Context(WithLogging):
         return IngressProviderAppData.load(databag).ingress
 
     @property
-    def auth_proxy_config(self) -> AuthProxyConfig | None:
+    def oauth2_proxy_config(self) -> AuthProxyConfig | None:
         """Configure the auth proxy relation."""
-        if self._auth_proxy_relation:
+        if self._oauth2_proxy_relation:
             return AuthProxyConfig(
                 protected_urls=[self.ingress.url] if self.ingress else [],
                 allowed_endpoints=[],
-                headers=AUTH_PROXY_HEADERS,
-                # authenticated_emails=AUTH_PROXY_AUTHENTICATED_EMAILS,
-                # authenticated_email_domains=AUTH_PROXY_AUTHENTICATED_EMAIL_DOMAINS
+                headers=OAUTH2_PROXY_HEADERS,
             )
+        else:
+            return None
 
-            # return AuthProxyConfig(
-            #     protected_urls=[self.ingress.url] if self.ingress else [],
-            #     headers=AUTH_PROXY_HEADERS,
-            #     allowed_endpoints=[],
-            # )
+    @property
+    def auth_proxy_config(self) -> OathkeeperAuthProxyConfig | None:
+        """Configure the auth proxy relation."""
+        if self._oathkeeper_relation:
+            return OathkeeperAuthProxyConfig(
+                protected_urls=[self.ingress.url] if self.ingress else [],
+                headers=AUTH_PROXY_HEADERS,
+                allowed_endpoints=[],
+            )
         else:
             return None
 
@@ -176,5 +198,8 @@ class Status(Enum):
     NOT_RUNNING = BlockedStatus("History server not running. Please check logs.")
     MULTIPLE_OBJECT_STORAGE_RELATIONS = BlockedStatus(
         "Spark History Server can be related to only one storage backend at a time."
+    )
+    MULTIPLE_AUTH_PROXY_RELATIONS = BlockedStatus(
+        "Spark History Server can be related to only one auth proxy backend (Oauth2proxy or Authkeeper) at a time."
     )
     ACTIVE = ActiveStatus("")

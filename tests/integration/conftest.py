@@ -6,7 +6,7 @@ import logging
 import os
 import subprocess
 from pathlib import Path
-from typing import Any, AsyncGenerator, Callable, Coroutine, Dict, Generator, Iterable
+from typing import Any, AsyncGenerator, Callable, Coroutine, Generator, Iterable
 
 import boto3
 import boto3.session
@@ -70,6 +70,9 @@ def charm_versions() -> IntegrationTestsCharms:
             base="ubuntu@20.04",
             alias="traefik-k8s",
             trust=True,
+        ),
+        oathkeeper=CharmVersion(
+            name="oathkeeper", channel="edge", base="ubuntu@22.04", trust=True
         ),
         oauth2proxy=CharmVersion(
             name="oauth2-proxy-k8s",
@@ -234,11 +237,13 @@ def history_server_charm() -> Path:
 
 @pytest.fixture(scope="session")
 def client() -> Client:
+    """Provide a Lightkube client for interacting with the cluster."""
     return Client(config=KubeConfig.from_file(KUBECONFIG), field_manager="dex-test")
 
 
 @pytest.fixture(scope="module")
 def event_loop():
+    """Create an instance of the default event loop for each test module."""
     loop = asyncio.get_event_loop()
     yield loop
     loop.close()
@@ -262,7 +267,8 @@ def external_idp_service(
 
 
 @pytest.fixture(scope="module")
-def launch_arguments(pytestconfig: Any) -> Dict:
+def launch_arguments(pytestconfig: Any) -> dict:
+    """Provide launch arguments for the browser."""
     return {
         "headless": not (pytestconfig.getoption("--headed") or os.getenv("HEADFUL", False)),
         "channel": pytestconfig.getoption("--browser-channel"),
@@ -271,12 +277,14 @@ def launch_arguments(pytestconfig: Any) -> Dict:
 
 @pytest_asyncio.fixture(scope="module")
 async def playwright() -> AsyncGenerator[AsyncPlaywright, None]:
+    """Provide an instance of AsyncPlaywright for browser automation."""
     async with async_playwright() as playwright_object:
         yield playwright_object
 
 
 @pytest.fixture(scope="module")
 def browser_type(playwright: AsyncPlaywright, browser_name: str) -> BrowserType:
+    """Provide the browser type based on the selected browser name."""
     if browser_name == "firefox":
         return playwright.firefox
     if browser_name == "webkit":
@@ -286,8 +294,9 @@ def browser_type(playwright: AsyncPlaywright, browser_name: str) -> BrowserType:
 
 @pytest_asyncio.fixture(scope="module")
 async def browser_factory(
-    launch_arguments: Dict, browser_type: BrowserType
+    launch_arguments: dict, browser_type: BrowserType
 ) -> AsyncGenerator[Callable[..., Coroutine[Any, Any, Browser]], None]:
+    """Factory to create browser instances with specified launch arguments."""
     browsers = []
 
     async def launch(**kwargs: Any) -> Browser:
@@ -304,6 +313,7 @@ async def browser_factory(
 async def browser(
     browser_factory: Callable[..., Coroutine[Any, Any, Browser]],
 ) -> AsyncGenerator[Browser, None]:
+    """Provide a browser instance for the test module."""
     browser = await browser_factory()
     yield browser
     await browser.close()
@@ -314,6 +324,7 @@ async def context_factory(
     browser: Browser,
 ) -> AsyncGenerator[Callable[..., Coroutine[Any, Any, BrowserContext]], None]:
     contexts = []
+    """Factory to create browser contexts."""
 
     async def launch(**kwargs: Any) -> BrowserContext:
         context = await browser.new_context(**kwargs)
@@ -329,6 +340,7 @@ async def context_factory(
 async def context(
     context_factory: Callable[..., Coroutine[Any, Any, BrowserContext]],
 ) -> AsyncGenerator[BrowserContext, None]:
+    """Provide a browser context for the test."""
     context = await context_factory(ignore_https_errors=True)
     yield context
     await context.close()
@@ -336,6 +348,7 @@ async def context(
 
 @pytest_asyncio.fixture
 async def page(context: BrowserContext) -> AsyncGenerator[Page, None]:
+    """Provide a browser page for the test."""
     page = await context.new_page()
     yield page
     await page.close()

@@ -9,7 +9,6 @@ import re
 from os.path import join
 from pathlib import Path
 from time import sleep
-from typing import List, Optional
 
 import requests
 from lightkube import Client, KubeConfig, codecs
@@ -89,7 +88,7 @@ class DexIdpService(ExternalIdpService):
     user_password = EXTERNAL_USER_PASSWORD
     _namespace = "dex"
 
-    def __init__(self, client: Optional[Client] = None):
+    def __init__(self, client: Client | None = None):
         if not client:
             client = Client(config=KubeConfig.from_file(KUBECONFIG), field_manager="dex-test")
         self._client = client
@@ -115,7 +114,8 @@ class DexIdpService(ExternalIdpService):
         except ApiError:
             return False
 
-    def _get_dex_manifest(self) -> List[codecs.AnyResource]:
+    def _get_dex_manifest(self) -> list[codecs.AnyResource]:
+        """Get the dex manifest with the correct parameters filled in."""
         temp_issuer_url = None
         try:
             temp_issuer_url = self.issuer_url
@@ -138,7 +138,8 @@ class DexIdpService(ExternalIdpService):
                 },
             )
 
-    def _restart_dex(self) -> List[str]:
+    def _restart_dex(self) -> list[str]:
+        """Restart the dex pods."""
         deleted = []
         for pod in self._client.list(Pod, namespace=self.namespace, labels={"app": "dex"}):
             deleted.append(pod.metadata.name)
@@ -146,6 +147,7 @@ class DexIdpService(ExternalIdpService):
         return deleted
 
     def _apply_dex_resources(self) -> None:
+        """Apply the dex manifest."""
         objs = self._get_dex_manifest()
 
         for obj in objs:
@@ -157,7 +159,8 @@ class DexIdpService(ExternalIdpService):
         logger.info("Waiting for dex to be ready")
         self._wait_until_is_ready(ignore=deleted_pod_names)
 
-    def __wait_until_is_ready(self, ignore: Optional[List[str]] = None) -> None:
+    def __wait_until_is_ready(self, ignore: list[str] | None = None) -> None:
+        """Wait until the dex service is ready."""
         ignore = ignore or []
         ready = False
         while not ready:
@@ -182,7 +185,7 @@ class DexIdpService(ExternalIdpService):
         if resp.status_code != 200:
             raise RuntimeError("Failed to deploy dex")
 
-    def _wait_until_is_ready(self, ignore: Optional[List[str]] = None) -> None:
+    def _wait_until_is_ready(self, ignore: list[str] | None = None) -> None:
         """Wait until the dex service is ready."""
         try:
             self.__wait_until_is_ready(ignore=ignore)
