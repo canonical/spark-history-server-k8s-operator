@@ -233,12 +233,13 @@ def test_history_server_cos_integration(
 
     logger.info("Waiting for test charm to be idle...")
     juju.wait(
-        lambda status: jubilant.all_blocked(status, charm_versions.grafana_agent.application_name)
+        lambda status: jubilant.all_blocked(status, charm_versions.grafana_agent.application_name),
+        delay=30
     )
 
     juju.integrate(charm_versions.grafana_agent.name, f"{APP_NAME}:metrics-endpoint")
     juju.integrate(charm_versions.grafana_agent.name, f"{APP_NAME}:grafana-dashboard")
-    juju.wait(lambda status: jubilant.all_active(status, APP_NAME), delay=10)
+    juju.wait(lambda status: jubilant.all_active(status, APP_NAME), delay=30)
     juju.wait(
         lambda status: jubilant.all_blocked(status, charm_versions.grafana_agent.application_name),
         delay=30,
