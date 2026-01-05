@@ -182,6 +182,13 @@ class DexIdpService(ExternalIdpService):
         conditions = [c for c in current_status.get("conditions", []) if c["status"] == "True"]
         assert any(c["type"] == status for c in conditions)
 
+    @retry(stop=stop_after_attempt(10), wait=wait_fixed(10))
+    def check_dex_health(self):
+        """Check that the dex service is reachable."""
+        resp = requests.get(join(self.issuer_url, ".well-known/openid-configuration"))
+        if resp.status_code != 200:
+            raise RuntimeError("Failed to deploy dex")
+
     def _wait_until_is_ready(self, ignore: list[str] | None = None) -> None:
         """Wait until the dex service is ready."""
         ignore = ignore or []
@@ -193,11 +200,8 @@ class DexIdpService(ExternalIdpService):
             self.assert_pod_status(pod, "Ready")
         # assert deployment is in the correct status
         self.assert_deployment_status("dex", "Available")
-
-        issuer_url = self.issuer_url
-        resp = requests.get(join(issuer_url, ".well-known/openid-configuration"))
-        if resp.status_code != 200:
-            raise RuntimeError("Failed to deploy dex")
+        # check that the dex service is reachable
+        self.check_dex_health()
 
     def create_idp_service(self):
         """Deploy and configure the dex service."""
