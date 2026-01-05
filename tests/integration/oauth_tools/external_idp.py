@@ -8,7 +8,6 @@ import os
 import re
 from os.path import join
 from pathlib import Path
-from time import sleep
 
 import requests
 from lightkube import Client, KubeConfig, codecs
@@ -17,7 +16,7 @@ from lightkube.resources.apps_v1 import Deployment
 from lightkube.resources.core_v1 import Namespace, Pod, Service
 from playwright.async_api import expect
 from playwright.async_api._generated import Page
-from requests.exceptions import RequestException
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 DEX_MANIFESTS = Path(__file__).parent / "dex.yaml"
 KUBECONFIG = os.environ.get("TESTING_KUBECONFIG", "~/.kube/config")
@@ -159,26 +158,41 @@ class DexIdpService(ExternalIdpService):
         logger.info("Waiting for dex to be ready")
         self._wait_until_is_ready(ignore=deleted_pod_names)
 
+    @retry(stop=stop_after_attempt(10), wait=wait_fixed(10))
+    def assert_pod_status(self, pod: Pod, status: str):
+        """Assert that pod status is the desired one."""
+        current_status = self._client.get(
+            Pod,
+            name=str(pod.metadata.name),
+            # for_conditions=["Ready"],
+            namespace=self.namespace,
+        ).status.to_dict()
+        conditions = [c for c in current_status.get("conditions", []) if c["status"] == "True"]
+        assert any(c["type"] == status for c in conditions)
+
+    @retry(stop=stop_after_attempt(10), wait=wait_fixed(10))
+    def assert_deployment_status(self, deployment_name: str, status: str):
+        """Assert that pod status is the desired one."""
+        current_status = self._client.get(
+            Deployment,
+            name=deployment_name,
+            # for_conditions=["Ready"],
+            namespace=self.namespace,
+        ).status.to_dict()
+        conditions = [c for c in current_status.get("conditions", []) if c["status"] == "True"]
+        assert any(c["type"] == status for c in conditions)
+
     def __wait_until_is_ready(self, ignore: list[str] | None = None) -> None:
         """Wait until the dex service is ready."""
         ignore = ignore or []
-        ready = False
-        while not ready:
-            for pod in self._client.list(Pod, namespace=self.namespace, labels={"app": "dex"}):
-                # Some pods may be deleted, if we are restarting
-                if pod.metadata.name in ignore:
-                    continue
-                self._client.wait(
-                    Pod,
-                    pod.metadata.name,
-                    for_conditions=["Ready"],
-                    namespace=self.namespace,
-                )
-                ready = True
-                break
-        self._client.wait(
-            Deployment, "dex", namespace=self.namespace, for_conditions=["Available"]
-        )
+        for pod in self._client.list(Pod, namespace=self.namespace, labels={"app": "dex"}):
+            # Some pods may be deleted, if we are restarting
+            if pod.metadata.name in ignore:
+                continue
+            # assert that dex pod is in the correct status
+            self.assert_pod_status(pod, "Ready")
+        # assert deployment is in the correct status
+        self.assert_deployment_status("dex", "Available")
 
         issuer_url = self.issuer_url
         resp = requests.get(join(issuer_url, ".well-known/openid-configuration"))
@@ -187,11 +201,7 @@ class DexIdpService(ExternalIdpService):
 
     def _wait_until_is_ready(self, ignore: list[str] | None = None) -> None:
         """Wait until the dex service is ready."""
-        try:
-            self.__wait_until_is_ready(ignore=ignore)
-        except (RuntimeError, RequestException):
-            sleep(3)
-            self.__wait_until_is_ready(ignore=ignore)
+        self.__wait_until_is_ready(ignore=ignore)
 
     def create_idp_service(self):
         """Deploy and configure the dex service."""
