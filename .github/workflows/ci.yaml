@@ -57,6 +57,8 @@ jobs:
           - integration-tls
           - integration-azure
           - integration-logs
+          - integration-auth
+          - integration-oathkeeper
         runner:
           - ubuntu-22.04
           - [self-hosted, linux, AMD64, X64, large, jammy]
@@ -64,6 +66,10 @@ jobs:
           - tox-environments: integration-azure # Don't test azure twice
             runner: [self-hosted, linux, AMD64, X64, large, jammy]
           - tox-environments: integration-charm # Don't test charm twice
+            runner: [self-hosted, linux, AMD64, X64, large, jammy]
+          - tox-environments: integration-auth # Don't test auth twice
+            runner: [self-hosted, linux, AMD64, X64, large, jammy]
+          - tox-environments: integration-oathkeeper # Don't test oathkeeper twice
             runner: [self-hosted, linux, AMD64, X64, large, jammy]
 
     name: ${{ matrix.tox-environments }}
@@ -74,6 +80,31 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     steps:
+      - name: Disk cleanup
+        if: ${{ matrix.runner == 'ubuntu-22.04' }}
+        shell: bash
+        run: |
+          sudo rm -rf \
+            /opt/google \
+            /opt/hostedtoolcache \
+            /opt/microsoft/powershell \
+            /opt/microsoft/msedge \
+            "$AGENT_TOOLSDIRECTORY" \
+            /usr/lib/firefox \
+            /usr/lib/mono \
+            /usr/local/julia* \
+            /usr/local/lib/android \
+            /usr/local/share/chromium \
+            /usr/local/share/powershell \
+            /usr/share/dotnet \
+            /usr/share/gradle* \
+            /usr/share/miniconda \
+            /usr/share/sbt \
+            /usr/share/swift \
+            /home/linuxbrew
+          pipx uninstall-all
+          printf '\nDisk usage\n'
+          df --human-readable
       - name: Checkout
         uses: actions/checkout@v6
       - name: Install Java

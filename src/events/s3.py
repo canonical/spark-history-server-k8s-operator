@@ -28,7 +28,7 @@ class S3Events(BaseEventHandler, WithLogging):
         self.context = context
         self.workload = workload
 
-        self.history_server = HistoryServerManager(self.workload)
+        self.history_server = HistoryServerManager(self.context, self.workload)
 
         self.s3_requirer = S3Requirer(self.charm, self.context.s3_endpoint.relation_name)
         self.framework.observe(
@@ -60,7 +60,11 @@ class S3Events(BaseEventHandler, WithLogging):
         )
 
         self.charm.unit.status = self.get_app_status(
-            None, self.context.azure_storage, self.context.ingress, self.context.auth_proxy_config
+            None,
+            self.context.azure_storage,
+            self.context.ingress,
+            self.context.auth_proxy_config,
+            self.context.oauth2_proxy_config,
         )
         if self.charm.unit.is_leader():
             self.charm.app.status = self.get_app_status(
@@ -68,4 +72,5 @@ class S3Events(BaseEventHandler, WithLogging):
                 self.context.azure_storage,
                 self.context.ingress,
                 self.context.auth_proxy_config,
+                self.context.oauth2_proxy_config,
             )

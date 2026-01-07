@@ -9,7 +9,14 @@ from typing import Callable
 
 from ops import CharmBase, EventBase, Object, StatusBase
 
-from core.context import AuthProxyConfig, Context, IngressUrl, S3ConnectionInfo, Status
+from core.context import (
+    AuthProxyConfig,
+    Context,
+    IngressUrl,
+    OathkeeperAuthProxyConfig,
+    S3ConnectionInfo,
+    Status,
+)
 from core.domain import AzureStorageConnectionInfo
 from core.workload import SparkHistoryWorkloadBase
 from managers.s3 import S3Manager
@@ -27,7 +34,8 @@ class BaseEventHandler(Object):
         s3: S3ConnectionInfo | None,
         azure: AzureStorageConnectionInfo | None,
         ingress: IngressUrl | None,
-        oathkeeper: AuthProxyConfig | None,
+        auth_proxy: OathkeeperAuthProxyConfig | None,
+        oauth2_proxy: AuthProxyConfig | None,
     ) -> StatusBase:
         """Return the status of the charm."""
         if not self.workload.ready():
@@ -49,7 +57,10 @@ class BaseEventHandler(Object):
         if not self.workload.active():
             return Status.NOT_RUNNING.value
 
-        if oathkeeper and not ingress:
+        if auth_proxy and oauth2_proxy:
+            return Status.MULTIPLE_AUTH_PROXY_RELATIONS.value
+
+        if (auth_proxy or oauth2_proxy) and not ingress:
             return Status.MISSING_INGRESS_RELATION.value
 
         return Status.ACTIVE.value
@@ -70,12 +81,14 @@ def compute_status(
                 event_handler.context.azure_storage,
                 event_handler.context.ingress,
                 event_handler.context.auth_proxy_config,
+                event_handler.context.oauth2_proxy_config,
             )
         event_handler.charm.unit.status = event_handler.get_app_status(
             event_handler.context.s3,
             event_handler.context.azure_storage,
             event_handler.context.ingress,
             event_handler.context.auth_proxy_config,
+            event_handler.context.oauth2_proxy_config,
         )
         return res
 

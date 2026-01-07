@@ -28,7 +28,7 @@ class AzureStorageEvents(BaseEventHandler, WithLogging):
         self.context = context
         self.workload = workload
 
-        self.history_server = HistoryServerManager(self.workload)
+        self.history_server = HistoryServerManager(self.context, self.workload)
 
         self.azure_storage_requirer = AzureStorageRequires(
             self.charm, self.context.azure_storage_endpoint.relation_name
@@ -66,9 +66,17 @@ class AzureStorageEvents(BaseEventHandler, WithLogging):
         )
 
         self.charm.unit.status = self.get_app_status(
-            self.context.s3, None, self.context.ingress, self.context.auth_proxy_config
+            self.context.s3,
+            None,
+            self.context.ingress,
+            self.context.auth_proxy_config,
+            self.context.oauth2_proxy_config,
         )
         if self.charm.unit.is_leader():
             self.charm.app.status = self.get_app_status(
-                self.context.s3, None, self.context.ingress, self.context.auth_proxy_config
+                self.context.s3,
+                None,
+                self.context.ingress,
+                self.context.auth_proxy_config,
+                self.context.oauth2_proxy_config,
             )

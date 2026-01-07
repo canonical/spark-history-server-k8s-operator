@@ -24,7 +24,7 @@ class HistoryServerEvents(BaseEventHandler, WithLogging):
         self.context = context
         self.workload = workload
 
-        self.history_server = HistoryServerManager(self.workload)
+        self.history_server = HistoryServerManager(self.context, self.workload)
 
         self.framework.observe(
             self.charm.on.spark_history_server_pebble_ready,
@@ -59,12 +59,17 @@ class HistoryServerEvents(BaseEventHandler, WithLogging):
             self.context.authorized_users,
         )
         self.charm.unit.status = self.get_app_status(
-            self.context.s3, self.context.azure_storage, self.context.ingress, None
+            self.context.s3,
+            self.context.azure_storage,
+            self.context.ingress,
+            self.context.auth_proxy_config,
+            self.context.oauth2_proxy_config,
         )
         if self.charm.unit.is_leader():
             self.charm.app.status = self.get_app_status(
                 self.context.s3,
                 self.context.azure_storage,
                 self.context.ingress,
-                self.context.authorized_users,  # type: ignore
+                self.context.auth_proxy_config,
+                self.context.oauth2_proxy_config,
             )
