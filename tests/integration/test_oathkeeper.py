@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-# Copyright 2024 Canonical Limited
+# Copyright 2026 Canonical Limited
 # See LICENSE file for licensing details.
-
-# Integration Tests TBD separately in next pulse
 
 import json
 import logging
