@@ -33,6 +33,7 @@ def test_build_and_deploy(
     charm_versions: IntegrationTestsCharms,
     history_server_charm: Path,
     s3_bucket_and_creds: S3Info,
+    platform: str,
 ) -> None:
     """Build the charm-under-test and deploy it together with related charms.
 
@@ -65,9 +66,14 @@ def test_build_and_deploy(
     logger.info("Deploying charm")
 
     # Deploy the charm and wait for waiting status
-    juju.deploy(**charm_versions.s3.deploy_dict())
+    juju.deploy(**charm_versions.s3.deploy_dict(), constraints={"arch": platform})
     juju.deploy(
-        history_server_charm, resources=resources, app=APP_NAME, num_units=1, base="ubuntu@22.04"
+        history_server_charm,
+        resources=resources,
+        app=APP_NAME,
+        num_units=1,
+        base="ubuntu@22.04",
+        constraints={"arch": platform},
     )
     juju.wait(jubilant.all_agents_idle, timeout=1000)
 
@@ -141,13 +147,15 @@ def test_build_and_deploy(
     assert len(apps) == 1
 
 
-def test_ingress(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) -> None:
+def test_ingress(
+    juju: jubilant.Juju, charm_versions: IntegrationTestsCharms, platform: str
+) -> None:
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
     """
     # Deploy the charm and wait for waiting status
-    juju.deploy(**charm_versions.ingress.deploy_dict())
+    juju.deploy(**charm_versions.ingress.deploy_dict(), constraints={"arch": platform})
     juju.wait(
         lambda status: jubilant.all_active(status, charm_versions.ingress.application_name),
         delay=10,
@@ -177,7 +185,9 @@ def test_ingress(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) ->
     logger.info(f"Number of apps: {len(apps)}")
 
 
-def test_oauth2proxy(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) -> None:
+def test_oauth2proxy(
+    juju: jubilant.Juju, charm_versions: IntegrationTestsCharms, platform: str
+) -> None:
     """Test the integration of the spark history server with Oauth2proxy.
 
     Assert that the proxied-enpoints of the ingress are protected (err code 401).
@@ -189,11 +199,13 @@ def test_oauth2proxy(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms
     juju.wait(jubilant.all_active, delay=10)
 
     # Deploy the self-signed-certificates charm
-    juju.deploy(**charm_versions.self_signed_certificate.deploy_dict())
+    juju.deploy(
+        **charm_versions.self_signed_certificate.deploy_dict(), constraints={"arch": platform}
+    )
     juju.wait(jubilant.all_active, delay=10)
 
     # Deploy the oauth2proxy charm and wait for waiting status
-    juju.deploy(**charm_versions.oauth2proxy.deploy_dict())
+    juju.deploy(**charm_versions.oauth2proxy.deploy_dict(), constraints={"arch": platform})
     juju.wait(jubilant.all_active, delay=10)
 
     # configure Oauth2proxy charm

@@ -31,6 +31,7 @@ def test_build_and_deploy(
     charm_versions: IntegrationTestsCharms,
     azure_storage_credentials: AzureInfo,
     history_server_charm: Path,
+    platform: str,
 ) -> None:
     """Build the charm-under-test and deploy it together with related charms.
 
@@ -57,13 +58,14 @@ def test_build_and_deploy(
     logger.info("Deploying charm")
 
     # Deploy the charm and wait for waiting status
-    juju.deploy(**charm_versions.azure_storage.deploy_dict())
+    juju.deploy(**charm_versions.azure_storage.deploy_dict(), constraints={"arch": platform})
     juju.deploy(
         history_server_charm,
         resources=resources,
         app=APP_NAME,
         num_units=1,
         base="ubuntu@22.04",
+        constraints={"arch": platform},
     )
 
     juju.wait(

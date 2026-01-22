@@ -35,6 +35,7 @@ def test_build_and_deploy(
     charm_versions: IntegrationTestsCharms,
     history_server_charm: Path,
     s3_bucket_and_creds: S3Info,
+    platform: str,
 ) -> None:
     """Build the charm-under-test and deploy it together with related charms.
 
@@ -54,10 +55,15 @@ def test_build_and_deploy(
 
     logger.info("Deploying charms")
     # Deploy the charm and wait for waiting status
-    juju.deploy(**charm_versions.s3.deploy_dict())
-    juju.deploy(**charm_versions.loki.deploy_dict())
+    juju.deploy(**charm_versions.s3.deploy_dict(), constraints={"arch": platform})
+    juju.deploy(**charm_versions.loki.deploy_dict(), constraints={"arch": platform})
     juju.deploy(
-        history_server_charm, resources=resources, app=APP_NAME, num_units=1, base="ubuntu@22.04"
+        history_server_charm,
+        resources=resources,
+        app=APP_NAME,
+        num_units=1,
+        base="ubuntu@22.04",
+        constraints={"arch": platform},
     )
     juju.wait(jubilant.all_agents_idle, timeout=1000)
 
@@ -218,7 +224,7 @@ def test_loki_integration(
 
 
 def test_history_server_cos_integration(
-    juju: jubilant.Juju, charm_versions: IntegrationTestsCharms
+    juju: jubilant.Juju, charm_versions: IntegrationTestsCharms, platform: str
 ) -> None:
     """Check that the integration with cos work correctly.
 
@@ -229,7 +235,7 @@ def test_history_server_cos_integration(
 
     # Deploying and relating to grafana-agent
     logger.info("Deploying grafana-agent-k8s charm...")
-    juju.deploy(**charm_versions.grafana_agent.deploy_dict())
+    juju.deploy(**charm_versions.grafana_agent.deploy_dict(), constraints={"arch": platform})
 
     logger.info("Waiting for test charm to be idle...")
     juju.wait(

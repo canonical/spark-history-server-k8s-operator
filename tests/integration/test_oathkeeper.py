@@ -28,6 +28,7 @@ def test_build_and_deploy(
     charm_versions: IntegrationTestsCharms,
     history_server_charm: Path,
     s3_bucket_and_creds: S3Info,
+    platform: str,
 ) -> None:
     """Build the charm-under-test and deploy it together with related charms.
 
@@ -60,9 +61,14 @@ def test_build_and_deploy(
     logger.info("Deploying charm")
 
     # Deploy the charm and wait for waiting status
-    juju.deploy(**charm_versions.s3.deploy_dict())
+    juju.deploy(**charm_versions.s3.deploy_dict(), constraints={"arch": platform})
     juju.deploy(
-        history_server_charm, resources=resources, app=APP_NAME, num_units=1, base="ubuntu@22.04"
+        history_server_charm,
+        resources=resources,
+        app=APP_NAME,
+        num_units=1,
+        base="ubuntu@22.04",
+        constraints={"arch": platform},
     )
     juju.wait(jubilant.all_agents_idle, timeout=1000)
 
@@ -136,13 +142,15 @@ def test_build_and_deploy(
     assert len(apps) == 1
 
 
-def test_ingress(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) -> None:
+def test_ingress(
+    juju: jubilant.Juju, charm_versions: IntegrationTestsCharms, platform: str
+) -> None:
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
     """
     # Deploy the charm and wait for waiting status
-    juju.deploy(**charm_versions.ingress.deploy_dict())
+    juju.deploy(**charm_versions.ingress.deploy_dict(), constraints={"arch": platform})
     juju.wait(
         lambda status: jubilant.all_active(status, charm_versions.ingress.application_name),
         delay=10,
@@ -173,8 +181,7 @@ def test_ingress(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) ->
 
 
 def test_oathkeeper_integration(
-    juju: jubilant.Juju,
-    charm_versions: IntegrationTestsCharms,
+    juju: jubilant.Juju, charm_versions: IntegrationTestsCharms, platform: str
 ) -> None:
     """Test Oathkeeper integration with the history server charm."""
     # remove relation between ingress and spark-history server
@@ -183,7 +190,7 @@ def test_oathkeeper_integration(
     )
     juju.wait(jubilant.all_active, delay=5)
     # Deploy the oathkeeper charm and wait for waiting status
-    juju.deploy(**charm_versions.oathkeeper.deploy_dict())
+    juju.deploy(**charm_versions.oathkeeper.deploy_dict(), constraints={"arch": platform})
     juju.wait(jubilant.all_active, delay=10)
 
     # configure Oathkeeper charm

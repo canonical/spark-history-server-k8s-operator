@@ -87,6 +87,7 @@ def test_build_and_deploy(
     charm_versions: IntegrationTestsCharms,
     history_server_charm: Path,
     s3_bucket_and_creds: S3Info,
+    platform: str,
 ) -> None:
     """Build the charm-under-test and deploy it together with related charms.
 
@@ -121,9 +122,14 @@ def test_build_and_deploy(
     logger.info("Deploying charm")
 
     # Deploy the charm and wait for waiting status
-    juju.deploy(**charm_versions.s3.deploy_dict())
+    juju.deploy(**charm_versions.s3.deploy_dict(), constraints={"arch": platform})
     juju.deploy(
-        history_server_charm, resources=resources, app=APP_NAME, num_units=1, base="ubuntu@22.04"
+        history_server_charm,
+        resources=resources,
+        app=APP_NAME,
+        num_units=1,
+        base="ubuntu@22.04",
+        constraints={"arch": platform},
     )
     juju.wait(jubilant.all_agents_idle, timeout=1000)
 
@@ -202,18 +208,27 @@ def test_deploy_iam_bundle(
     juju: jubilant.Juju,
     charm_versions: IntegrationTestsCharms,
     external_idp_service: ExternalIdpService,
+    platform: str,
 ) -> None:
     """Deploy the iam bundle."""
     # Deploy all charms necessary for Oauth2proxy integration
-    juju.deploy(**charm_versions.ingress.deploy_dict())
-    juju.deploy(**charm_versions.postgresql.deploy_dict())
-    juju.deploy(**charm_versions.self_signed_certificate.deploy_dict())
-    juju.deploy(**charm_versions.hydra.deploy_dict())
-    juju.deploy(**charm_versions.kratos.deploy_dict())
-    juju.deploy(**charm_versions.identity_platform_login_ui_operator.deploy_dict())
-    juju.deploy(**charm_versions.kratos_external_idp_integrator.deploy_dict())
+    juju.deploy(**charm_versions.ingress.deploy_dict(), constraints={"arch": platform})
+    juju.deploy(**charm_versions.postgresql.deploy_dict(), constraints={"arch": platform})
+    juju.deploy(
+        **charm_versions.self_signed_certificate.deploy_dict(), constraints={"arch": platform}
+    )
+    juju.deploy(**charm_versions.hydra.deploy_dict(), constraints={"arch": platform})
+    juju.deploy(**charm_versions.kratos.deploy_dict(), constraints={"arch": platform})
+    juju.deploy(
+        **charm_versions.identity_platform_login_ui_operator.deploy_dict(),
+        constraints={"arch": platform},
+    )
+    juju.deploy(
+        **charm_versions.kratos_external_idp_integrator.deploy_dict(),
+        constraints={"arch": platform},
+    )
 
-    juju.deploy(**charm_versions.oauth2proxy.deploy_dict())
+    juju.deploy(**charm_versions.oauth2proxy.deploy_dict(), constraints={"arch": platform})
 
     juju.integrate(
         charm_versions.self_signed_certificate.application_name,
