@@ -35,11 +35,12 @@ KUBECONFIG = os.environ.get("TESTING_KUBECONFIG", "~/.kube/config")
 
 
 @pytest.fixture(scope="module")
-def juju(request: pytest.FixtureRequest):
+def juju(request: pytest.FixtureRequest, platform: str):
     keep_models = bool(request.config.getoption("--keep-models"))
 
     with jubilant.temp_model(keep=keep_models) as juju:
         juju.wait_timeout = 10 * 60
+        juju.cli("set-model-constraints", f"arch={platform}")
 
         yield juju  # run the test
 
