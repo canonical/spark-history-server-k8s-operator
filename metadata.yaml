@@ -20,7 +20,7 @@ website:
   - https://ubuntu.com/data/spark
   - https://charmhub.io/spark-k8s-bundle
   - https://github.com/canonical/spark-history-server-k8s-operator
-  - https://matrix.to/#/#charmhub-analytics:ubuntu.com
+  - https://matrix.to/#/%23charmhub-analytics%3Aubuntu.com
 maintainers:
   - Canonical Data Platform <data-platform@lists.launchpad.net>
 
