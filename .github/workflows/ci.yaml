@@ -46,7 +46,9 @@ jobs:
 
   build:
     name: Build charms
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v40.0.2
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v41.1.0
+    with:
+      cache: false
 
   integration-test:
     strategy:
@@ -61,18 +63,29 @@ jobs:
           - integration-oathkeeper
         runner:
           - ubuntu-22.04
-          - [self-hosted, linux, AMD64, X64, large, jammy]
+          - ubuntu-22.04-arm
+          - self-hosted-linux-amd64-jammy-large
         exclude:
           - tox-environments: integration-azure # Don't test azure twice
-            runner: [self-hosted, linux, AMD64, X64, large, jammy]
+            runner: self-hosted-linux-amd64-jammy-large
           - tox-environments: integration-charm # Don't test charm twice
-            runner: [self-hosted, linux, AMD64, X64, large, jammy]
+            runner: self-hosted-linux-amd64-jammy-large
           - tox-environments: integration-auth # Don't test auth twice
-            runner: [self-hosted, linux, AMD64, X64, large, jammy]
+            runner: self-hosted-linux-amd64-jammy-large
           - tox-environments: integration-oathkeeper # Don't test oathkeeper twice
-            runner: [self-hosted, linux, AMD64, X64, large, jammy]
+            runner: self-hosted-linux-amd64-jammy-large
 
-    name: ${{ matrix.tox-environments }}
+          - tox-environments: integration-azure # Don't test azure twice
+            runner: ubuntu-22.04-arm
+          - tox-environments: integration-logs # No ARM build for obs charms
+            runner: ubuntu-22.04-arm
+          - tox-environments: integration-charm # No ARM build for oauth2proxy
+            runner: ubuntu-22.04-arm
+          - tox-environments: integration-auth # No ARM build for oauth2proxy
+            runner: ubuntu-22.04-arm
+          - tox-environments: integration-oathkeeper # No ARM build for oathkeeper
+            runner: ubuntu-22.04-arm
+    name: ${{ matrix.tox-environments }} ${{ matrix.runner }}
     needs:
       - lint
       - unit-test
@@ -143,6 +156,7 @@ jobs:
           echo -e "S3_SERVER_URL=http://$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc'):80/\nS3_ACCESS_KEY=foo\nS3_SECRET_KEY=bar" > .env
       - name: Setup Azure CLI
         id: Azure
+        if: ${{ matrix.tox-environments == 'integration-azure' }}
         run: |
           sudo snap install azcli
       - name: Download packed charm(s)

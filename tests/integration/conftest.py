@@ -6,6 +6,7 @@ import logging
 import os
 import subprocess
 from pathlib import Path
+from platform import machine
 from typing import Any, AsyncGenerator, Callable, Coroutine, Generator, Iterable
 
 import boto3
@@ -34,11 +35,12 @@ KUBECONFIG = os.environ.get("TESTING_KUBECONFIG", "~/.kube/config")
 
 
 @pytest.fixture(scope="module")
-def juju(request: pytest.FixtureRequest):
+def juju(request: pytest.FixtureRequest, platform: str):
     keep_models = bool(request.config.getoption("--keep-models"))
 
     with jubilant.temp_model(keep=keep_models) as juju:
         juju.wait_timeout = 10 * 60
+        juju.cli("set-model-constraints", f"arch={platform}")
 
         yield juju  # run the test
 
@@ -227,9 +229,19 @@ def s3_bucket_and_creds(request: pytest.FixtureRequest) -> Iterable[S3Info]:
 
 
 @pytest.fixture(scope="module")
-def history_server_charm() -> Path:
+def platform() -> str:
+    """Fixture to provide the platform architecture for testing."""
+    platforms = {
+        "x86_64": "amd64",
+        "aarch64": "arm64",
+    }
+    return platforms.get(machine(), "amd64")
+
+
+@pytest.fixture(scope="module")
+def history_server_charm(platform: str) -> Path:
     """Path to the packed history server charm."""
-    if not (path := next(iter(Path.cwd().glob("*.charm")), None)):
+    if not (path := next(iter(Path.cwd().glob(f"*-{platform}.charm")), None)):
         raise FileNotFoundError("Could not find packed history server charm.")
 
     return path
