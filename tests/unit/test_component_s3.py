@@ -46,7 +46,7 @@ def test_bucket_created_on_verify(s3: S3Client) -> None:
     connection_info.bucket = bucket_name
     connection_info.path = "path"
     connection_info.tls_ca_chain = []
-    connection_info.region = ""
+    connection_info.region = "us-east-1"
     s3_manager = S3Manager(connection_info)
 
     assert not len(s3.list_buckets()["Buckets"])
@@ -72,7 +72,7 @@ def test_bucket_existing_path_created_on_verify(s3: S3Client) -> None:
     connection_info.bucket = bucket_name
     connection_info.path = "path"
     connection_info.tls_ca_chain = []
-    connection_info.region = ""
+    connection_info.region = "us-east-1"
     s3_manager = S3Manager(connection_info)
 
     s3.create_bucket(Bucket=bucket_name)
@@ -99,7 +99,7 @@ def test_path_existing_still_ok_on_verify(s3: S3Client) -> None:
     connection_info.bucket = bucket_name
     connection_info.path = "path"
     connection_info.tls_ca_chain = []
-    connection_info.region = ""
+    connection_info.region = "us-east-1"
     s3_manager = S3Manager(connection_info)
 
     s3.create_bucket(Bucket=bucket_name)
