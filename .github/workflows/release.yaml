@@ -57,7 +57,7 @@ jobs:
     needs:
       - release-checks
       - ci-tests
-    uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v41.1.0
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v41.1.2
     with:
       track: ${{ needs.release-checks.outputs.track }}
       artifact-prefix: ${{ needs.ci-tests.outputs.artifact-prefix }}
