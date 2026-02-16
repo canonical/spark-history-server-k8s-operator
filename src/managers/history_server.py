@@ -70,14 +70,15 @@ class HistoryServerConfig(WithLogging):
     def _s3_conf(self) -> dict[str, str]:
         if (s3 := self.s3) and s3.verify():
             return {
-                "spark.hadoop.fs.s3a.endpoint": s3.config.endpoint or "https://s3.amazonaws.com",
-                "spark.hadoop.fs.s3a.access.key": s3.config.access_key,
-                "spark.hadoop.fs.s3a.secret.key": s3.config.secret_key,
-                "spark.eventLog.dir": s3.config.log_dir,
-                "spark.history.fs.logDirectory": s3.config.log_dir,
+                "spark.hadoop.fs.s3a.endpoint": s3.connection_info.endpoint
+                or "https://s3.amazonaws.com",
+                "spark.hadoop.fs.s3a.access.key": s3.connection_info.access_key,
+                "spark.hadoop.fs.s3a.secret.key": s3.connection_info.secret_key,
+                "spark.eventLog.dir": s3.connection_info.log_dir,
+                "spark.history.fs.logDirectory": s3.connection_info.log_dir,
                 "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
                 "spark.hadoop.fs.s3a.connection.ssl.enabled": self._ssl_enabled(
-                    s3.config.endpoint
+                    s3.connection_info.endpoint
                 ),
             }
         return {}
