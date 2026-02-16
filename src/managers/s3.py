@@ -6,18 +6,18 @@
 
 from __future__ import annotations
 
+import ipaddress
 import os
 import tempfile
 from functools import cached_property
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 import boto3
 from botocore.client import Config
-from botocore.exceptions import ClientError, SSLError, ProxyConnectionError
+from botocore.exceptions import ClientError, ProxyConnectionError, SSLError
 from tenacity import retry, retry_if_exception_cause_type, stop_after_attempt, wait_fixed
 
-from urllib.parse import urlparse
-import ipaddress
 from common.utils import WithLogging
 from core.domain import S3ConnectionInfo
 
