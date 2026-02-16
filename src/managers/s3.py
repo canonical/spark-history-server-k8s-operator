@@ -13,14 +13,48 @@ from typing import TYPE_CHECKING
 
 import boto3
 from botocore.client import Config
-from botocore.exceptions import ClientError, SSLError
+from botocore.exceptions import ClientError, SSLError, ProxyConnectionError
 from tenacity import retry, retry_if_exception_cause_type, stop_after_attempt, wait_fixed
 
+from urllib.parse import urlparse
+import ipaddress
 from common.utils import WithLogging
 from core.domain import S3ConnectionInfo
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.client import S3Client
+
+
+def is_proxy_skipped(endpoint: str) -> bool:
+    """Determine if proxy should not be applied for the given endpoint."""
+    no_proxy_list = os.environ.get("JUJU_CHARM_NO_PROXY", "")
+    if not no_proxy_list:
+        return False
+
+    host = urlparse(endpoint).hostname
+    if not host:
+        return False
+    no_proxy_entries = [
+        entry.strip().lower() for entry in no_proxy_list.split(",") if entry.strip()
+    ]
+    for entry in no_proxy_entries:
+        if host == entry:
+            return True
+        elif entry.startswith(".") and host.endswith(
+            entry
+        ):  # abc.example.com matches .example.com
+            return True
+        elif host.endswith("." + entry):  # abc.example.com matches example.com
+            return True
+        try:
+            if ipaddress.ip_address(host) in ipaddress.ip_network(
+                entry, strict=False
+            ):  # CIDR match
+                return True
+        except (AttributeError, ValueError):
+            continue
+
+    return False
 
 
 class S3Manager(WithLogging):
@@ -74,6 +108,14 @@ class S3Manager(WithLogging):
 
     def verify(self) -> bool:
         """Verify S3 credentials and configuration."""
+        proxy_config: dict[str, str] = {}
+
+        if not is_proxy_skipped(self.connection_info.endpoint or ""):
+            if os.environ.get("JUJU_CHARM_HTTPS_PROXY"):
+                proxy_config["https"] = os.environ["JUJU_CHARM_HTTPS_PROXY"]
+            if os.environ.get("JUJU_CHARM_HTTP_PROXY"):
+                proxy_config["http"] = os.environ["JUJU_CHARM_HTTP_PROXY"]
+
         with tempfile.NamedTemporaryFile() as ca_file:
             if tls_ca_chain := self.connection_info.tls_ca_chain:
                 ca_file.write("\n".join(tls_ca_chain).encode())
@@ -87,6 +129,7 @@ class S3Manager(WithLogging):
                 config=Config(
                     request_checksum_calculation="when_supported",
                     response_checksum_validation="when_supported",
+                    proxies=proxy_config,
                 ),
             )
 
@@ -98,6 +141,8 @@ class S3Manager(WithLogging):
             except SSLError as ssl_error:
                 self.logger.error(f"SSL validation failed... {ssl_error}")
                 return False
+            except ProxyConnectionError as proxy_error:
+                self.logger.error(f"Could not communicate with/through proxy {proxy_error}")
             except Exception as e:
                 self.logger.error(f"S3 related error {e}")
                 return False
