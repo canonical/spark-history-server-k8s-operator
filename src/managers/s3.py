@@ -6,55 +6,21 @@
 
 from __future__ import annotations
 
-import ipaddress
 import os
 import tempfile
 from functools import cached_property
 from typing import TYPE_CHECKING
-from urllib.parse import urlparse
 
 import boto3
 from botocore.client import Config
 from botocore.exceptions import ClientError, ProxyConnectionError, SSLError
 from tenacity import retry, retry_if_exception_cause_type, stop_after_attempt, wait_fixed
 
-from common.utils import WithLogging
+from common.utils import WithLogging, is_proxy_skipped
 from core.domain import S3ConnectionInfo
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.client import S3Client
-
-
-def is_proxy_skipped(endpoint: str) -> bool:
-    """Determine if proxy should not be applied for the given endpoint."""
-    no_proxy_list = os.environ.get("JUJU_CHARM_NO_PROXY", "")
-    if not no_proxy_list:
-        return False
-
-    host = urlparse(endpoint).hostname
-    if not host:
-        return False
-    no_proxy_entries = [
-        entry.strip().lower() for entry in no_proxy_list.split(",") if entry.strip()
-    ]
-    for entry in no_proxy_entries:
-        if host == entry:
-            return True
-        elif entry.startswith(".") and host.endswith(
-            entry
-        ):  # abc.example.com matches .example.com
-            return True
-        elif host.endswith("." + entry):  # abc.example.com matches example.com
-            return True
-        try:
-            if ipaddress.ip_address(host) in ipaddress.ip_network(
-                entry, strict=False
-            ):  # CIDR match
-                return True
-        except (AttributeError, ValueError):
-            continue
-
-    return False
 
 
 class S3Manager(WithLogging):
