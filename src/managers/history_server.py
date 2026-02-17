@@ -4,9 +4,11 @@
 
 """History Server manager."""
 
+import os
 import re
+from urllib.parse import ParseResult, urlparse
 
-from common.utils import WithLogging
+from common.utils import WithLogging, is_proxy_skipped
 from core.context import (
     AUTH_PROXY_HEADERS,
     OAUTH2_PROXY_HEADERS,
@@ -68,20 +70,76 @@ class HistoryServerConfig(WithLogging):
 
     @property
     def _s3_conf(self) -> dict[str, str]:
-        if (s3 := self.s3) and s3.verify():
-            return {
-                "spark.hadoop.fs.s3a.endpoint": s3.connection_info.endpoint
-                or "https://s3.amazonaws.com",
-                "spark.hadoop.fs.s3a.access.key": s3.connection_info.access_key,
-                "spark.hadoop.fs.s3a.secret.key": s3.connection_info.secret_key,
-                "spark.eventLog.dir": s3.connection_info.log_dir,
-                "spark.history.fs.logDirectory": s3.connection_info.log_dir,
-                "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-                "spark.hadoop.fs.s3a.connection.ssl.enabled": self._ssl_enabled(
-                    s3.connection_info.endpoint
+        if (s3 := self.s3) is None or not s3.verify():
+            return {}
+
+        base_s3_conf = {
+            "spark.hadoop.fs.s3a.endpoint": s3.connection_info.endpoint
+            or "https://s3.amazonaws.com",
+            "spark.hadoop.fs.s3a.access.key": s3.connection_info.access_key,
+            "spark.hadoop.fs.s3a.secret.key": s3.connection_info.secret_key,
+            "spark.eventLog.dir": s3.connection_info.log_dir,
+            "spark.history.fs.logDirectory": s3.connection_info.log_dir,
+            "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
+            "spark.hadoop.fs.s3a.connection.ssl.enabled": self._ssl_enabled(
+                s3.connection_info.endpoint
+            ),
+        }
+
+        # Assigns the first non empty proxy url or defaults to an empty string
+        proxy_url = next(
+            filter(
+                None,
+                (
+                    os.environ.get("JUJU_CHARM_HTTP_PROXY", ""),
+                    os.environ.get("JUJU_CHARM_HTTPS_PROXY", ""),
                 ),
-            }
-        return {}
+            ),
+            "",
+        )
+        if is_proxy_skipped(s3.connection_info.endpoint):
+            proxy_conf = {}
+        else:
+            match urlparse(proxy_url):
+                case ParseResult(
+                    username=str(username),
+                    password=str(password),
+                    hostname=str(hostname),
+                    port=port,
+                    scheme=scheme,
+                ) if scheme in ("http", "https"):
+                    port = port if port else 80
+
+                    proxy_conf = {
+                        "spark.hadoop.fs.s3a.proxy.host": hostname,
+                        "spark.hadoop.fs.s3a.proxy.ssl.enabled": "true"
+                        if scheme == "https"
+                        else "false",
+                        "spark.hadoop.fs.s3a.proxy.port": port,
+                        "spark.hadoop.fs.s3a.proxy.username": username,
+                        "spark.hadoop.fs.s3a.proxy.password": password,
+                    }
+
+                case ParseResult(
+                    username=None,
+                    password=None,
+                    hostname=str(hostname),
+                    port=port,
+                    scheme=scheme,
+                ) if scheme in ("http", "https"):
+                    port = port if port else 80
+                    proxy_conf = {
+                        "spark.hadoop.fs.s3a.proxy.host": hostname,
+                        "spark.hadoop.fs.s3a.proxy.ssl.enabled": "true"
+                        if scheme == "https"
+                        else "false",
+                        "spark.hadoop.fs.s3a.proxy.port": port,
+                    }
+
+                case _:
+                    proxy_conf = {}
+
+        return base_s3_conf | proxy_conf
 
     @property
     def _azure_storage_conf(self) -> dict[str, str]:
