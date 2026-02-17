@@ -143,6 +143,7 @@ class S3Manager(WithLogging):
                 return False
             except ProxyConnectionError as proxy_error:
                 self.logger.error(f"Could not communicate with/through proxy {proxy_error}")
+                return False
             except Exception as e:
                 self.logger.error(f"S3 related error {e}")
                 return False
