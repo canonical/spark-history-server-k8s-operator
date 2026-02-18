@@ -108,8 +108,7 @@ class HistoryServerConfig(WithLogging):
                     port=port,
                     scheme=scheme,
                 ) if scheme in ("http", "https"):
-                    port = port if port else 80
-
+                    port = port if port else {"http": 80, "https": 443}.get(scheme)
                     proxy_conf = {
                         "spark.hadoop.fs.s3a.proxy.host": hostname,
                         "spark.hadoop.fs.s3a.proxy.ssl.enabled": "true"
@@ -127,7 +126,7 @@ class HistoryServerConfig(WithLogging):
                     port=port,
                     scheme=scheme,
                 ) if scheme in ("http", "https"):
-                    port = port if port else 80
+                    port = port if port else {"http": 80, "https": 443}.get(scheme)
                     proxy_conf = {
                         "spark.hadoop.fs.s3a.proxy.host": hostname,
                         "spark.hadoop.fs.s3a.proxy.ssl.enabled": "true"
