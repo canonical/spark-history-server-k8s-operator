@@ -30,17 +30,10 @@ class AzureStorageManager(WithLogging):
     @cached_property
     def container_client(self) -> ContainerClient:
         """Azure container client session."""
-        proxy_config: dict[str, str] = {}
-        if os.environ.get("JUJU_CHARM_HTTPS_PROXY"):
-            proxy_config["https"] = os.environ["JUJU_CHARM_HTTPS_PROXY"]
-        if os.environ.get("JUJU_CHARM_HTTP_PROXY"):
-            proxy_config["http"] = os.environ["JUJU_CHARM_HTTP_PROXY"]
-
         return ContainerClient(
             account_url=self.config.endpoint_http,
             container_name=self.config.container,
             credential=self.config.secret_key,
-            proxies=proxy_config,
         )
 
     def get_or_create_container(self) -> bool:
