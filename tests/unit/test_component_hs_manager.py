@@ -48,4 +48,4 @@ def test_s3_proxy_plain_ip(monkeypatch: MonkeyPatch) -> None:
     # Then
     assert s3_proxy_conf.get("spark.hadoop.fs.s3a.proxy.host", "") == proxy_host
     assert s3_proxy_conf.get("spark.hadoop.fs.s3a.proxy.ssl.enabled", "") == "false"
-    assert s3_proxy_conf.get("spark.hadoop.fs.s3a.proxy.port", 0) == 80
+    assert s3_proxy_conf.get("spark.hadoop.fs.s3a.proxy.port", "0") == "80"

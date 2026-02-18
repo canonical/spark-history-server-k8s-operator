@@ -98,7 +98,7 @@ class HistoryServerConfig(WithLogging):
             "",
         )
         if is_proxy_skipped(s3.connection_info.endpoint):
-            proxy_conf = {}
+            proxy_conf: dict[str, str] = {}
         else:
             match urlparse(proxy_url):
                 case ParseResult(
@@ -108,13 +108,13 @@ class HistoryServerConfig(WithLogging):
                     port=port,
                     scheme=scheme,
                 ) if scheme in ("http", "https"):
-                    port = port if port else {"http": 80, "https": 443}.get(scheme)
+                    port_str = str(port) if port else {"http": "80", "https": "443"}[scheme]
                     proxy_conf = {
                         "spark.hadoop.fs.s3a.proxy.host": hostname,
                         "spark.hadoop.fs.s3a.proxy.ssl.enabled": "true"
                         if scheme == "https"
                         else "false",
-                        "spark.hadoop.fs.s3a.proxy.port": port,
+                        "spark.hadoop.fs.s3a.proxy.port": port_str,
                         "spark.hadoop.fs.s3a.proxy.username": username,
                         "spark.hadoop.fs.s3a.proxy.password": password,
                     }
@@ -126,13 +126,13 @@ class HistoryServerConfig(WithLogging):
                     port=port,
                     scheme=scheme,
                 ) if scheme in ("http", "https"):
-                    port = port if port else {"http": 80, "https": 443}.get(scheme)
+                    port_str = str(port) if port else {"http": "80", "https": "443"}[scheme]
                     proxy_conf = {
                         "spark.hadoop.fs.s3a.proxy.host": hostname,
                         "spark.hadoop.fs.s3a.proxy.ssl.enabled": "true"
                         if scheme == "https"
                         else "false",
-                        "spark.hadoop.fs.s3a.proxy.port": port,
+                        "spark.hadoop.fs.s3a.proxy.port": port_str,
                     }
 
                 case _:
