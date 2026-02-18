@@ -81,7 +81,7 @@ class S3Manager(WithLogging):
 
             s3 = self.session.client(
                 "s3",
-                region_name=self.config.region or "us-east-1",
+                region_name=self.config.region or "",
                 endpoint_url=self.config.endpoint or "https://s3.amazonaws.com",
                 verify=ca_file.name if self.config.tls_ca_chain else None,
                 config=Config(
