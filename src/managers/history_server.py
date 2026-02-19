@@ -86,17 +86,12 @@ class HistoryServerConfig(WithLogging):
             ),
         }
 
-        # Assigns the first non empty proxy url or defaults to an empty string
-        proxy_url = next(
-            filter(
-                None,
-                (
-                    os.environ.get("JUJU_CHARM_HTTP_PROXY", ""),
-                    os.environ.get("JUJU_CHARM_HTTPS_PROXY", ""),
-                ),
-            ),
-            "",
-        )
+        s3_scheme = urlparse(s3.connection_info.endpoint).scheme
+        proxy_url = {
+            "http": os.environ.get("JUJU_CHARM_HTTP_PROXY", ""),
+            "https": os.environ.get("JUJU_CHARM_HTTPS_PROXY", ""),
+        }.get(s3_scheme, os.environ.get("JUJU_CHARM_HTTP_PROXY", ""))
+
         if is_proxy_skipped(s3.connection_info.endpoint):
             proxy_conf: dict[str, str] = {}
         else:

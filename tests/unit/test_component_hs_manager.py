@@ -13,9 +13,7 @@ def test_s3_proxy_credentials(monkeypatch: MonkeyPatch) -> None:
     # Given
     monkeypatch.setenv("JUJU_CHARM_HTTP_PROXY", "http://username:password@10.152.193.234:80")
     s3_manager_testing = mock.MagicMock()
-    s3_manager_testing.connection_info.endpoint = mock.PropertyMock(
-        side_effect="https://192.168.1.1"
-    )
+    s3_manager_testing.connection_info.endpoint = "http://192.168.1.1"
 
     config = HistoryServerConfig(None, s3_manager_testing, None, None, None)  # type: ignore
 
@@ -36,9 +34,7 @@ def test_s3_proxy_plain_ip(monkeypatch: MonkeyPatch) -> None:
     proxy_host = "10.152.193.234"
     monkeypatch.setenv("JUJU_CHARM_HTTPS_PROXY", f"http://{proxy_host}")
     s3_manager_testing = mock.MagicMock()
-    s3_manager_testing.connection_info.endpoint = mock.PropertyMock(
-        side_effect="https://192.168.1.1"
-    )
+    s3_manager_testing.connection_info.endpoint = "https://192.168.1.1"
 
     config = HistoryServerConfig(None, s3_manager_testing, None, None, None)  # type: ignore
 
