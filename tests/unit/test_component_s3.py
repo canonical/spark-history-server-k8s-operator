@@ -163,6 +163,7 @@ def test_path_existing_still_ok_on_verify(s3: S3Client) -> None:
     ],
 )
 def test_skip_proxy(no_proxy_env, endpoint, expected, monkeypatch):
+    """Test that we are properly detecting that we should skip domains given a NO_PROXY env var."""
     # Given
     # Patch JUJU_CHARM_NO_PROXY env var
     monkeypatch.setenv("JUJU_CHARM_NO_PROXY", no_proxy_env)
