@@ -49,9 +49,9 @@ class S3ConnectionInfo(StateBase):
         super().__init__(relation, component)
 
     @property
-    def endpoint(self) -> str | None:
+    def endpoint(self) -> str:
         """Return endpoint of the S3 bucket."""
-        return self.relation_data.get("endpoint", None)
+        return self.relation_data.get("endpoint", "")
 
     @property
     def access_key(self) -> str:
