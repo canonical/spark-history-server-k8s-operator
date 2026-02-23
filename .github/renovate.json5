@@ -4,11 +4,11 @@
     "github>canonical/data-platform//renovate_presets/charm.json5",
   ],
   "reviewers": ["canonical:processing"],
-  // Between 1AM and 4:59AM on Friday, twice a month
-  "schedule": ["* 1-4 1-7,15-21 * 5"],
+  // Between 1AM and 6:59AM, first Friday of the month
+  "schedule": ["* 1-6 1-7 * 5"],
   "lockFileMaintenance": {
     "enabled": true,
-    "schedule": ["* 1-4 1-7,15-21 * 5"]
+    "schedule": ["* 1-6 1-7 * 5"]
   },
   "ignoreDeps": ["ubuntu"]
 }
