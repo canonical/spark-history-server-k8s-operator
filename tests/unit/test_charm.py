@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
-from ops import ActiveStatus, BlockedStatus, MaintenanceStatus
 from ops.testing import Container, Context, Relation, State
 
 from constants import CONTAINER
+from core.context import Status
 
 if TYPE_CHECKING:
     from charm import SparkHistoryServerCharm
@@ -40,7 +40,7 @@ def test_start_history_server(history_server_ctx: Context[SparkHistoryServerChar
         containers=[Container(name=CONTAINER, can_connect=False)],
     )
     out = history_server_ctx.run(history_server_ctx.on.install(), state)
-    assert out.unit_status == MaintenanceStatus("Waiting for Pebble")
+    assert out.unit_status == Status.WAITING_PEBBLE.value
 
 
 @patch("workload.SparkHistoryServer.exec")
@@ -55,7 +55,7 @@ def test_pebble_ready(
     out = history_server_ctx.run(
         history_server_ctx.on.pebble_ready(history_server_container), state
     )
-    assert out.unit_status == BlockedStatus("Missing relation with storage (s3 or azure storage)")
+    assert out.unit_status == Status.MISSING_STORAGE_RELATION.value
 
 
 @patch("managers.s3.S3Manager.verify", return_value=True)
@@ -73,7 +73,7 @@ def test_s3_relation_connection_ok(
         containers=[history_server_container],
     )
     out = history_server_ctx.run(history_server_ctx.on.relation_changed(s3_relation), state)
-    assert out.unit_status == ActiveStatus("")
+    assert out.unit_status == Status.ACTIVE.value
 
     # Check containers modifications
     assert len(out.get_container(CONTAINER).layers) == 2
@@ -114,7 +114,7 @@ def test_s3_relation_connection_ok_tls(
         containers=[history_server_container],
     )
     inter = history_server_ctx.run(history_server_ctx.on.relation_changed(s3_relation_tls), state)
-    assert inter.unit_status == ActiveStatus("")
+    assert inter.unit_status == Status.ACTIVE.value
 
     # Check containers modifications
     assert len(inter.get_container(CONTAINER).layers) == 2
@@ -172,7 +172,32 @@ def test_s3_relation_connection_ko(
         containers=[history_server_container],
     )
     out = history_server_ctx.run(history_server_ctx.on.relation_changed(s3_relation), state)
-    assert out.unit_status == BlockedStatus("Invalid S3 credentials")
+    assert out.unit_status == Status.INVALID_STORAGE_CREDENTIALS.value
+
+
+@patch("managers.s3.S3Manager.verify", return_value=True)
+@patch("workload.SparkHistoryServer.exec")
+def test_s3_relation_no_path_ko(
+    exec_calls,
+    verify_call,
+    history_server_ctx: Context[SparkHistoryServerCharm],
+    history_server_container: Container,
+    s3_relation_no_path: Relation,
+) -> None:
+    """Assert that a missing path in the S3 relation leads to a blocked state."""
+    # Given
+    state = State(
+        relations=[s3_relation_no_path],
+        containers=[history_server_container],
+    )
+
+    # When
+    out = history_server_ctx.run(
+        history_server_ctx.on.relation_changed(s3_relation_no_path), state
+    )
+
+    # Then
+    assert out.unit_status == Status.MISSING_STORAGE_PATH.value
 
 
 @patch("managers.s3.S3Manager.verify", return_value=True)
@@ -197,9 +222,7 @@ def test_s3_relation_broken(
         history_server_ctx.on.relation_broken(s3_relation), state_after_relation_changed
     )
 
-    assert state_after_relation_broken.unit_status == BlockedStatus(
-        "Missing relation with storage (s3 or azure storage)"
-    )
+    assert state_after_relation_broken.unit_status == Status.MISSING_STORAGE_RELATION.value
 
     spark_properties = parse_spark_properties(state_after_relation_broken, tmp_path)
 
@@ -220,7 +243,7 @@ def test_ingress_relation_creation(
         containers=[history_server_container],
     )
     out = history_server_ctx.run(history_server_ctx.on.relation_changed(ingress_relation), state)
-    assert out.unit_status == BlockedStatus("Missing relation with storage (s3 or azure storage)")
+    assert out.unit_status == Status.MISSING_STORAGE_RELATION.value
 
 
 @patch("managers.s3.S3Manager.verify", return_value=True)
@@ -240,7 +263,7 @@ def test_with_ingress(
     )
     out = history_server_ctx.run(history_server_ctx.on.relation_changed(ingress_relation), state)
 
-    assert out.unit_status == ActiveStatus("")
+    assert out.unit_status == Status.ACTIVE.value
 
     spark_properties = parse_spark_properties(out, tmp_path)
 
@@ -267,7 +290,7 @@ def test_with_ingress_subdomain(
         history_server_ctx.on.relation_changed(ingress_subdomain_relation), state
     )
 
-    assert out.unit_status == ActiveStatus("")
+    assert out.unit_status == Status.ACTIVE.value
 
     spark_properties = parse_spark_properties(out, tmp_path)
 
@@ -292,7 +315,7 @@ def test_remove_ingress(
     )
     out = history_server_ctx.run(history_server_ctx.on.relation_broken(ingress_relation), state)
 
-    assert out.unit_status == ActiveStatus("")
+    assert out.unit_status == Status.ACTIVE.value
 
     spark_properties = parse_spark_properties(out, tmp_path)
 
@@ -317,7 +340,7 @@ def test_azure_storage_relation(
     out = history_server_ctx.run(
         history_server_ctx.on.relation_changed(azure_storage_relation), state
     )
-    assert out.unit_status == ActiveStatus("")
+    assert out.unit_status == Status.ACTIVE.value
 
     # Check containers modifications
     assert len(out.get_container(CONTAINER).layers) == 2
@@ -373,9 +396,7 @@ def test_azure_storage_relation_broken(
         state_after_relation_changed,
     )
 
-    assert state_after_relation_broken.unit_status == BlockedStatus(
-        "Missing relation with storage (s3 or azure storage)"
-    )
+    assert state_after_relation_broken.unit_status == Status.MISSING_STORAGE_RELATION.value
 
     spark_properties = parse_spark_properties(state_after_relation_broken, tmp_path)
 
@@ -403,6 +424,4 @@ def test_both_azure_storage_and_s3_relation_together(
     out = history_server_ctx.run(
         history_server_ctx.on.relation_changed(azure_storage_relation), state
     )
-    assert out.unit_status == BlockedStatus(
-        "Spark History Server can be related to only one storage backend at a time."
-    )
+    assert out.unit_status == Status.MULTIPLE_OBJECT_STORAGE_RELATIONS.value

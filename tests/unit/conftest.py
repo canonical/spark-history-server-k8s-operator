@@ -88,6 +88,30 @@ def s3_relation():
 
 
 @pytest.fixture
+def s3_relation_no_path():
+    """Provide fixture for the S3 relation."""
+    relation = Relation(
+        endpoint=S3,
+        interface="s3",
+        remote_app_name="s3-integrator",
+    )
+    relation_id = relation.id
+
+    return replace(
+        relation,
+        local_app_data={"bucket": f"relation-{relation_id}"},
+        remote_app_data={
+            "access-key": "access-key",
+            "bucket": "my-bucket",
+            "data": f'{{"bucket": "relation-{relation_id}"}}',
+            "endpoint": "https://s3.endpoint",
+            "path": "",
+            "secret-key": "secret-key",
+        },
+    )
+
+
+@pytest.fixture
 def s3_relation_tls():
     """Provide fixture for the S3 relation."""
     relation = Relation(
