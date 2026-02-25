@@ -175,7 +175,7 @@ def test_s3_relation_connection_ko(
     assert out.unit_status == Status.INVALID_STORAGE_CREDENTIALS.value
 
 
-@patch("managers.s3.S3Manager.verify", return_value=True)
+@patch("managers.s3.S3Manager.verify", return_value=False)
 @patch("workload.SparkHistoryServer.exec")
 def test_s3_relation_no_path_ko(
     exec_calls,
@@ -368,6 +368,31 @@ def test_azure_storage_relation(
         ]
         == azure_storage_relation.remote_app_data["secret-key"]
     )
+
+
+@patch("managers.azure_storage.AzureStorageManager.verify", return_value=False)
+@patch("workload.SparkHistoryServer.exec")
+def test_azure_relation_no_path_ko(
+    exec_calls,
+    verify_call,
+    history_server_ctx: Context[SparkHistoryServerCharm],
+    history_server_container: Container,
+    azure_storage_relation_no_path: Relation,
+) -> None:
+    """Assert that a missing path in the Azure Storage relation leads to a blocked state."""
+    # Given
+    state = State(
+        relations=[azure_storage_relation_no_path],
+        containers=[history_server_container],
+    )
+
+    # When
+    out = history_server_ctx.run(
+        history_server_ctx.on.relation_changed(azure_storage_relation_no_path), state
+    )
+
+    # Then
+    assert out.unit_status == Status.MISSING_STORAGE_PATH.value
 
 
 @patch("managers.s3.S3Manager.verify", return_value=True)
