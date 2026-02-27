@@ -191,15 +191,18 @@ class Context(WithLogging):
 class Status(Enum):
     """Class bundling all statuses that the charm may fall into."""
 
-    WAITING_PEBBLE = MaintenanceStatus("Waiting for Pebble")
-    MISSING_STORAGE_RELATION = BlockedStatus("Missing relation with storage (s3 or azure storage)")
-    INVALID_S3_CREDENTIALS = BlockedStatus("Invalid S3 credentials")
-    MISSING_INGRESS_RELATION = BlockedStatus("Missing INGRESS relation")
-    NOT_RUNNING = BlockedStatus("History server not running. Please check logs.")
-    MULTIPLE_OBJECT_STORAGE_RELATIONS = BlockedStatus(
-        "Spark History Server can be related to only one storage backend at a time."
+    ACTIVE = ActiveStatus("")
+    INVALID_STORAGE_CREDENTIALS = BlockedStatus(
+        "Invalid object storage credentials or permission issue. Please check logs."
     )
+    MISSING_INGRESS_RELATION = BlockedStatus("Missing INGRESS relation")
+    MISSING_STORAGE_PATH = BlockedStatus("Missing object storage folder path")
+    MISSING_STORAGE_RELATION = BlockedStatus("Missing relation with storage (s3 or azure storage)")
     MULTIPLE_AUTH_PROXY_RELATIONS = BlockedStatus(
         "Spark History Server can be related to only one auth proxy backend (Oauth2proxy or Authkeeper) at a time."
     )
-    ACTIVE = ActiveStatus("")
+    MULTIPLE_OBJECT_STORAGE_RELATIONS = BlockedStatus(
+        "Spark History Server can be related to only one storage backend at a time."
+    )
+    NOT_RUNNING = BlockedStatus("History server not running. Please check logs.")
+    WAITING_PEBBLE = MaintenanceStatus("Waiting for Pebble")

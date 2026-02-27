@@ -19,6 +19,7 @@ from core.context import (
 )
 from core.domain import AzureStorageConnectionInfo
 from core.workload import SparkHistoryWorkloadBase
+from managers.azure_storage import AzureStorageManager
 from managers.s3 import S3Manager
 
 
@@ -41,18 +42,21 @@ class BaseEventHandler(Object):
         if not self.workload.ready():
             return Status.WAITING_PEBBLE.value
 
-        s3 = s3
-
         if not s3 and not azure:
             return Status.MISSING_STORAGE_RELATION.value
 
         if s3 and azure:
             return Status.MULTIPLE_OBJECT_STORAGE_RELATIONS.value
 
-        if s3:
-            s3_manager = S3Manager(s3)
-            if not s3_manager.verify():
-                return Status.INVALID_S3_CREDENTIALS.value
+        if not getattr(s3, "path", None) and not getattr(azure, "path", None):
+            # We already assessed that one of the two is present
+            return Status.MISSING_STORAGE_PATH.value
+
+        if s3 and not S3Manager(s3).verify():
+            return Status.INVALID_STORAGE_CREDENTIALS.value
+
+        if azure and not AzureStorageManager(azure).verify():
+            return Status.INVALID_STORAGE_CREDENTIALS.value
 
         if not self.workload.active():
             return Status.NOT_RUNNING.value

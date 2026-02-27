@@ -49,6 +49,12 @@ class AzureStorageManager(WithLogging):
                 self._wait_until_exists(self.container_client)
             except RetryError:
                 return False
+        return True
+
+    def ensure_path(self) -> bool:
+        """Create path if it does not exists."""
+        if not self.config.path:
+            return False
 
         blob_client = self.container_client.get_blob_client(
             os.path.join(self.config.path, ".keep")
@@ -83,7 +89,11 @@ class AzureStorageManager(WithLogging):
             return False
 
         if not self.get_or_create_container():
-            self.logger.error("Could not create container or path.")
+            self.logger.error("Could not create container.")
+            return False
+
+        if not self.ensure_path():
+            self.logger.error("Could not create path.")
             return False
 
         return True

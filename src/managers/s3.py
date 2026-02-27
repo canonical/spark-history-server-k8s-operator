@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import tempfile
 from functools import cached_property
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import boto3
 from botocore.client import Config
@@ -50,15 +50,39 @@ class S3Manager(WithLogging):
                 return False
             elif "(404)" in ex.args[0]:
                 bucket_exists = False
-        else:
-            self.logger.info(f"Using existing bucket {bucket_name}")
 
         if not bucket_exists:
             client.create_bucket(Bucket=bucket_name)
-            self._wait_until_exists(client)
+            self._wait_until_exists(client, "bucket")
             self.logger.info(f"Created bucket {bucket_name}")
 
-        client.put_object(Bucket=bucket_name, Key=os.path.join(self.connection_info.path, ""))
+        return True
+
+    def ensure_path(self, client: S3Client) -> bool:
+        """Create path if it does not exists."""
+        path = self.connection_info.path
+        path_exists = True
+        if not path:
+            return False
+        try:
+            client.head_object(
+                Bucket=self.connection_info.bucket,
+                Key=os.path.join(path, ".keep"),
+            )
+        except ClientError as ex:
+            if "(403)" in ex.args[0]:
+                self.logger.error("Wrong credentials or access to bucket is forbidden")
+                return False
+            elif "(404)" in ex.args[0]:
+                path_exists = False
+
+        if not path_exists:
+            client.put_object(
+                Bucket=self.connection_info.bucket,
+                Key=os.path.join(path, ".keep"),
+            )
+            self._wait_until_exists(client, "key")
+            self.logger.info(f"Created path {path} in bucket {self.connection_info.bucket}")
 
         return True
 
@@ -68,9 +92,17 @@ class S3Manager(WithLogging):
         retry=retry_if_exception_cause_type(ClientError),
         reraise=True,
     )
-    def _wait_until_exists(self, client: S3Client):
+    def _wait_until_exists(
+        self, client: S3Client, resource_type: Literal["bucket", "key"]
+    ) -> None:
         """Poll s3 API until resource is found."""
-        client.head_bucket(Bucket=self.connection_info.bucket)
+        if resource_type == "bucket":
+            client.head_bucket(Bucket=self.connection_info.bucket)
+        else:
+            client.head_object(
+                Bucket=self.connection_info.bucket,
+                Key=os.path.join(self.connection_info.path, ".keep"),
+            )
 
     def verify(self) -> bool:
         """Verify S3 credentials and configuration."""
@@ -117,4 +149,4 @@ class S3Manager(WithLogging):
             if not self.get_or_create_bucket(s3):
                 return False
 
-        return True
+        return self.ensure_path(s3)

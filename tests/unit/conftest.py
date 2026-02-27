@@ -88,6 +88,30 @@ def s3_relation():
 
 
 @pytest.fixture
+def s3_relation_no_path():
+    """Provide fixture for the S3 relation."""
+    relation = Relation(
+        endpoint=S3,
+        interface="s3",
+        remote_app_name="s3-integrator",
+    )
+    relation_id = relation.id
+
+    return replace(
+        relation,
+        local_app_data={"bucket": f"relation-{relation_id}"},
+        remote_app_data={
+            "access-key": "access-key",
+            "bucket": "my-bucket",
+            "data": f'{{"bucket": "relation-{relation_id}"}}',
+            "endpoint": "https://s3.endpoint",
+            "path": "",
+            "secret-key": "secret-key",
+        },
+    )
+
+
+@pytest.fixture
 def s3_relation_tls():
     """Provide fixture for the S3 relation."""
     relation = Relation(
@@ -171,6 +195,30 @@ def azure_storage_relation():
             "container": "my-bucket",
             "data": f'{{"container": "relation-{relation_id}"}}',
             "path": "spark-events",
+            "storage-account": "test-storage-account",
+            "connection-protocol": "abfss",
+            "secret-key": "some-secret",
+        },
+    )
+
+
+@pytest.fixture
+def azure_storage_relation_no_path():
+    """Provide fixture for the Azure storage relation."""
+    relation = Relation(
+        endpoint=AZURE_RELATION_NAME,
+        interface="azure_storage",
+        remote_app_name="azure-storage-integrator",
+    )
+    relation_id = relation.id
+
+    return replace(
+        relation,
+        local_app_data={"container": f"relation-{relation_id}"},
+        remote_app_data={
+            "container": "my-bucket",
+            "data": f'{{"container": "relation-{relation_id}"}}',
+            "path": "",
             "storage-account": "test-storage-account",
             "connection-protocol": "abfss",
             "secret-key": "some-secret",
