@@ -73,7 +73,7 @@ class ExternalIdpService(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def complete_user_login(self, page: Page) -> None:
+    async def complete_user_login(self, page: Page) -> None:
         """Get a page on the IDP login page and login the user."""
         ...
 
@@ -121,7 +121,7 @@ class DexIdpService(ExternalIdpService):
         except ApiError:
             logger.info("No service found for identity provider")
 
-        temp_redirect_url = self._redirect_uri
+        temp_redirect_url: str | None = self._redirect_uri
         if not temp_redirect_url:
             temp_redirect_url = None
 

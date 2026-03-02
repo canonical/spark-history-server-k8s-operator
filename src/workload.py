@@ -39,7 +39,7 @@ class SparkHistoryServer(SparkHistoryWorkloadBase, K8sWorkload, WithLogging):
             jmx_exporter=self.jmx_file,
         )
 
-        self._envs = None
+        self._envs: dict[str, str] | None = None
 
     @property
     def jmx_file(self):

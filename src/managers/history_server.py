@@ -5,8 +5,7 @@
 """History Server manager."""
 
 import os
-import re
-from urllib.parse import ParseResult, urlparse
+from urllib.parse import ParseResult, urlparse, urlunparse
 
 from common.utils import WithLogging, is_proxy_skipped
 from core.context import (
@@ -25,8 +24,6 @@ from managers.tls import TLSManager
 
 class HistoryServerConfig(WithLogging):
     """Class representing the Spark Properties configuration file."""
-
-    _ingress_pattern = re.compile("http://.*?/|https://.*?/")
 
     _base_conf: dict[str, str] = {
         "spark.hadoop.fs.s3a.path.style.access": "true",
@@ -60,13 +57,14 @@ class HistoryServerConfig(WithLogging):
         if not self.ingress:
             return {}
 
-        # Get DNS and skip the trailing /
-        proxy_dns = self._ingress_pattern.match(f"{self.ingress.url}/").group()[:-1]
-        proxy_base = str(self.ingress.url).removeprefix(proxy_dns)
+        parsed_ingress = urlparse(self.ingress.url)
+        redirect_uri = urlunparse((parsed_ingress.scheme, parsed_ingress.netloc, "", "", "", ""))
+        ingress_properties = {"spark.ui.proxyRedirectUri": redirect_uri}
 
-        return {"spark.ui.proxyRedirectUri": proxy_dns} | (
-            {"spark.ui.proxyBase": proxy_base} if proxy_base != "/" else {}
-        )
+        if base := parsed_ingress.path.strip("/"):
+            ingress_properties["spark.ui.proxyBase"] = base
+
+        return ingress_properties
 
     @property
     def _s3_conf(self) -> dict[str, str]:

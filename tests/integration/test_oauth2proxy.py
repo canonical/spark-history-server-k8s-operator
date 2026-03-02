@@ -68,7 +68,7 @@ async def get_cookie_from_browser_by_name(
 
 async def complete_auth_code_login(
     page: Page,
-    external_idp_service: Optional[ExternalIdpService],
+    external_idp_service: ExternalIdpService,
 ) -> None:
     """Take a page that is in the identity-platform's login page and login the user.
 

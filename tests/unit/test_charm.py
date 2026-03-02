@@ -395,11 +395,9 @@ def test_azure_relation_no_path_ko(
     assert out.unit_status == Status.MISSING_STORAGE_PATH.value
 
 
-@patch("managers.s3.S3Manager.verify", return_value=True)
 @patch("workload.SparkHistoryServer.exec")
 def test_azure_storage_relation_broken(
     exec_calls,
-    verify_call,
     tmp_path: Path,
     history_server_ctx: Context[SparkHistoryServerCharm],
     history_server_container: Container,
@@ -442,6 +440,7 @@ def test_both_azure_storage_and_s3_relation_together(
     s3_relation: Relation,
     azure_storage_relation: Relation,
 ) -> None:
+    # Patching verify speeds up the test
     state = State(
         relations=[s3_relation, azure_storage_relation],
         containers=[history_server_container],
