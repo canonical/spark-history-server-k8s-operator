@@ -63,9 +63,12 @@ def prometheus_exporter_data(host: str) -> str | None:
         logger.info(f"Response: {response.text}")
         print(response)
     except requests.exceptions.RequestException:
-        return
+        return None
+
     if response.status_code == 200:
         return response.text
+
+    return None
 
 
 def all_prometheus_exporters_data(juju: jubilant.Juju, check_field) -> bool:
@@ -74,7 +77,7 @@ def all_prometheus_exporters_data(juju: jubilant.Juju, check_field) -> bool:
     status = juju.status()
     for unit in status.apps[APP_NAME].units.values():
         unit_ip = unit.address
-        result = result and check_field in prometheus_exporter_data(unit_ip)
+        result = result and check_field in (prometheus_exporter_data(unit_ip) or "")
     return result
 
 
@@ -86,10 +89,12 @@ def published_prometheus_alerts(juju: jubilant.Juju, host: str) -> dict | None:
     try:
         response = requests.get(url)
     except requests.exceptions.RequestException:
-        return
+        return None
 
     if response.status_code == 200:
         return response.json()
+
+    return None
 
 
 def published_prometheus_data(juju: jubilant.Juju, host: str, field: str) -> dict | None:
@@ -100,10 +105,12 @@ def published_prometheus_data(juju: jubilant.Juju, host: str, field: str) -> dic
     try:
         response = requests.get(url)
     except requests.exceptions.RequestException:
-        return
+        return None
 
     if response.status_code == 200:
         return response.json()
+
+    return None
 
 
 def published_grafana_dashboards(juju: jubilant.Juju) -> dict | None:
@@ -116,9 +123,12 @@ def published_grafana_dashboards(juju: jubilant.Juju) -> dict | None:
         session.auth = ("admin", pw)
         response = session.get(url)
     except requests.exceptions.RequestException:
-        return
+        return None
+
     if response.status_code == 200:
         return response.json()
+
+    return None
 
 
 def get_cos_address(juju: jubilant.Juju) -> str:
