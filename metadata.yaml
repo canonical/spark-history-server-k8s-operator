@@ -14,6 +14,7 @@ description: |
 
   Apache Spark is a free, open source software project by the Apache Software Foundation.
   Users can find out more at the [Spark project page](https://spark.apache.org/).
+docs: https://canonical-charmed-spark.readthedocs-hosted.com/main/how-to/spark-history-server
 source: https://github.com/canonical/spark-history-server-k8s-operator
 issues: https://github.com/canonical/spark-history-server-k8s-operator/issues
 website:
