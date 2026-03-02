@@ -70,9 +70,7 @@ class BaseEventHandler(Object):
         return Status.ACTIVE.value
 
 
-def compute_status(
-    hook: Callable[[BaseEventHandler, EventBase], None],
-) -> Callable[[BaseEventHandler, EventBase], None]:
+def compute_status(hook: Callable) -> Callable[[BaseEventHandler, EventBase], None]:
     """Decorator to automatically compute statuses at the end of the hook."""
 
     @wraps(hook)
@@ -100,7 +98,7 @@ def compute_status(
 
 
 def defer_when_not_ready(
-    hook: Callable[[BaseEventHandler, EventBase], None],
+    hook: Callable,
 ) -> Callable[[BaseEventHandler, EventBase], None]:
     """Decorator to automatically compute statuses at the end of the hook."""
 

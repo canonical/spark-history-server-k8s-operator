@@ -84,10 +84,9 @@ class IngressEvents(BaseEventHandler, WithLogging):
     @defer_when_not_ready
     def _on_ingress_revoked(self, _: IngressPerAppRevokedEvent):
         """Handle the `IngressPerAppRevokedEvent`."""
-        self.log_result("This app no longer has ingress")(
-            self.history_server.update(
-                self.context.s3, self.context.azure_storage, None, self.context.authorized_users
-            )
+        self.logger.info("This app no longer has ingress")
+        self.history_server.update(
+            self.context.s3, self.context.azure_storage, None, self.context.authorized_users
         )
 
         self.charm.unit.status = self.get_app_status(
