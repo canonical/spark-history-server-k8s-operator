@@ -179,4 +179,26 @@ jobs:
           AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
           CI_PACKED_CHARMS: ${{ needs.build.outputs.charms }}
         run: |
-          tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}'
+          tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}' --keep-models
+
+      - name: Collect logs if job failed
+        if: ${{ failure() }}
+        run: |
+          juju-crashdump
+
+          # get pods
+          kubectl get pods -A
+
+          # replay juju-debug logs
+          sudo snap install yq
+          for model in $(juju models --format yaml | yq '.models[] | .name');
+          do
+            echo "Model: $model"
+            if [[ ${model} != *"controller"* ]];then
+              juju debug-log --model $model --replay
+            fi
+          done
+
+          # events
+          kubectl events -A
+          echo "Done"
