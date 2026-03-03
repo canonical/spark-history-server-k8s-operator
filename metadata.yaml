@@ -14,6 +14,7 @@ description: |
 
   Apache Spark is a free, open source software project by the Apache Software Foundation.
   Users can find out more at the [Spark project page](https://spark.apache.org/).
+docs: https://canonical-charmed-spark.readthedocs-hosted.com/main/how-to/spark-history-server
 source: https://github.com/canonical/spark-history-server-k8s-operator
 issues: https://github.com/canonical/spark-history-server-k8s-operator/issues
 website:
@@ -32,7 +33,8 @@ resources:
   spark-history-server-image:
     type: oci-image
     description: OCI image for Spark History Server
-    upstream-source: ghcr.io/canonical/charmed-spark@sha256:a21e7b2d697fe3cfc61986ac40e60f4e9b6e72c4c2b37b34d3e2a6f46a66a80c # spark-version: 3.5.5
+    # spark-version: 3.5.7, released on 2026-02-27
+    upstream-source: ghcr.io/canonical/charmed-spark@sha256:c7eef66beaeff463fdb7b707c630c0574912df8b843d8e3169f358adee2ae706
 
 requires:
   s3-credentials:
