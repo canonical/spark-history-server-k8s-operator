@@ -33,8 +33,8 @@ resources:
   spark-history-server-image:
     type: oci-image
     description: OCI image for Spark History Server
-    # spark-version: 3.5.7, released on 2026-02-27
-    upstream-source: ghcr.io/canonical/charmed-spark@sha256:c7eef66beaeff463fdb7b707c630c0574912df8b843d8e3169f358adee2ae706
+    # 3.5.7-22.04, release date 16/03/2026
+    upstream-source: ghcr.io/canonical/charmed-spark@sha256:f7f387a76ba2f3b6cfc34a35f36c0f4ae85bfa78c8c9d4bfa06ba86401b95d70
 
 requires:
   s3-credentials:
