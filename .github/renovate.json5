@@ -10,5 +10,23 @@
     "enabled": true,
     "schedule": ["* 1-6 1-7 * 5"]
   },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^metadata\\.yaml$/"],
+      "matchStrings": [
+        "# (?<currentValue>3\\.[^,\\s]+), release date .*\\n\\s*upstream-source: (?<depName>ghcr\\.io/canonical/charmed-spark)@(?<currentDigest>sha256:[a-f0-9]+)"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["ghcr.io/canonical/charmed-spark"],
+      "allowedVersions": "/^3\\./"
+    }
+  ],
   "ignoreDeps": ["ubuntu"]
 }
