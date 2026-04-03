@@ -12,6 +12,7 @@ from time import sleep
 
 import jubilant
 import yaml
+from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from .test_helpers import (
     get_certificate_from_file,
@@ -87,12 +88,21 @@ def test_build_and_deploy(
     logger.info("Relating history server charm with s3-integrator charm")
 
     juju.integrate(charm_versions.s3.application_name, APP_NAME)
-    status = juju.wait(jubilant.all_active, delay=5)
+    status = juju.wait(jubilant.all_active, delay=10)
 
     logger.info("Verifying history server has no app entries")
 
     address = status.apps[APP_NAME].units[f"{APP_NAME}/0"].address
-    apps = json.loads(urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read())
+
+    apps = []
+    try:
+        for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(3)):
+            with attempt:
+                apps = json.loads(
+                    urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read()
+                )
+    except RetryError as e:
+        raise AssertionError(f"History server API was not ready in time: {e}") from e
 
     assert len(apps) == 0
 
@@ -118,6 +128,7 @@ def test_build_and_deploy(
 
     logger.info("Verifying history server has 1 app entry")
 
+    apps = []
     for _ in range(0, 5):
         try:
             apps = json.loads(
