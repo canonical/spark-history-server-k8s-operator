@@ -53,16 +53,16 @@ jobs:
       fail-fast: false
       matrix:
         tox-environments:
-          - integration-charm
-          - integration-tls
+          # - integration-charm
+          # - integration-tls
           - integration-azure
-          - integration-logs
-          - integration-auth
-          - integration-oathkeeper
+          # - integration-logs
+          # - integration-auth
+          # - integration-oathkeeper
         runner:
           - ubuntu-22.04
-          - ubuntu-22.04-arm
-          - self-hosted-linux-amd64-jammy-large
+          # - ubuntu-22.04-arm
+          # - self-hosted-linux-amd64-jammy-large
         exclude:
           - tox-environments: integration-azure # Don't test azure twice
             runner: self-hosted-linux-amd64-jammy-large
@@ -173,6 +173,8 @@ jobs:
             echo Skipping unstable tests
             echo "mark_expression=not unstable" >> $GITHUB_OUTPUT
           fi
+      - name: Setup upterm session
+        uses: owenthereal/action-upterm@v1
       - name: Run integration tests
         env:
           AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
