@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 from platform import machine
 from typing import Any, AsyncGenerator, Callable, Coroutine, Generator, Iterable
+from uuid import uuid4
 
 import boto3
 import boto3.session
@@ -149,7 +150,7 @@ def charm_versions() -> IntegrationTestsCharms:
 @pytest.fixture(scope="module")
 def azure_storage_credentials() -> AzureInfo:
     return {
-        "container": "test-container",
+        "container": str(uuid4()),
         "path": "spark-events",
         "storage-account": os.environ["AZURE_STORAGE_ACCOUNT"],
         "connection-protocol": "abfss",
