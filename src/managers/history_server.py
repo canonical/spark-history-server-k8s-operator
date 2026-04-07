@@ -237,16 +237,13 @@ class HistoryServerManager(WithLogging):
         ):
             self.logger.info("Neither S3 nor Azure Storage are ready")
             return
-        if s3:
-            if tls_ca_chain := s3.tls_ca_chain:
-                self.tls.import_ca("\n".join(tls_ca_chain))
-                self.workload.set_environment(
-                    {
-                        "SPARK_HISTORY_OPTS": f"-Djavax.net.ssl.trustStore={self.workload.paths.truststore} "
-                        f"-Djavax.net.ssl.trustStorePassword={self.tls.truststore_password}"
-                    }
-                )
-            else:
-                self.workload.set_environment({"SPARK_HISTORY_OPTS": ""})
+        if s3 and (tls_ca_chain := s3.tls_ca_chain):
+            self.tls.import_ca("\n".join(tls_ca_chain))
+            self.workload.set_environment(
+                {
+                    "SPARK_HISTORY_OPTS": f"-Djavax.net.ssl.trustStore={self.workload.paths.truststore} "
+                    f"-Djavax.net.ssl.trustStorePassword={self.tls.truststore_password}"
+                }
+            )
 
         self.workload.start()
