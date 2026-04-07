@@ -3,7 +3,7 @@ name: Release to Charmhub
 on:
   push:
     branches:
-      - 3/edge
+      - 4/edge
 
 jobs:
   release-checks:
