@@ -78,3 +78,4 @@ class TLSManager(WithLogging):
         """Remove all files related to TLS configuration."""
         self.workload.exec(["rm", "-f", str(self.workload.paths.truststore)])
         self.workload.exec(["rm", "-f", str(self.workload.paths.cert)])
+        self.workload.set_environment({"SPARK_HISTORY_OPTS": ""})
