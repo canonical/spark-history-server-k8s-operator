@@ -18,13 +18,10 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y python3-venv
-
-      - name: Install pipx
-        run: python3 -m pip install --user pipx && python3 -m pipx ensurepath
-
-      - name: Add pipx to PATH
-        run: echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+        run: |
+          sudo apt update
+          sudo apt install -y pipx python3-venv
+          pipx ensurepath
 
       - name: Install tox and poetry using pipx
         run: |
