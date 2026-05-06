@@ -24,7 +24,6 @@ from playwright.async_api._generated import Playwright as AsyncPlaywright
 from .oauth_tools.external_idp import DexIdpService
 from .types import AzureInfo, CharmVersion, IntegrationTestsCharms, S3Info
 
-load_dotenv("microceph.source")
 load_dotenv()
 
 
@@ -34,21 +33,6 @@ PATH_NAME = "spark-events"
 KUBECONFIG = os.environ.get("TESTING_KUBECONFIG", "~/.kube/config")
 
 
-@pytest.fixture(scope="module")
-def juju(request: pytest.FixtureRequest, platform: str):
-    keep_models = bool(request.config.getoption("--keep-models"))
-
-    with jubilant.temp_model(keep=keep_models) as juju:
-        juju.wait_timeout = 10 * 60
-        juju.cli("set-model-constraints", f"arch={platform}")
-
-        yield juju  # run the test
-
-        if request.session.testsfailed:
-            log = juju.debug_log(limit=30)
-            print(log, end="")
-
-
 def pytest_addoption(parser):
     parser.addoption(
         "--keep-models",
@@ -56,6 +40,40 @@ def pytest_addoption(parser):
         default=False,
         help="keep temporarily-created models",
     )
+    parser.addoption(
+        "--model",
+        action="store",
+        help="Juju model to use; if not provided, a new model "
+        "will be created for each test which requires one",
+    )
+
+
+@pytest.fixture(scope="module")
+def juju(request: pytest.FixtureRequest, platform: str):
+    keep_models = bool(request.config.getoption("--keep-models"))
+    model = request.config.getoption("--model")
+    model_name = str(model)
+
+    if model is None:
+        with jubilant.temp_model(keep=keep_models) as juju:
+            juju.wait_timeout = 10 * 60
+            juju.cli("set-model-constraints", f"arch={platform}")
+            yield juju
+
+    else:
+        juju = jubilant.Juju()
+        juju.model = model_name
+        try:
+            juju.status()
+        except jubilant.CLIError:
+            juju.add_model(model_name)
+
+        juju.wait_timeout = 10 * 60
+        juju.cli("set-model-constraints", f"arch={platform}")
+        yield juju
+
+    if model is not None and not keep_models:
+        juju.destroy_model(model_name, destroy_storage=True, force=True)
 
 
 @pytest.fixture

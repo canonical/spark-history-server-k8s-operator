@@ -1,0 +1,22 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+summary: integration-auth pytest suite
+
+systems:
+  - ubuntu-22.04
+
+prepare: |
+  microceph cluster bootstrap
+  microceph disk add loop,1G,3
+  microceph enable rgw
+  microceph.radosgw-admin user create \
+    --uid test --display-name test \
+    --access-key=foo --secret-key=bar
+  IP=$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc')
+  printf "S3_SERVER_URL=http://%s:80/\nS3_ACCESS_KEY=foo\nS3_SECRET_KEY=bar\n" "$IP" \
+    > "$SPREAD_PATH/.env"
+
+execute: |
+  cd "$SPREAD_PATH"
+  tox run -e integration-auth -- -x --model testing --keep-models
