@@ -68,7 +68,7 @@ def charm_versions() -> IntegrationTestsCharms:
         ),
         ingress=CharmVersion(
             name="traefik-k8s",
-            channel="latest/stable",
+            channel="latest/edge",
             base="ubuntu@20.04",
             alias="traefik-k8s",
             trust=True,
