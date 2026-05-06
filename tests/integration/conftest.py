@@ -83,7 +83,7 @@ def charm_versions() -> IntegrationTestsCharms:
         ),
         azure_storage=CharmVersion(
             name="azure-storage-integrator",
-            channel="edge",
+            channel="1/stable",
             base="ubuntu@22.04",
             alias="azure-storage",
         ),
