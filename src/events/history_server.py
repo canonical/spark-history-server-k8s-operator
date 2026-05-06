@@ -46,8 +46,13 @@ class HistoryServerEvents(BaseEventHandler, WithLogging):
         )
 
     @compute_status
-    def _update_event(self, _):
-        pass
+    def _update_event(self, _) -> None:
+        self.history_server.update(
+            self.context.s3,
+            self.context.azure_storage,
+            self.context.ingress,
+            self.context.authorized_users,
+        )
 
     def _on_config_changed(self, _: ConfigChangedEvent):
         """Handle the on config changed event."""
