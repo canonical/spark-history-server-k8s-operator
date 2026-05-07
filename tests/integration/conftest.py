@@ -1,25 +1,21 @@
 #!/usr/bin/env python3
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
-import asyncio
 import logging
 import os
 import subprocess
 from pathlib import Path
 from platform import machine
-from typing import Any, AsyncGenerator, Callable, Coroutine, Generator, Iterable
+from typing import Generator, Iterable
 
 import boto3
 import boto3.session
 import jubilant
 import pytest
-import pytest_asyncio
 from botocore.client import Config
 from dotenv import load_dotenv
 from lightkube import Client, KubeConfig
-from playwright.async_api import async_playwright
-from playwright.async_api._generated import Browser, BrowserContext, BrowserType, Page
-from playwright.async_api._generated import Playwright as AsyncPlaywright
+from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright
 
 from .oauth_tools.external_idp import DexIdpService
 from .types import AzureInfo, CharmVersion, IntegrationTestsCharms, S3Info
@@ -271,15 +267,7 @@ def client() -> Client:
     return Client(config=KubeConfig.from_file(KUBECONFIG), field_manager="dex-test")
 
 
-@pytest.fixture(scope="module")
-def event_loop():
-    """Create an instance of the default event loop for each test module."""
-    loop = asyncio.get_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def external_idp_service(
     request: pytest.FixtureRequest, client: Client
 ) -> Generator[DexIdpService, None, None]:
@@ -296,89 +284,26 @@ def external_idp_service(
         ext_idp_manager.remove_idp_service()
 
 
-@pytest.fixture(scope="module")
-def launch_arguments(pytestconfig: Any) -> dict:
-    """Provide launch arguments for the browser."""
-    return {
-        "headless": not (pytestconfig.getoption("--headed") or os.getenv("HEADFUL", False)),
-        "channel": pytestconfig.getoption("--browser-channel"),
-    }
-
-
-@pytest_asyncio.fixture(scope="module")
-async def playwright() -> AsyncGenerator[AsyncPlaywright, None]:
-    """Provide an instance of AsyncPlaywright for browser automation."""
-    async with async_playwright() as playwright_object:
-        yield playwright_object
-
-
-@pytest.fixture(scope="module")
-def browser_type(playwright: AsyncPlaywright, browser_name: str) -> BrowserType:
-    """Provide the browser type based on the selected browser name."""
-    if browser_name == "firefox":
-        return playwright.firefox
-    if browser_name == "webkit":
-        return playwright.webkit
-    return playwright.chromium
-
-
-@pytest_asyncio.fixture(scope="module")
-async def browser_factory(
-    launch_arguments: dict, browser_type: BrowserType
-) -> AsyncGenerator[Callable[..., Coroutine[Any, Any, Browser]], None]:
-    """Factory to create browser instances with specified launch arguments."""
-    browsers = []
-
-    async def launch(**kwargs: Any) -> Browser:
-        browser = await browser_type.launch(**launch_arguments, **kwargs)
-        browsers.append(browser)
-        return browser
-
-    yield launch
-    for browser in browsers:
-        await browser.close()
-
-
-@pytest_asyncio.fixture(scope="module")
-async def browser(
-    browser_factory: Callable[..., Coroutine[Any, Any, Browser]],
-) -> AsyncGenerator[Browser, None]:
+@pytest.fixture(scope="session")
+def browser() -> Iterable[Browser]:
     """Provide a browser instance for the test module."""
-    browser = await browser_factory()
-    yield browser
-    await browser.close()
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        yield browser
+        browser.close()
 
 
-@pytest_asyncio.fixture
-async def context_factory(
-    browser: Browser,
-) -> AsyncGenerator[Callable[..., Coroutine[Any, Any, BrowserContext]], None]:
-    contexts = []
-    """Factory to create browser contexts."""
-
-    async def launch(**kwargs: Any) -> BrowserContext:
-        context = await browser.new_context(**kwargs)
-        contexts.append(context)
-        return context
-
-    yield launch
-    for context in contexts:
-        await context.close()
-
-
-@pytest_asyncio.fixture
-async def context(
-    context_factory: Callable[..., Coroutine[Any, Any, BrowserContext]],
-) -> AsyncGenerator[BrowserContext, None]:
+@pytest.fixture(scope="function")
+def context(browser: Browser) -> Iterable[BrowserContext]:
     """Provide a browser context for the test."""
-    context = await context_factory(ignore_https_errors=True)
+    context = browser.new_context(ignore_https_errors=True)
     yield context
-    await context.close()
+    context.close()
 
 
-@pytest_asyncio.fixture
-async def page(context: BrowserContext) -> AsyncGenerator[Page, None]:
+@pytest.fixture(scope="function")
+def page(context: BrowserContext) -> Iterable[Page]:
     """Provide a browser page for the test."""
-    page = await context.new_page()
+    page = context.new_page()
     yield page
-    await page.close()
+    page.close()

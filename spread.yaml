@@ -74,7 +74,6 @@ backends:
     # Manually pass specific environment variables
     environment:
       CI: "$(HOST: echo $CI)"
-      DOCKERHUB_MIRROR: "$(HOST: echo $DOCKERHUB_MIRROR)"
       AZURE_STORAGE_ACCOUNT: "$(HOST: echo $AZURE_STORAGE_ACCOUNT)"
       AZURE_STORAGE_KEY: "$(HOST: echo $AZURE_STORAGE_KEY)"
     systems:
