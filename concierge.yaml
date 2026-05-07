@@ -22,4 +22,3 @@ host:
     charmcraft:
       channel: latest/stable
     microceph:
-      channel: latest/stable
