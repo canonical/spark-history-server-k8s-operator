@@ -50,6 +50,9 @@ jobs:
   build:
     name: Build charms
     uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v49.0.1
+    permissions:
+      actions: read
+      contents: read
 
   collect-integration-tests:
     name: Collect integration test spread jobs
