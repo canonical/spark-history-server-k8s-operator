@@ -35,9 +35,7 @@ prepare: |
   microceph disk add loop,1G,3
   SERVER_CRT_B64=$(base64 -w0 /tmp/certs/server.crt)
   SERVER_KEY_B64=$(base64 -w0 /tmp/certs/server.key)
-  microceph enable rgw \
-    --ssl-certificate "$SERVER_CRT_B64" \
-    --ssl-private-key "$SERVER_KEY_B64"
+  microceph enable rgw --ssl-certificate "$SERVER_CRT_B64" --ssl-private-key "$SERVER_KEY_B64"
   microceph.radosgw-admin user create \
     --uid test --display-name test \
     --access-key=foo --secret-key=bar
