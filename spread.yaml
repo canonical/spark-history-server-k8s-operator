@@ -5,6 +5,51 @@ project: spark-history-server-k8s-operator
 
 backends:
   # Derived from https://github.com/canonical/object-storage-integrator/blob/main/spread.yaml
+  lxd-vm:
+    # TODO: remove after https://github.com/canonical/spread/pull/185 merged & in charmcraft
+    type: adhoc
+    allocate: |
+      hash=$(python3 -c "import hashlib; print(hashlib.sha256('$SPREAD_PASSWORD'.encode()).hexdigest()[:6])")
+      VM_NAME="${VM_NAME:-${SPREAD_SYSTEM//./-}-${hash}}"
+      DISK="${DISK:-20}"
+      CPU="${CPU:-4}"
+      MEM="${MEM:-8}"
+
+      cloud_config="#cloud-config
+      ssh_pwauth: true
+      users:
+        - default
+        - name: runner
+          plain_text_passwd: $SPREAD_PASSWORD
+          lock_passwd: false
+          sudo: ALL=(ALL) NOPASSWD:ALL
+      "
+
+      lxc launch --vm \
+        "${SPREAD_SYSTEM//-/:}" \
+        "${VM_NAME}" \
+        -c user.user-data="${cloud_config}" \
+        -c limits.cpu="${CPU}" \
+        -c limits.memory="${MEM}GiB" \
+        -d root,size="${DISK}GiB"
+
+      # Wait for the runner user
+      while ! lxc exec "${VM_NAME}" -- id -u runner &>/dev/null; do sleep 0.5; done
+
+      # Set the instance address for spread
+      ADDRESS "$(lxc ls -f csv | grep "${VM_NAME}" | cut -d"," -f3 | cut -d" " -f1)"
+    discard: |
+      hash=$(python3 -c "import hashlib; print(hashlib.sha256('$SPREAD_PASSWORD'.encode()).hexdigest()[:6])")
+      VM_NAME="${VM_NAME:-${SPREAD_SYSTEM//./-}-${hash}}"
+      lxc delete --force "${VM_NAME}"
+    systems:
+      - ubuntu-22.04:
+          username: runner
+    prepare: |
+      systemctl disable --now unattended-upgrades.service
+      systemctl mask unattended-upgrades.service
+      pipx install charmcraftcache
+
   github-ci:
     type: adhoc
     # Only run on CI
@@ -32,10 +77,6 @@ backends:
       DOCKERHUB_MIRROR: "$(HOST: echo $DOCKERHUB_MIRROR)"
       AZURE_STORAGE_ACCOUNT: "$(HOST: echo $AZURE_STORAGE_ACCOUNT)"
       AZURE_STORAGE_KEY: "$(HOST: echo $AZURE_STORAGE_KEY)"
-      # S3_ACCESS_KEY: "$(HOST: echo $S3_ACCESS_KEY)"
-      # S3_SECRET_KEY: "$(HOST: echo $S3_SECRET_KEY)"
-      # S3_SERVER_URL: "$(HOST: echo $S3_SERVER_URL)"
-      # S3_CA_BUNDLE_PATH: "$(HOST: echo $S3_CA_BUNDLE_PATH)"
     systems:
       - ubuntu-22.04:
           username: runner
@@ -57,13 +98,13 @@ environment:
   CONCIERGE_JUJU_CHANNEL/juju36: 3.6/stable
 
 prepare: |
+  sleep 5
   snap refresh --hold
   chown -R root:root "$SPREAD_PATH"
   cd "$SPREAD_PATH"
-  
+
   snap install --classic concierge
   concierge prepare --trace
 
   pipx install tox
   pipx install poetry
-
