@@ -11,4 +11,4 @@ prepare: |
 
 execute: |
   cd "$SPREAD_PATH"
-  tox run -e integration-azure -- -x --model testing --keep-models
+  tox run -e integration-azure -- --model testing --keep-models

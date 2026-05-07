@@ -19,4 +19,4 @@ prepare: |
 
 execute: |
   cd "$SPREAD_PATH"
-  tox run -e integration-auth -- -x --model testing --keep-models
+  tox run -e integration-auth -- --model testing --keep-models

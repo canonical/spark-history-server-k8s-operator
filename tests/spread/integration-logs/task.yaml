@@ -20,4 +20,4 @@ prepare: |
 
 execute: |
   cd "$SPREAD_PATH"
-  tox run -e integration-logs -- -x --model testing --keep-models
+  tox run -e integration-logs -- --model testing --keep-models

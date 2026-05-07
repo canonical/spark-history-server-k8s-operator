@@ -19,4 +19,4 @@ prepare: |
 
 execute: |
   cd "$SPREAD_PATH"
-  tox run -e integration-charm -- -x --model testing --keep-models
+  tox run -e integration-charm -- --model testing --keep-models

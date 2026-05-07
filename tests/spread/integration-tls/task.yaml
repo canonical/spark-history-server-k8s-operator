@@ -9,7 +9,7 @@ systems:
   - self-hosted-linux-amd64-jammy-large
 
 prepare: |
-  # Install Java (keytool is needed by the TLS test)
+  # Install Java to get keytool (needed by the TLS test)
   apt-get install -y default-jdk-headless
 
   IP=$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc')
@@ -40,11 +40,11 @@ prepare: |
     --ssl-private-key "$SERVER_KEY_B64"
   microceph.radosgw-admin user create \
     --uid test --display-name test \
-    --access-key=accesskey --secret-key=secretkey
+    --access-key=foo --secret-key=bar
 
-  printf "S3_SERVER_URL=https://%s:443/\nS3_ACCESS_KEY=accesskey\nS3_SECRET_KEY=secretkey\nS3_CA_BUNDLE_PATH=/tmp/certs/ca.crt\n" "$IP" \
+  printf "S3_SERVER_URL=https://%s:443/\nS3_ACCESS_KEY=foo\nS3_SECRET_KEY=bar\nS3_CA_BUNDLE_PATH=/tmp/certs/ca.crt\n" "$IP" \
     > "$SPREAD_PATH/.env"
 
 execute: |
   cd "$SPREAD_PATH"
-  tox run -e integration-tls -- -x --model testing --keep-models
+  tox run -e integration-tls -- --model testing --keep-models
