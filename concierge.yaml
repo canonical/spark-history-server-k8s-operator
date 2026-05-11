@@ -18,7 +18,10 @@ providers:
 host:
   packages:
     - pipx
+    - jq
   snaps:
     charmcraft:
+      channel: latest/stable
+    rockcraft:
       channel: latest/stable
     microceph:
