@@ -1,0 +1,14 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+summary: integration-azure pytest suite
+
+systems:
+  - ubuntu-22.04
+
+prepare: |
+  snap install azcli
+
+execute: |
+  cd "$SPREAD_PATH"
+  tox run -e integration-azure -- --model testing --keep-models

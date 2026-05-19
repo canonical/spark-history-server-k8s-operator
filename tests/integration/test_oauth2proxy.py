@@ -9,12 +9,11 @@ import subprocess
 import urllib.request
 from pathlib import Path
 from time import sleep
-from typing import Optional
 
 import jubilant
 import requests
 import yaml
-from playwright.async_api._generated import BrowserContext, Page
+from playwright.sync_api import BrowserContext, Page
 
 from .oauth_tools.external_idp import ExternalIdpService
 from .test_helpers import (
@@ -29,56 +28,33 @@ APP_NAME = METADATA["name"]
 BUCKET_NAME = "history-server"
 
 
-async def verify_page_loads(page: Page, url: str):
-    """Verify that the correct url has been loaded.
-
-    Args:
-        page (page): The page fixture.
-        url (str): The url to go to.
-    """
-    await page.wait_for_url(url)
+def verify_page_loads(page: Page, url: str) -> None:
+    """Verify that the correct url has been loaded."""
+    page.wait_for_url(url)
 
 
-async def click_on_sign_in_button_by_text(page: Page, text: str):
-    """Find and click on a button by its displayed text.
-
-    Args:
-        page (page): The page fixture.
-        text (str): The button's text to search for.
-    """
-    async with page.expect_navigation():
-        await page.get_by_text(text).click()
+def click_on_sign_in_button_by_text(page: Page, text: str) -> None:
+    """Find and click on a button by its displayed text."""
+    with page.expect_navigation():
+        page.get_by_text(text).click()
 
 
-async def get_cookie_from_browser_by_name(
-    browser_context: BrowserContext, name: str
-) -> Optional[str]:
-    """Retrieve a cookie by name.
-
-    Args:
-        browser_context (BrowserContext): The browser_context fixture.
-        name (str): The cookie name.
-    """
-    cookies = await browser_context.cookies()
+def get_cookie_from_browser_by_name(browser_context: BrowserContext, name: str) -> str | None:
+    """Retrieve a cookie by name."""
+    cookies = browser_context.cookies()
     for cookie in cookies:
-        if cookie["name"] == name:
-            return cookie["value"]
+        if cookie.get("name", None) == name:
+            return cookie.get("value")
     return None
 
 
-async def complete_auth_code_login(
+def complete_auth_code_login(
     page: Page,
     external_idp_service: ExternalIdpService,
 ) -> None:
-    """Take a page that is in the identity-platform's login page and login the user.
-
-    Args:
-        page (page): The page fixture.
-        identity_platform_login_ui_operator_url (str): The identity platform login UI operator URL.
-        external_idp_service (ExternalIdpService): The external IdP service.
-    """
-    async with page.expect_navigation():
-        await external_idp_service.complete_user_login(page)
+    """Take a page that is in the identity-platform's login page and login the user."""
+    with page.expect_navigation():
+        external_idp_service.complete_user_login(page)
     logger.info(f"Login flow completed: {page.url}")
 
 
@@ -379,7 +355,7 @@ def test_deploy_iam_bundle(
     logger.info("IAM bundle deployed successfully.")
 
 
-async def test_login(
+def test_login(
     juju: jubilant.Juju,
     charm_versions: IntegrationTestsCharms,
     external_idp_service: ExternalIdpService,
@@ -394,21 +370,21 @@ async def test_login(
 
     logger.info(f"History server proxy endpoint: {history_server_proxy_endpoint}")
 
-    await page.goto(history_server_proxy_endpoint)
+    page.goto(history_server_proxy_endpoint)
     logger.info(f"Navigated to {history_server_proxy_endpoint}")
 
     logger.info("Clicking on Sign in with Generic identity provider.")
-    await click_on_sign_in_button_by_text(page=page, text="Sign in with Generic")
+    click_on_sign_in_button_by_text(page=page, text="Sign in with Generic")
 
     # complete login in the external identity provider
-    await complete_auth_code_login(page=page, external_idp_service=external_idp_service)
+    complete_auth_code_login(page=page, external_idp_service=external_idp_service)
 
     # verify the correct redirect after login
-    await verify_page_loads(page=page, url=history_server_proxy_endpoint)
+    verify_page_loads(page=page, url=history_server_proxy_endpoint)
 
     # Verifying that the login flow was successful is application specific.
     # The test uses Spark history server's /api/user endpoint to verify the session cookie is valid
-    history_server_session_cookie = await get_cookie_from_browser_by_name(
+    history_server_session_cookie = get_cookie_from_browser_by_name(
         browser_context=context, name="_oauth2_proxy"
     )
     request = requests.get(
