@@ -14,8 +14,8 @@ from lightkube import Client, KubeConfig, codecs
 from lightkube.core.exceptions import ApiError
 from lightkube.resources.apps_v1 import Deployment
 from lightkube.resources.core_v1 import Namespace, Pod, Service
-from playwright.async_api import expect
-from playwright.async_api._generated import Page
+from playwright.sync_api import expect
+from playwright.sync_api._generated import Page
 from tenacity import retry, stop_after_attempt, wait_fixed
 
 DEX_MANIFESTS = Path(__file__).parent / "dex.yaml"
@@ -73,7 +73,7 @@ class ExternalIdpService(abc.ABC):
         ...
 
     @abc.abstractmethod
-    async def complete_user_login(self, page: Page) -> None:
+    def complete_user_login(self, page: Page) -> None:
         """Get a page on the IDP login page and login the user."""
         ...
 
@@ -224,12 +224,12 @@ class DexIdpService(ExternalIdpService):
             except ApiError:
                 pass
 
-    async def complete_user_login(self, page: Page) -> None:
+    def complete_user_login(self, page: Page) -> None:
         """Get a page on the IDP login page and login the user."""
         logger.info("Signing in to dex")
-        await expect(page).to_have_url(re.compile(rf"{self.issuer_url}*"))
-        await page.get_by_placeholder("email address").click()
-        await page.get_by_placeholder("email address").fill(self.user_email)
-        await page.get_by_placeholder("password").click()
-        await page.get_by_placeholder("password").fill(self.user_password)
-        await page.get_by_role("button", name="Login").click()
+        expect(page).to_have_url(re.compile(rf"{self.issuer_url}*"))
+        page.get_by_placeholder("email address").click()
+        page.get_by_placeholder("email address").fill(self.user_email)
+        page.get_by_placeholder("password").click()
+        page.get_by_placeholder("password").fill(self.user_password)
+        page.get_by_role("button", name="Login").click()
