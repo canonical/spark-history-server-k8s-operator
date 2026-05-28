@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 def set_s3_credentials(
     juju: jubilant.Juju,
+    s3_app_name: str,
     access_key: str,
     secret_key: str,
 ) -> None:
@@ -33,9 +34,9 @@ def set_s3_credentials(
         "access-key": access_key,
         "secret-key": secret_key,
     }
-
-    task = juju.run("s3-integrator/0", "sync-s3-credentials", params)
-    assert task.return_code == 0
+    secret_uri = juju.add_secret("s3-credentials", params)
+    juju.grant_secret(secret_uri, s3_app_name)
+    juju.config(s3_app_name, {"credentials": secret_uri})
 
 
 def delete_azure_container(container: str):

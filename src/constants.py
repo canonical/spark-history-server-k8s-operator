@@ -9,6 +9,7 @@
 CONTAINER = "spark-history-server"
 
 PEBBLE_USER = ("_daemon_", "_daemon_")
+S3_RELATION_NAME = "s3-credentials"
 AZURE_RELATION_NAME = "azure-storage-credentials"
 JMX_EXPORTER_PORT = 9101
 JMX_CC_PORT = 9102

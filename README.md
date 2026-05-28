@@ -19,8 +19,11 @@ Apache Spark is a free, open source software project by the Apache Software Foun
 ## Usage
 
 ```bash
-$ juju deploy s3-integrator --channel latest/edge
-$ juju deploy spark-history-server-k8s --channel 3.4/stable
+$ juju deploy s3-integrator --channel 2/stable
+$ juju add-secret s3-creds access-key=<access-key> secret-key=<secret-key>
+$ juju grant-secret s3-creds s3-integrator
+$ juju config s3-integrator bucket=<bucket> endpoint=<endpoint> region=<region> path=spark-events/ credentials=<secret-uri> 
+$ juju deploy spark-history-server-k8s --channel 4/edge
 $ juju relate spark-history-server-k8s s3-integrator
 ```
 

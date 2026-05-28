@@ -4,11 +4,7 @@
 
 """S3 Integration related event handlers."""
 
-from charms.data_platform_libs.v0.object_storage import (
-    AzureStorageRequires,
-    StorageConnectionInfoChangedEvent,
-    StorageConnectionInfoGoneEvent,
-)
+from object_storage import StorageConnectionInfoChangedEvent, StorageConnectionInfoGoneEvent
 from ops import CharmBase
 
 from common.utils import WithLogging
@@ -30,9 +26,7 @@ class AzureStorageEvents(BaseEventHandler, WithLogging):
 
         self.history_server = HistoryServerManager(self.context, self.workload)
 
-        self.azure_storage_requirer = AzureStorageRequires(
-            self.charm, self.context.azure_storage_endpoint.relation_name
-        )
+        self.azure_storage_requirer = self.context.azure_storage_requirer
         self.framework.observe(
             self.azure_storage_requirer.on.storage_connection_info_changed,
             self._on_azure_storage_connection_info_changed,

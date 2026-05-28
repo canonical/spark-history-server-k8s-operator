@@ -64,8 +64,8 @@ def charm_versions() -> IntegrationTestsCharms:
     return IntegrationTestsCharms(
         s3=CharmVersion(
             name="s3-integrator",
-            channel="edge",
-            base="ubuntu@22.04",
+            channel="2/edge",
+            base="ubuntu@24.04",
         ),
         ingress=CharmVersion(
             name="traefik-k8s",

@@ -5,30 +5,24 @@
 """Charm Context definition and parsing logic."""
 
 from enum import Enum
+from typing import cast
 
-from charms.data_platform_libs.v0.data_interfaces import RequirerData
 from charms.oathkeeper.v0.auth_proxy import AuthProxyConfig as OathkeeperAuthProxyConfig
 from charms.oauth2_proxy_k8s.v0.auth_proxy import AuthProxyConfig
 from charms.traefik_k8s.v2.ingress import IngressProviderAppData, IngressUrl
+from object_storage import AzureStorageRequirer, S3Requirer
 from ops import ActiveStatus, BlockedStatus, CharmBase, MaintenanceStatus, ModelError, Relation
 
 from common.utils import WithLogging
-from constants import AZURE_RELATION_NAME
+from constants import AZURE_RELATION_NAME, S3_RELATION_NAME
 from core.domain import AzureStorageConnectionInfo, S3ConnectionInfo
 
-S3 = "s3-credentials"
 OATHKEEPER = "auth-proxy"
 INGRESS = "ingress"
 OAUTH2_PROXY = "oauth2-proxy"
 AUTHORIZED_USERS = "authorized-users"
 AUTH_PROXY_HEADERS = ["X-User", "X-Email"]
 OAUTH2_PROXY_HEADERS = ["X-Auth-Request-User", "X-Auth-Request-Email"]
-AZURE_MANDATORY_OPTIONS = [
-    "secret-key",
-    "container",
-    "connection-protocol",
-    "storage-account",
-]
 
 
 class Context(WithLogging):
@@ -38,13 +32,8 @@ class Context(WithLogging):
         self.charm = charm
         self.model = charm.model
 
-        self.s3_endpoint = RequirerData(
-            self.charm.model, S3
-        )  # TODO: It would be nice if we had something that is more general (e.g. without extra-user-roles)
-
-        self.azure_storage_endpoint = RequirerData(
-            self.charm.model, AZURE_RELATION_NAME, additional_secret_fields=["secret-key"]
-        )
+        self.s3_requirer = S3Requirer(self.charm, S3_RELATION_NAME)
+        self.azure_storage_requirer = AzureStorageRequirer(self.charm, AZURE_RELATION_NAME)
 
     # --------------
     # --- CONFIG ---
@@ -65,12 +54,14 @@ class Context(WithLogging):
     @property
     def _s3_relation_id(self) -> int | None:
         """The S3 relation."""
-        return relation.id if (relation := self.charm.model.get_relation(S3)) else None
+        return (
+            relation.id if (relation := self.charm.model.get_relation(S3_RELATION_NAME)) else None
+        )
 
     @property
     def _s3_relation(self) -> Relation | None:
         """The S3 relation."""
-        return self.charm.model.get_relation(S3)
+        return self.charm.model.get_relation(S3_RELATION_NAME)
 
     @property
     def _ingress_relation(self) -> Relation | None:
@@ -105,7 +96,12 @@ class Context(WithLogging):
     @property
     def s3(self) -> S3ConnectionInfo | None:
         """The server state of the current running Unit."""
-        return S3ConnectionInfo(rel, rel.app) if (rel := self._s3_relation) else None
+        relation_data = (
+            self.s3_requirer.get_storage_connection_info(self._s3_relation)
+            if self._s3_relation
+            else None
+        )
+        return S3ConnectionInfo(cast(dict, relation_data)) if relation_data else None
 
     @property
     def ingress(self) -> IngressUrl | None:
@@ -171,21 +167,11 @@ class Context(WithLogging):
     def azure_storage(self) -> AzureStorageConnectionInfo | None:
         """The server state of the current running Unit."""
         relation_data = (
-            self.azure_storage_endpoint.fetch_relation_data()[self._azure_storage_relation_id]
+            self.azure_storage_requirer.get_storage_connection_info(self._azure_storage_relation)
             if self._azure_storage_relation
             else None
         )
-        # check if correct fields are present in the azure relation databag.
-
-        if not relation_data:
-            return None
-        # if relation data do not contains all required fields return None
-        if relation_data:
-            for option in AZURE_MANDATORY_OPTIONS:
-                if option not in relation_data:
-                    return None
-
-        return AzureStorageConnectionInfo(relation_data)
+        return AzureStorageConnectionInfo(relation_data) if relation_data else None
 
 
 class Status(Enum):
