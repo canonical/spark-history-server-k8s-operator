@@ -28,3 +28,7 @@ $ juju relate spark-history-server-k8s s3-integrator
 ```
 
 Once the spark history server unit is active, go to the IP of the unit at port 18080 to load the history server UI.
+
+Although both tracks `1/` and track `2/` of `s3-integrator` are supported for integration with the Spark History Server charm, it is still recommended to use
+`s3-integrator` from track `2/` because of it's advanced capabilities like the use of Juju secrets for credentials and the track `1/` being locked for critical
+bugfixes and security fixes and reaching EOL in the near future.
