@@ -72,7 +72,7 @@ def test_build_and_deploy(
     juju.wait(jubilant.all_agents_idle, timeout=1000)
 
     logger.info("Setting up s3 credentials in s3-integrator charm")
-    set_s3_credentials(juju, access_key, secret_key)
+    set_s3_credentials(juju, charm_versions.s3.application_name, access_key, secret_key)
 
     juju.wait(lambda status: jubilant.all_active(status, charm_versions.s3.application_name))
 

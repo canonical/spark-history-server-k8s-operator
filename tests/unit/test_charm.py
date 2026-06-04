@@ -214,17 +214,13 @@ def test_s3_relation_broken(
         relations=[s3_relation],
         containers=[history_server_container],
     )
-
-    state_after_relation_changed = history_server_ctx.run(
-        history_server_ctx.on.relation_changed(s3_relation), initial_state
-    )
-    state_after_relation_broken = history_server_ctx.run(
-        history_server_ctx.on.relation_broken(s3_relation), state_after_relation_changed
+    state_out = history_server_ctx.run(
+        history_server_ctx.on.relation_broken(s3_relation), initial_state
     )
 
-    assert state_after_relation_broken.unit_status == Status.MISSING_STORAGE_RELATION.value
+    assert state_out.unit_status == Status.MISSING_STORAGE_RELATION.value
 
-    spark_properties = parse_spark_properties(state_after_relation_broken, tmp_path)
+    spark_properties = parse_spark_properties(state_out, tmp_path)
 
     # Assert one of the keys
     assert "spark.hadoop.fs.s3a.endpoint" not in spark_properties
@@ -333,6 +329,7 @@ def test_azure_storage_relation(
     azure_storage_relation: Relation,
 ) -> None:
     state = State(
+        leader=True,
         relations=[azure_storage_relation],
         containers=[history_server_container],
     )
@@ -382,6 +379,7 @@ def test_azure_relation_no_path_ko(
     """Assert that a missing path in the Azure Storage relation leads to a blocked state."""
     # Given
     state = State(
+        leader=True,
         relations=[azure_storage_relation_no_path],
         containers=[history_server_container],
     )
@@ -442,6 +440,7 @@ def test_both_azure_storage_and_s3_relation_together(
 ) -> None:
     # Patching verify speeds up the test
     state = State(
+        leader=True,
         relations=[s3_relation, azure_storage_relation],
         containers=[history_server_container],
     )

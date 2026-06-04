@@ -4,11 +4,7 @@
 
 """S3 Integration related event handlers."""
 
-from charms.data_platform_libs.v0.s3 import (
-    CredentialsChangedEvent,
-    CredentialsGoneEvent,
-    S3Requirer,
-)
+from object_storage import StorageConnectionInfoChangedEvent, StorageConnectionInfoGoneEvent
 from ops import CharmBase
 
 from common.utils import WithLogging
@@ -30,16 +26,18 @@ class S3Events(BaseEventHandler, WithLogging):
 
         self.history_server = HistoryServerManager(self.context, self.workload)
 
-        self.s3_requirer = S3Requirer(self.charm, self.context.s3_endpoint.relation_name)
+        self.s3_requirer = self.context.s3_requirer
         self.framework.observe(
-            self.s3_requirer.on.credentials_changed, self._on_s3_credential_changed
+            self.s3_requirer.on.storage_connection_info_changed, self._on_s3_credential_changed
         )
-        self.framework.observe(self.s3_requirer.on.credentials_gone, self._on_s3_credential_gone)
+        self.framework.observe(
+            self.s3_requirer.on.storage_connection_info_gone, self._on_s3_credential_gone
+        )
 
     @compute_status
     @defer_when_not_ready
-    def _on_s3_credential_changed(self, _: CredentialsChangedEvent):
-        """Handle the `CredentialsChangedEvent` event from S3 integrator."""
+    def _on_s3_credential_changed(self, _: StorageConnectionInfoChangedEvent):
+        """Handle the `StorageConnectionInfoChangedEvent` event from S3 integrator."""
         self.logger.info("S3 Credentials changed")
         self.history_server.update(
             self.context.s3,
@@ -49,8 +47,8 @@ class S3Events(BaseEventHandler, WithLogging):
         )
 
     @defer_when_not_ready
-    def _on_s3_credential_gone(self, _: CredentialsGoneEvent):
-        """Handle the `CredentialsGoneEvent` event for S3 integrator."""
+    def _on_s3_credential_gone(self, _: StorageConnectionInfoGoneEvent):
+        """Handle the `StorageConnectionInfoGoneEvent` event for S3 integrator."""
         self.logger.info("S3 Credentials gone")
         self.history_server.update(
             None,
