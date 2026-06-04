@@ -72,7 +72,7 @@ def test_build_and_deploy(
     juju.wait(jubilant.all_agents_idle, timeout=1000)
 
     logger.info("Setting up s3 credentials in s3-integrator charm")
-    set_s3_credentials(juju, access_key, secret_key)
+    set_s3_credentials(juju, charm_versions.s3.application_name, access_key, secret_key)
 
     ca = get_certificate_from_file(tls_ca_chain_path)
     ca_b64 = base64.b64encode(ca.encode("utf-8")).decode("utf-8")
