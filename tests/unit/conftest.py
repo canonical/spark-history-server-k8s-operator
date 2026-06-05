@@ -9,8 +9,8 @@ from ops.testing import Container, Context, Model, Mount, Relation
 
 # from scenario.state import next_relation_id
 from charm import SparkHistoryServerCharm
-from constants import AZURE_RELATION_NAME, CONTAINER
-from core.context import INGRESS, S3
+from constants import AZURE_RELATION_NAME, CONTAINER, S3_RELATION_NAME
+from core.context import INGRESS
 
 
 @pytest.fixture
@@ -67,7 +67,7 @@ def history_server_container(tmp_path):
 def s3_relation():
     """Provide fixture for the S3 relation."""
     relation = Relation(
-        endpoint=S3,
+        endpoint=S3_RELATION_NAME,
         interface="s3",
         remote_app_name="s3-integrator",
     )
@@ -91,7 +91,7 @@ def s3_relation():
 def s3_relation_no_path():
     """Provide fixture for the S3 relation."""
     relation = Relation(
-        endpoint=S3,
+        endpoint=S3_RELATION_NAME,
         interface="s3",
         remote_app_name="s3-integrator",
     )
@@ -115,7 +115,7 @@ def s3_relation_no_path():
 def s3_relation_tls():
     """Provide fixture for the S3 relation."""
     relation = Relation(
-        endpoint=S3,
+        endpoint=S3_RELATION_NAME,
         interface="s3",
         remote_app_name="s3-integrator",
     )
