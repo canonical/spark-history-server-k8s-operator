@@ -53,6 +53,7 @@ jobs:
     secrets: inherit
     permissions:
       actions: read
+      contents: read
 
   release-charm:
     name: Release charm
