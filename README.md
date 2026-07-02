@@ -19,13 +19,19 @@ Apache Spark is a free, open source software project by the Apache Software Foun
 ## Usage
 
 ```bash
-$ juju deploy s3-integrator --channel 2/stable
-$ juju add-secret s3-creds access-key=<access-key> secret-key=<secret-key>
-$ juju grant-secret s3-creds s3-integrator
-$ juju config s3-integrator bucket=<bucket> endpoint=<endpoint> region=<region> path=spark-events/ credentials=<secret-uri> 
-$ juju deploy spark-history-server-k8s --channel 4/edge
-$ juju relate spark-history-server-k8s s3-integrator
+juju deploy spark-history-server-k8s --channel 4/edge
+juju deploy s3-integrator --channel 2/stable
+
+SECRET_URI=$(juju add-secret s3-creds access-key=<access-key> secret-key=<secret-key>)
+juju grant-secret s3-creds s3-integrator
+
+juju config s3-integrator bucket=<bucket> endpoint=<endpoint> region=<region> path=spark-events credentials=$SECRET_URI 
+
+juju relate spark-history-server-k8s s3-integrator
 ```
+
+> [!NOTE]  
+> If the `region` is not configured in the `s3-integrator` charm before integrating it with `spark-history-server-k8s` charm, the `spark-history-server-k8s` charm uses `us-east-1` as the region to send requests to S3.
 
 Once the spark history server unit is active, go to the IP of the unit at port 18080 to load the history server UI.
 
