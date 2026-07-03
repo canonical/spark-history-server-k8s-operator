@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install tox
         run: pipx install tox
       - name: Run linters
@@ -39,7 +39,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install tox
         run: pipx install tox
       - name: Run tests
@@ -49,7 +49,7 @@ jobs:
 
   build:
     name: Build charms
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v49.0.2
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v50.0.0
     permissions:
       actions: read
       contents: read
@@ -64,7 +64,7 @@ jobs:
       - build
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Set up environment
         run: |
           sudo snap install go --classic
@@ -167,7 +167,7 @@ jobs:
           printf '\nDisk usage\n'
           df --human-readable
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Set up spread
         run: |
           sudo snap install go --classic
