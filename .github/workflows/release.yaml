@@ -5,6 +5,9 @@ on:
     branches:
       - 3/edge
 
+permissions:
+  contents: read
+
 jobs:
   release-checks:
     runs-on: ubuntu-22.04
@@ -51,9 +54,6 @@ jobs:
   ci-tests:
     uses: ./.github/workflows/ci.yaml
     secrets: inherit
-    permissions:
-      actions: read
-      contents: read
 
   release-charm:
     name: Release charm
