@@ -5,12 +5,15 @@ on:
     branches:
       - 3/edge
 
+permissions:
+  contents: read
+
 jobs:
   release-checks:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Extract branch metadata
         shell: bash
@@ -51,16 +54,13 @@ jobs:
   ci-tests:
     uses: ./.github/workflows/ci.yaml
     secrets: inherit
-    permissions:
-      actions: read
-      contents: read
 
   release-charm:
     name: Release charm
     needs:
       - release-checks
       - ci-tests
-    uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v49.0.2
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v50.0.0
     with:
       track: ${{ needs.release-checks.outputs.track }}
       artifact-prefix: ${{ needs.ci-tests.outputs.artifact-prefix }}
