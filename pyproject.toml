@@ -8,7 +8,7 @@ requires-poetry = ">=2.0.0"
 [tool.poetry.dependencies]
 python = ">=3.10,<4.0"
 ops = "^3.8.0"
-pydantic = "^1.10.26"
+pydantic = "^2.13.4"
 pyyaml = ">=6.0.3"
 boto3 = "^1.43.47"
 jsonschema = "^4.26.0"
@@ -18,11 +18,8 @@ object-storage-charmlib = "^1.0.0"
 
 [tool.poetry.group.charm-libs.dependencies]
 ops = "^3.0.0"
-poetry-core = "*"
-# grafana_agent/v0/cos_agent.py requires pydantic <2
 # traefix_k8s/v2/ingress.py
-pydantic = "^1.10.17, <2"
-# grafana_agent/v0/cos_agent.py
+pydantic = "*"
 # loki_k8s/v1/loki_push_api.py
 # prometheus_k8s/v0/prometheus_scrape.py
 pyyaml = "*"
@@ -44,7 +41,7 @@ optional = true
 [tool.poetry.group.lint.dependencies]
 ruff = ">=0.15.21"
 codespell = ">=2.4.2"
-mypy = "^1.20.2"
+mypy = "^2.3.0"
 boto3-stubs = { extras = ["s3"], version = "^1.43.47" }
 types-pyyaml = "^6.0.12.20250915"
 types-requests = "^2.32.4.20260107"
@@ -105,7 +102,6 @@ follow_imports = "silent"
 
 [[tool.mypy.overrides]]
 module = [
-  "charms.data_platform_libs.*",
   "charms.grafana_k8s.*",
   "charms.loki_k8s.*",
   "charms.prometheus_k8s.*",
@@ -124,7 +120,7 @@ branch = true
 show_missing = true
 
 [tool.pytest.ini_options]
-minversion = "6.0"
+minversion = "9.0"
 log_cli_level = "INFO"
 markers = ["unstable"]
 

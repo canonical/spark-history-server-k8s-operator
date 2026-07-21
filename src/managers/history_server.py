@@ -57,7 +57,7 @@ class HistoryServerConfig(WithLogging):
         if not self.ingress:
             return {}
 
-        parsed_ingress = urlparse(self.ingress.url)
+        parsed_ingress = urlparse(str(self.ingress.url))
         redirect_uri = urlunparse((parsed_ingress.scheme, parsed_ingress.netloc, "", "", "", ""))
         ingress_properties = {"spark.ui.proxyRedirectUri": redirect_uri}
 
