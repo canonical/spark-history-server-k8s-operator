@@ -5,6 +5,21 @@ type: charm
 platforms:
   ubuntu@22.04:amd64:
   ubuntu@22.04:arm64:
+
+charm-libs:
+  - lib: grafana_k8s.grafana_dashboard
+    version: "0"
+  - lib: loki_k8s.loki_push_api
+    version: "1"
+  - lib: oathkeeper.auth_proxy
+    version: "0"
+  - lib: oauth2_proxy_k8s.auth_proxy
+    version: "0"
+  - lib: prometheus_k8s.prometheus_scrape
+    version: "0"
+  - lib: traefik_k8s.ingress
+    version: "2"
+
 # Files implicitly created by charmcraft without a part:
 # - dispatch (https://github.com/canonical/charmcraft/pull/1898)
 # - manifest.yaml
@@ -51,11 +66,11 @@ parts:
     source: .
     after:
       - poetry-deps
-    poetry-export-extra-args: ['--only', 'main,charm-libs']
+    poetry-export-extra-args: ["--only", "main,charm-libs"]
     build-packages:
-      - libffi-dev  # Needed to build Python dependencies with Rust from source
-      - libssl-dev  # Needed to build Python dependencies with Rust from source
-      - pkg-config  # Needed to build Python dependencies with Rust from source
+      - libffi-dev # Needed to build Python dependencies with Rust from source
+      - libssl-dev # Needed to build Python dependencies with Rust from source
+      - pkg-config # Needed to build Python dependencies with Rust from source
     override-build: |
       # Workaround for https://github.com/canonical/charmcraft/issues/2068
       # rustup used to install rustc and cargo, which are needed to build Python dependencies with Rust from source
