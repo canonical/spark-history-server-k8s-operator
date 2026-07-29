@@ -1,0 +1,48 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+summary: integration-tls pytest suite
+
+systems:
+  - ubuntu-22.04
+  - ubuntu-22.04-arm
+  - self-hosted-linux-amd64-jammy-large
+
+prepare: |
+  # Install Java to get keytool (needed by the TLS test)
+  apt-get install -y default-jdk-headless
+
+  IP=$(ip -4 -j route get 2.2.2.2 | jq -r '.[] | .prefsrc')
+
+  # Generate self-signed CA and server certificate
+  mkdir -p /tmp/certs
+  openssl genrsa -out /tmp/certs/ca.key 2048
+  openssl req -x509 -new -nodes -key /tmp/certs/ca.key \
+    -days 1024 -out /tmp/certs/ca.crt -outform PEM \
+    -subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=$IP"
+  openssl genrsa -out /tmp/certs/server.key 2048
+  openssl req -new -key /tmp/certs/server.key \
+    -out /tmp/certs/server.csr \
+    -subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=$IP"
+  echo "subjectAltName = DNS:$IP, IP:$IP" > /tmp/certs/extfile.cnf
+  openssl x509 -req -in /tmp/certs/server.csr \
+    -CA /tmp/certs/ca.crt -CAkey /tmp/certs/ca.key \
+    -CAcreateserial -out /tmp/certs/server.crt \
+    -days 365 -extfile /tmp/certs/extfile.cnf
+
+  # Configure microceph with TLS
+  microceph cluster bootstrap
+  microceph disk add loop,1G,3
+  SERVER_CRT_B64=$(base64 -w0 /tmp/certs/server.crt)
+  SERVER_KEY_B64=$(base64 -w0 /tmp/certs/server.key)
+  microceph enable rgw --ssl-certificate "$SERVER_CRT_B64" --ssl-private-key "$SERVER_KEY_B64"
+  microceph.radosgw-admin user create \
+    --uid test --display-name test \
+    --access-key=foo --secret-key=bar
+
+  printf "S3_SERVER_URL=https://%s:443/\nS3_ACCESS_KEY=foo\nS3_SECRET_KEY=bar\nS3_CA_BUNDLE_PATH=/tmp/certs/ca.crt\n" "$IP" \
+    > "$SPREAD_PATH/.env"
+
+execute: |
+  cd "$SPREAD_PATH"
+  tox run -e integration-tls -- --model testing --keep-models

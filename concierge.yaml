@@ -1,0 +1,27 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+juju:
+  model-defaults:
+    logging-config: <root>=INFO; unit=DEBUG
+
+providers:
+  microk8s:
+    enable: true
+    channel: 1.32-strict/stable
+    bootstrap: true
+    addons:
+      - dns
+      - hostpath-storage
+      - metallb:10.64.140.43-10.64.140.49
+
+host:
+  packages:
+    - pipx
+    - jq
+  snaps:
+    charmcraft:
+      channel: latest/stable
+    rockcraft:
+      channel: latest/stable
+    microceph:
