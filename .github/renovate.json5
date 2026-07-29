@@ -1,32 +1,45 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
     "github>canonical/data-platform//renovate_presets/charm.json5",
+    "helpers:pinGitHubActionDigests",
   ],
-  "reviewers": ["team:processing"],
-  // Between 1AM and 6:59AM, first Friday of the month
-  "schedule": ["* 1-6 1-7 * 5"],
-  "lockFileMaintenance": {
-    "enabled": true,
-    "schedule": ["* 1-6 1-7 * 5"]
+  // Between 1AM and 6:59AM, Friday mid-month
+  schedule: ["* 1-6 14-21 * 5"],
+  lockFileMaintenance: {
+    enabled: true,
+    // Between 1AM and 6:59AM, first Friday of the month
+    schedule: ["* 1-6 1-7 * 5"],
   },
-  "ignoreDeps": ["ubuntu"],
-  "customManagers": [
+  commitMessagePrefix: "[RENOVATE] ",
+  ignoreDeps: ["ubuntu"],
+  customManagers: [
     {
-      "customType": "regex",
-      "fileMatch": ["(^|/)metadata\\.yaml$"],
-      "matchStrings": [
-        "#\\s*oci-tag=(?<currentValue>[^\\s]+)\\r?\\n\\s*upstream-source:\\s*(?<depName>[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]+)"
+      customType: "regex",
+      managerFilePatterns: ["metadata.yaml"],
+      matchStrings: [
+        "#\\s*oci-tag=(?<currentValue>[^\\s]+)\\r?\\n\\s*upstream-source:\\s*(?<depName>[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]+)",
       ],
-      "datasourceTemplate": "docker"
-    }
+      datasourceTemplate: "docker",
+    },
   ],
-  "packageRules": [
+  packageRules: [
     {
-      "matchDatasources": ["docker"],
-      "matchPackageNames": ["ghcr.io/canonical/charmed-spark"],
-      "pinDigests": true,
-      "allowedVersions": "/^3\\.5-/"
-    }
-  ]
+      matchDatasources: ["docker"],
+      matchPackageNames: ["ghcr.io/canonical/charmed-spark"],
+      pinDigests: true,
+      allowedVersions: "/^3\\.5-/",
+    },
+    {
+      description: "Combine all charmcraft|charmcraft.yaml dependencies into a single PR",
+      matchFileNames: ["charmcraft.yaml", "metadata.yaml"],
+      groupName: "Charm dependencies",
+      groupSlug: "charm-deps",
+    },
+    {
+      description: "Require manual approval on Dashboard for major updates",
+      matchUpdateTypes: ["major"],
+      dependencyDashboardApproval: true,
+    },
+  ],
 }
