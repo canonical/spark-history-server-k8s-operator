@@ -130,7 +130,7 @@ class Context(WithLogging):
         """Configure the auth proxy relation."""
         if self._oauth2_proxy_relation:
             return AuthProxyConfig(
-                protected_urls=[self.ingress.url] if self.ingress else [],
+                protected_urls=[str(self.ingress.url)] if self.ingress else [],
                 allowed_endpoints=[],
                 headers=OAUTH2_PROXY_HEADERS,
             )
@@ -142,7 +142,7 @@ class Context(WithLogging):
         """Configure the auth proxy relation."""
         if self._oathkeeper_relation:
             return OathkeeperAuthProxyConfig(
-                protected_urls=[self.ingress.url] if self.ingress else [],
+                protected_urls=[str(self.ingress.url)] if self.ingress else [],
                 headers=AUTH_PROXY_HEADERS,
                 allowed_endpoints=[],
             )
