@@ -1,9 +1,15 @@
+# Copyright 2024 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 name: Release to Charmhub
 
 on:
   push:
     branches:
       - 4/edge
+
+permissions:
+  contents: read
 
 jobs:
   release-checks:
