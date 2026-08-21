@@ -6,11 +6,13 @@ import json
 import logging
 import subprocess
 from pathlib import Path
-from typing import cast
+from typing import Dict, TypedDict, cast
 
 import jubilant
+import lightkube
 import requests
 import yaml
+from lightkube.resources.core_v1 import Pod
 
 from constants import JMX_EXPORTER_PORT
 
@@ -21,6 +23,67 @@ COS_METRICS_PORT = 10019
 
 
 logger = logging.getLogger(__name__)
+
+
+class ContainerSecurityContext(TypedDict):
+    """Kubernetes container security context UID/GID settings."""
+
+    runAsUser: int | None  # noqa N815
+    runAsGroup: int | None  # noqa N815
+    runAsNonRoot: bool | None  # noqa N815
+
+
+def generate_container_securitycontext_map(
+    metadata_yaml: dict, juju_user_id: int = 170
+) -> dict[str, ContainerSecurityContext]:
+    """Build a map of container names to expected security context UID/GID settings.
+
+    The map is derived from the ``uid``/``gid`` values in the ``containers`` section
+    of ``metadata.yaml``, plus a ``charm`` entry for the Juju agent container.
+    """
+    c_uid_map: dict[str, ContainerSecurityContext] = {}
+    for k, v in metadata_yaml.get("containers", {}).items():
+        c_uid_map[k] = ContainerSecurityContext(
+            runAsUser=v["uid"],
+            runAsGroup=v["gid"],
+        )
+    c_uid_map["charm"] = {"runAsUser": juju_user_id, "runAsGroup": juju_user_id}
+    return c_uid_map
+
+
+def get_pod_names(model: str, application_name: str) -> list[str]:
+    """Retrieve names of all pods belonging to a specific Juju application."""
+    cmd = [
+        "kubectl",
+        "get",
+        "pods",
+        f"-n{model}",
+        f"-lapp.kubernetes.io/name={application_name}",
+        "--no-headers",
+        "-o=custom-columns=NAME:.metadata.name",
+    ]
+    proc = subprocess.run(
+        cmd,
+        stdout=subprocess.PIPE,
+    )
+    stdout = proc.stdout.decode("utf8")
+    return stdout.split()
+
+
+def assert_security_context(
+    lightkube_client: lightkube.Client,
+    pod_name: str,
+    container_name: str,
+    container_securitycontext_map: Dict[str, ContainerSecurityContext],
+    model_name: str,
+) -> None:
+    """Assert a container's security context matches expected UID/GID settings."""
+    containers: list = lightkube_client.get(Pod, pod_name, namespace=model_name).spec.containers
+    container = next((c for c in containers if c.name == container_name), None)
+    security_context = container.securityContext
+    # assert user ID is the one defined in metadata.yaml
+    for key, value in container_securitycontext_map.get(container_name).items():
+        assert getattr(security_context, key) == value
 
 
 def set_s3_credentials(
