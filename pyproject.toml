@@ -7,13 +7,13 @@ requires-poetry = ">=2.0.0"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<4.0"
-ops = "^3.8.0"
+ops = "^3.8.1"
 pydantic = "^2.13.4"
 pyyaml = ">=6.0.3"
-boto3 = "^1.42.0"
-jsonschema = "^4.25.1"
-tenacity = ">=9.1.2"
-azure-storage-blob = "^12.27.1"
+boto3 = "^1.43.75"
+jsonschema = "^4.26.0"
+tenacity = ">=9.1.4"
+azure-storage-blob = "^12.30.0"
 object-storage-charmlib = "^1.0.0"
 
 [tool.poetry.group.charm-libs.dependencies]
@@ -33,16 +33,16 @@ cosl = "*"
 optional = true
 
 [tool.poetry.group.format.dependencies]
-ruff = ">=0.14.7"
+ruff = ">=0.16.3"
 
 [tool.poetry.group.lint]
 optional = true
 
 [tool.poetry.group.lint.dependencies]
-ruff = ">=0.15.21"
-codespell = ">=2.4.2"
-mypy = "^2.3.0"
-boto3-stubs = { extras = ["s3"], version = "^1.43.47" }
+ruff = ">=0.16.3"
+codespell = ">=2.4.3"
+mypy = "^2.3.1"
+boto3-stubs = { extras = ["s3"], version = "^1.43.75" }
 types-pyyaml = "^6.0.12.20250915"
 types-requests = "^2.32.4.20260107"
 
@@ -50,22 +50,22 @@ types-requests = "^2.32.4.20260107"
 optional = true
 
 [tool.poetry.group.unit.dependencies]
-pytest = "^9.0.3"
+pytest = "^9.1.1"
 coverage = { extras = ["toml"], version = ">7.0" }
-ops = { version = "^3.4.0", extras = ["testing"] }
-moto = { extras = ["s3"], version = "^5.1.18" }
+ops = { version = "^3.8.1", extras = ["testing"] }
+moto = { extras = ["s3"], version = "^5.2.2" }
 
 [tool.poetry.group.integration]
 optional = true
 
 [tool.poetry.group.integration.dependencies]
-pytest = "^9.0.3"
+pytest = "^9.1.1"
 coverage = { extras = ["toml"], version = ">7.0" }
-tenacity = "^9.1.2"
-jubilant = "^1.6.1"
-python-dotenv = "^1.2.1"
-pytest-playwright = "^0.7.2"
-lightkube = "^0.18.0"
+tenacity = "^9.1.4"
+jubilant = "^1.12.0"
+python-dotenv = "^1.2.3"
+pytest-playwright = "^0.9.0"
+lightkube = "^0.22.0"
 jinja2 = "*"
 
 [tool.ruff]
