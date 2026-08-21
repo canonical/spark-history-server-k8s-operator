@@ -25,7 +25,7 @@ COS_METRICS_PORT = 10019
 logger = logging.getLogger(__name__)
 
 
-class ContainerSecurityContext(TypedDict):
+class ContainerSecurityContext(TypedDict, total=False):
     """Kubernetes container security context UID/GID settings."""
 
     runAsUser: int | None  # noqa N815
@@ -80,9 +80,10 @@ def assert_security_context(
     """Assert a container's security context matches expected UID/GID settings."""
     containers: list = lightkube_client.get(Pod, pod_name, namespace=model_name).spec.containers
     container = next((c for c in containers if c.name == container_name), None)
+    assert container is not None, f"Container {container_name} not found in pod {pod_name}"
     security_context = container.securityContext
     # assert user ID is the one defined in metadata.yaml
-    for key, value in container_securitycontext_map.get(container_name).items():
+    for key, value in container_securitycontext_map[container_name].items():
         assert getattr(security_context, key) == value
 
 
