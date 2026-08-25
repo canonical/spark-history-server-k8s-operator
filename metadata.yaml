@@ -34,7 +34,7 @@ resources:
     type: oci-image
     description: OCI image for Spark History Server
     # oci-tag=3.5-22.04_edge
-    upstream-source: ghcr.io/canonical/charmed-spark@sha256:fef3c1b4ef769ae47bbec0248df6fe7f883df6ef201dcfafdab632464af8d4cb
+    upstream-source: ghcr.io/canonical/charmed-spark@sha256:be8a6f6147cbb73f9fe8bb56c6df87d89d3bd8ae95d07b939f3e23de1c75a6a5
 
 requires:
   s3-credentials:
