@@ -2,7 +2,7 @@
 # Copyright 2024 Canonical Limited
 # See LICENSE file for licensing details.
 
-"""S3 Integration related event handlers."""
+"""Service Mesh Integration related event handlers."""
 
 from ops import CharmBase
 
