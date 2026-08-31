@@ -18,6 +18,7 @@ from events.azure_storage import AzureStorageEvents
 from events.history_server import HistoryServerEvents
 from events.ingress import IngressEvents
 from events.s3 import S3Events
+from events.service_mesh import ServiceMeshEvents
 from workload import SparkHistoryServer
 
 
@@ -51,6 +52,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         self.s3 = S3Events(self, context, workload)
         self.azure_storage = AzureStorageEvents(self, context, workload)
         self.history_server = HistoryServerEvents(self, context, workload)
+        self.service_mesh = ServiceMeshEvents(self, context, workload)
 
 
 if __name__ == "__main__":  # pragma: nocover
