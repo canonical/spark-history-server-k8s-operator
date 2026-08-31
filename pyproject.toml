@@ -112,6 +112,7 @@ module = [
   "charms.oauth2_proxy_k8s.*",
   "charms.oathkeeper.*",
   "charms.traefik_k8s.*",
+  "charms.istio_beacon_k8s.*",
 ]
 ignore_missing_imports = true
 

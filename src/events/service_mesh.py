@@ -4,6 +4,7 @@
 
 """Service Mesh Integration related event handlers."""
 
+from charms.istio_beacon_k8s.v0.service_mesh import ServiceMeshConsumer
 from ops import CharmBase
 
 from common.utils import WithLogging
@@ -11,7 +12,6 @@ from core.context import Context
 from core.workload import SparkHistoryWorkloadBase
 from events.base import BaseEventHandler
 
-from charms.istio_beacon_k8s.v0.service_mesh import ServiceMeshConsumer
 
 class ServiceMeshEvents(BaseEventHandler, WithLogging):
     """Class implementing Ambient Service Mesh event hooks."""
