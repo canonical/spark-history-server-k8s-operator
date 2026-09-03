@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2024 Canonical Limited
+# Copyright 2026 Canonical Limited
 # See LICENSE file for licensing details.
 
 """Service Mesh Integration related event handlers."""

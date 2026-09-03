@@ -54,6 +54,8 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         self.history_server = HistoryServerEvents(self, context, workload)
         self.service_mesh = ServiceMeshEvents(self, context, workload)
 
+        self.unit.set_ports(18080)
+
 
 if __name__ == "__main__":  # pragma: nocover
     main(SparkHistoryServerCharm)

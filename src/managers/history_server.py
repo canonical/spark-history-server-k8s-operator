@@ -62,7 +62,7 @@ class HistoryServerConfig(WithLogging):
         ingress_properties = {"spark.ui.proxyRedirectUri": redirect_uri}
 
         if base := parsed_ingress.path.strip("/"):
-            ingress_properties["spark.ui.proxyBase"] = f"/{base}"
+            ingress_properties["spark.ui.proxyBase"] = base
 
         return ingress_properties
 
