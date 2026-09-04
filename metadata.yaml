@@ -25,9 +25,13 @@ website:
 maintainers:
   - Canonical Data Platform <data-platform@lists.launchpad.net>
 
+charm-user: non-root
+
 containers:
   spark-history-server:
     resource: spark-history-server-image
+    uid: 584792
+    gid: 584792
 
 resources:
   spark-history-server-image:
@@ -68,3 +72,7 @@ provides:
   grafana-dashboard:
     interface: grafana_dashboard
     optional: true
+
+assumes:
+  - k8s-api
+  - juju >= 3.6
