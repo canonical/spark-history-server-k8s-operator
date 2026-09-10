@@ -11,7 +11,14 @@ from ops import CharmBase
 from ops.main import main
 
 from common.utils import WithLogging
-from constants import CONTAINER, JMX_CC_PORT, JMX_EXPORTER_PORT, METRICS_RULES_DIR, PEBBLE_USER
+from constants import (
+    CONTAINER,
+    HISTORY_SERVER_PORT,
+    JMX_CC_PORT,
+    JMX_EXPORTER_PORT,
+    METRICS_RULES_DIR,
+    PEBBLE_USER,
+)
 from core.context import Context
 from core.domain import User
 from events.azure_storage import AzureStorageEvents
@@ -54,7 +61,7 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         self.history_server = HistoryServerEvents(self, context, workload)
         self.service_mesh = ServiceMeshEvents(self, context, workload)
 
-        self.unit.set_ports(18080)
+        self.unit.set_ports(HISTORY_SERVER_PORT)
 
 
 if __name__ == "__main__":  # pragma: nocover

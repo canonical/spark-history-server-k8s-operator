@@ -2,25 +2,27 @@
 # Copyright 2024 Canonical Limited
 # See LICENSE file for licensing details.
 
-import json
 import logging
-import subprocess
-import urllib.request
 from pathlib import Path
-from time import sleep
-from urllib.parse import urlencode
 
 import jubilant
 import yaml
 from tenacity import Retrying, stop_after_attempt, wait_fixed
 
+from .helpers import (
+    assert_jobs_in_history_server,
+    deploy_history_server_setup,
+    get_logs_in_loki,
+    get_unit_address,
+    run_spark_job,
+    setup_spark_job,
+)
 from .test_helpers import (
     all_prometheus_exporters_data,
     get_cos_address,
     published_grafana_dashboards,
     published_prometheus_alerts,
     published_prometheus_data,
-    set_s3_credentials,
 )
 from .types import IntegrationTestsCharms, S3Info
 
@@ -40,44 +42,14 @@ def test_build_and_deploy(
 
     Assert on the output of collected Loki labels and logs.
     """
-    bucket = s3_bucket_and_creds["bucket"]
-    access_key = s3_bucket_and_creds["access_key"]
-    secret_key = s3_bucket_and_creds["secret_key"]
-    endpoint = s3_bucket_and_creds["endpoint"]
-    path = s3_bucket_and_creds["path"]
-
-    image_version = METADATA["resources"]["spark-history-server-image"]["upstream-source"]
-
-    logger.info(f"Image version: {image_version}")
-
-    resources = {"spark-history-server-image": image_version}
-
-    logger.info("Deploying charms")
-    # Deploy the charm and wait for waiting status
-    juju.deploy(**charm_versions.s3.deploy_dict())
-    juju.deploy(**charm_versions.loki.deploy_dict())
-    juju.deploy(
-        history_server_charm, resources=resources, app=APP_NAME, num_units=1, base="ubuntu@22.04"
+    deploy_history_server_setup(
+        juju=juju,
+        charm_versions=charm_versions,
+        history_server_charm=history_server_charm,
+        s3_bucket_and_creds=s3_bucket_and_creds,
     )
-    juju.wait(jubilant.all_agents_idle, timeout=1000)
-
-    logger.info("Setting up s3 credentials in s3-integrator charm")
-    set_s3_credentials(juju, charm_versions.s3.application_name, access_key, secret_key)
-
-    configuration_parameters = {
-        "bucket": bucket,
-        "path": path,
-        "endpoint": endpoint,
-    }
-    # apply new configuration options
-    juju.config(charm_versions.s3.application_name, configuration_parameters)
-    juju.wait(jubilant.all_agents_idle)
-
-    logger.info("Relating history server charm with s3-integrator charm")
-
-    juju.integrate(charm_versions.s3.application_name, APP_NAME)
     juju.wait(
-        lambda status: jubilant.all_active(status, APP_NAME, charm_versions.s3.application_name),
+        lambda status: jubilant.all_active(status),
         delay=5,
     )
 
@@ -91,121 +63,25 @@ def test_loki_integration(
 
     Assert on the unit status before any relations/configurations take place.
     """
-    access_key = s3_bucket_and_creds["access_key"]
-    secret_key = s3_bucket_and_creds["secret_key"]
-    endpoint = s3_bucket_and_creds["endpoint"]
-
-    image_version = METADATA["resources"]["spark-history-server-image"]["upstream-source"]
-
-    image_metadata = json.loads(
-        subprocess.check_output(
-            f"./tests/integration/setup/get_image_metadata.sh {image_version}",
-            shell=True,
-            stderr=None,
-        ).decode("utf-8")
-    )
-
-    spark_version = image_metadata["org.opencontainers.image.version"]
-
-    logger.info(f"Spark version: {spark_version}")
-
     logger.info("Verifying history server has no app entries")
-    status = juju.status()
-    address = status.apps[APP_NAME].units[f"{APP_NAME}/0"].address
-
-    apps = json.loads(urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read())
-
-    assert len(apps) == 0
+    address = get_unit_address(juju, APP_NAME)
+    history_server_url = f"http://{address}:18080"
+    assert_jobs_in_history_server(server_url=history_server_url, expected_count=0)
 
     logger.info("Integrate spark-history-server with Loki-k8s ")
 
     juju.integrate(charm_versions.loki.application_name, APP_NAME)
     juju.wait(jubilant.all_agents_idle)
 
-    logger.info("Setup a spark to run job")
-
-    setup_spark_output = subprocess.check_output(
-        f"./tests/integration/setup/setup_spark.sh {endpoint} {access_key} {secret_key} {image_version}",
-        shell=True,
-        stderr=None,
-    ).decode("utf-8")
-
-    logger.info(f"Setup spark output:\n{setup_spark_output}")
-
-    logger.info("Executing Spark job")
-
-    run_spark_output = subprocess.check_output(
-        f"./tests/integration/setup/run_spark_job.sh {spark_version}", shell=True, stderr=None
-    ).decode("utf-8")
-
-    logger.info(f"Run spark output:\n{run_spark_output}")
+    setup_spark_job(s3_bucket_and_creds=s3_bucket_and_creds)
+    run_spark_job()
 
     logger.info("Verifying history server has 1 app entry")
+    assert_jobs_in_history_server(server_url=history_server_url, expected_count=1)
 
-    for _ in range(0, 5):
-        try:
-            apps = json.loads(
-                urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read()
-            )
-        except Exception:
-            apps = []
-
-        if len(apps) > 0:
-            break
-        else:
-            sleep(3)
-
-    assert len(apps) == 1
-
-    logger.info("Verifying Loki has received the logs.")
-    loki_app_name = charm_versions.loki.application_name
-    status = juju.status()
-    loki_address = status.apps[loki_app_name].units[f"{loki_app_name}/0"].address
-
-    logger.info("Verifying loki labels")
-    try:
-        labels = json.loads(
-            urllib.request.urlopen(f"http://{loki_address}:3100/loki/api/v1/labels").read()
-        )
-    except Exception:
-        labels = {}
-
-    logger.info(f"Labels: {labels}")
-    assert "success" == labels["status"]
-    assert "juju_unit" in labels["data"]
-
-    try:
-        units = json.loads(
-            urllib.request.urlopen(
-                f"http://{loki_address}:3100/loki/api/v1/label/juju_unit/values"
-            ).read()
-        )
-    except Exception:
-        units = {}
-
-    # check label juju_unit contains spark-history-server-k8s application
-    logger.info(f"units: {units}")
-    assert "success" == units["status"]
-    assert f"{APP_NAME}/0" in units["data"][0]
-
-    # check for history server logs in loki
-    url = f"http://{loki_address}:3100/loki/api/v1/query_range"
-    keys = {"query": f'{{juju_unit="{APP_NAME}/0"}}'}
-    data = urlencode(keys).encode()
-
-    try:
-        query = json.loads(urllib.request.urlopen(url, data).read().decode())
-        logger.info(query)
-    except Exception:
-        query = {}
-
-    assert "success" == query["status"]
-    assert "stream" in query["data"]["result"][0]
-    assert f"{APP_NAME}" == query["data"]["result"][0]["stream"]["charm"]
-    assert f"{APP_NAME}/0" == query["data"]["result"][0]["stream"]["juju_unit"]
-
-    logs = query["data"]["result"][0]["values"]
-    logger.info(f"Retrieved logs: {logs}")
+    logs = get_logs_in_loki(
+        juju=juju, app_name=APP_NAME, filter_by_label={"juju_unit": f"{APP_NAME}/0"}
+    )
     # check for non empty logs
     assert len(logs) > 0
     # check if startup messages are there

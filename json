@@ -1,0 +1,44 @@
+kiali-k8s/0:
+  opened-ports: []
+  charm: ch:amd64/kiali-k8s-13
+  leader: true
+  life: alive
+  relation-info:
+  - relation-id: 0
+    endpoint: grafana
+    related-endpoint: grafana
+    application-data: {}
+    local-unit:
+      in-scope: true
+      data:
+        egress-subnets: 10.152.183.126/32
+        ingress-address: 10.152.183.126
+        private-address: 10.152.183.126
+  - relation-id: 1
+    endpoint: istio-metadata
+    cross-model: true
+    related-endpoint: istio-metadata
+    application-data:
+      root_namespace: istio-cp
+    related-units:
+      istio-k8s/0:
+        in-scope: true
+        data:
+          egress-subnets: 10.152.183.85/32
+          ingress-address: 10.152.183.85
+          private-address: 10.152.183.85
+  - relation-id: 2
+    endpoint: prometheus-api
+    cross-model: true
+    related-endpoint: prometheus-api
+    application-data:
+      direct_url: http://prometheus-k8s-0.prometheus-k8s-endpoints.istio-cp.svc.cluster.local:9090/
+    related-units:
+      prometheus-k8s/0:
+        in-scope: true
+        data:
+          egress-subnets: 10.152.183.96/32
+          ingress-address: 10.152.183.96
+          private-address: 10.152.183.96
+  provider-id: kiali-k8s-0
+  address: 10.1.139.138

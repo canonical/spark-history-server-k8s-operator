@@ -87,12 +87,33 @@ def charm_versions() -> IntegrationTestsCharms:
             alias="traefik-k8s",
             trust=True,
         ),
+        istio=CharmVersion(
+            name="istio-k8s",
+            channel="2/stable",
+            base="ubuntu@24.04",
+            alias="istio-k8s",
+            trust=True,
+        ),
+        istio_beacon=CharmVersion(
+            name="istio-beacon-k8s",
+            channel="2/stable",
+            base="ubuntu@22.04",
+            alias="istio-beacon-k8s",
+            trust=True,
+        ),
+        istio_ingress=CharmVersion(
+            name="istio-ingress-k8s",
+            channel="2/stable",
+            base="ubuntu@24.04",
+            alias="istio-ingress-k8s",
+            trust=True,
+        ),
         oathkeeper=CharmVersion(
             name="oathkeeper", channel="edge", base="ubuntu@22.04", trust=True
         ),
         oauth2proxy=CharmVersion(
             name="oauth2-proxy-k8s",
-            channel="latest/edge",
+            channel="latest/edge/fix-istio",
             base="ubuntu@22.04",
         ),
         azure_storage=CharmVersion(

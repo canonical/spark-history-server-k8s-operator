@@ -2,60 +2,30 @@
 # Copyright 2025 Canonical Limited
 # See LICENSE file for licensing details.
 
-import json
 import logging
-import os
-import subprocess
-import urllib.request
 from pathlib import Path
-from time import sleep
 
 import jubilant
-import requests
 import yaml
 from playwright.sync_api import BrowserContext, Page
 
-from .oauth_tools.external_idp import ExternalIdpService
-from .test_helpers import (
-    set_s3_credentials,
+from .helpers import (
+    assert_jobs_in_history_server,
+    complete_authentication_flow,
+    deploy_history_server_setup,
+    deploy_identity_setup,
+    get_ingress_url,
+    run_spark_job,
+    setup_spark_job,
 )
-from .types import IntegrationTestsCharms, S3Info
+from .oauth_tools.external_idp import ExternalIdpService
+from .types import IngressMode, IntegrationTestsCharms, S3Info
 
 logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
 BUCKET_NAME = "history-server"
-
-
-def verify_page_loads(page: Page, url: str) -> None:
-    """Verify that the correct url has been loaded."""
-    page.wait_for_url(url)
-
-
-def click_on_sign_in_button_by_text(page: Page, text: str) -> None:
-    """Find and click on a button by its displayed text."""
-    with page.expect_navigation():
-        page.get_by_text(text).click()
-
-
-def get_cookie_from_browser_by_name(browser_context: BrowserContext, name: str) -> str | None:
-    """Retrieve a cookie by name."""
-    cookies = browser_context.cookies()
-    for cookie in cookies:
-        if cookie.get("name", None) == name:
-            return cookie.get("value")
-    return None
-
-
-def complete_auth_code_login(
-    page: Page,
-    external_idp_service: ExternalIdpService,
-) -> None:
-    """Take a page that is in the identity-platform's login page and login the user."""
-    with page.expect_navigation():
-        external_idp_service.complete_user_login(page)
-    logger.info(f"Login flow completed: {page.url}")
 
 
 def test_build_and_deploy(
@@ -68,333 +38,54 @@ def test_build_and_deploy(
 
     Assert on the unit status before any relations/configurations take place.
     """
-    bucket = s3_bucket_and_creds["bucket"]
-    access_key = s3_bucket_and_creds["access_key"]
-    secret_key = s3_bucket_and_creds["secret_key"]
-    endpoint = s3_bucket_and_creds["endpoint"]
-    path = s3_bucket_and_creds["path"]
-
-    # Deploy charm from local source folder
-
-    image_version = METADATA["resources"]["spark-history-server-image"]["upstream-source"]
-
-    logger.info(f"Image version: {image_version}")
-
-    shell_output = subprocess.check_output(
-        f"./tests/integration/setup/get_image_metadata.sh {image_version}", shell=True
-    ).decode("utf-8")
-
-    logger.info(shell_output)
-
-    image_metadata = json.loads(shell_output)
-
-    spark_version = image_metadata["org.opencontainers.image.version"]
-
-    logger.info(f"Spark version: {spark_version}")
-
-    resources = {"spark-history-server-image": image_version}
-
-    logger.info("Deploying charm")
-
-    # Deploy the charm and wait for waiting status
-    juju.deploy(**charm_versions.s3.deploy_dict())
-    juju.deploy(
-        history_server_charm, resources=resources, app=APP_NAME, num_units=1, base="ubuntu@22.04"
+    deploy_history_server_setup(
+        juju=juju,
+        charm_versions=charm_versions,
+        history_server_charm=history_server_charm,
+        s3_bucket_and_creds=s3_bucket_and_creds,
+        ingress_mode=IngressMode.TRAEFIK,
     )
-    juju.wait(jubilant.all_agents_idle, timeout=1000)
-
-    logger.info("Setting up s3 credentials in s3-integrator charm")
-    set_s3_credentials(juju, charm_versions.s3.application_name, access_key, secret_key)
-
-    juju.wait(lambda status: jubilant.all_active(status, charm_versions.s3.application_name))
-
-    configuration_parameters = {
-        "bucket": bucket,
-        "path": path,
-        "endpoint": endpoint,
-    }
-    # apply new configuration options
-    juju.config(charm_versions.s3.application_name, configuration_parameters)
-    juju.wait(jubilant.all_agents_idle)
-
-    logger.info("Relating history server charm with s3-integrator charm")
-
-    juju.integrate(APP_NAME, charm_versions.s3.application_name)
-
     status = juju.wait(jubilant.all_active)
 
-    logger.info("Verifying history server has no app entries")
-
     address = status.apps[APP_NAME].units[f"{APP_NAME}/0"].address
-    apps = None
+    server_url = f"http://{address}:18080"
+    logger.info("Verifying history server has no app entries")
+    assert_jobs_in_history_server(server_url=server_url, expected_count=0)
 
-    for _ in range(0, 5):
-        try:
-            apps = json.loads(
-                urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read()
-            )
-        except Exception:
-            sleep(3)
-
-    assert apps is not None and len(apps) == 0
-
-    logger.info("Setting up spark")
-
-    setup_spark_output = subprocess.check_output(
-        f"./tests/integration/setup/setup_spark.sh {endpoint} {access_key} {secret_key} {image_version}",
-        shell=True,
-        stderr=None,
-    ).decode("utf-8")
-
-    logger.info(f"Setup spark output:\n{setup_spark_output}")
-
-    logger.info("Executing Spark job")
-
-    run_spark_output = subprocess.check_output(
-        f"./tests/integration/setup/run_spark_job.sh {spark_version}", shell=True, stderr=None
-    ).decode("utf-8")
-
-    logger.info(f"Run spark output:\n{run_spark_output}")
+    setup_spark_job(s3_bucket_and_creds=s3_bucket_and_creds)
+    run_spark_job()
 
     logger.info("Verifying history server has 1 app entry")
-
-    for _ in range(0, 5):
-        try:
-            apps = json.loads(
-                urllib.request.urlopen(f"http://{address}:18080/api/v1/applications").read()
-            )
-        except Exception:
-            apps = []
-
-        if len(apps) > 0:
-            break
-        else:
-            sleep(3)
-
-    assert len(apps) == 1
+    assert_jobs_in_history_server(server_url=server_url, expected_count=1)
 
 
-def test_deploy_iam_bundle(
-    juju: jubilant.Juju,
-    charm_versions: IntegrationTestsCharms,
-    external_idp_service: ExternalIdpService,
-) -> None:
-    """Deploy the iam bundle."""
-    # Deploy all charms necessary for Oauth2proxy integration
-    juju.deploy(**charm_versions.ingress.deploy_dict())
-    juju.deploy(**charm_versions.postgresql.deploy_dict())
-    juju.deploy(**charm_versions.self_signed_certificate.deploy_dict())
-    juju.deploy(**charm_versions.hydra.deploy_dict())
-    juju.deploy(**charm_versions.kratos.deploy_dict())
-    juju.deploy(**charm_versions.identity_platform_login_ui_operator.deploy_dict())
-    juju.deploy(**charm_versions.kratos_external_idp_integrator.deploy_dict())
-
-    juju.deploy(**charm_versions.oauth2proxy.deploy_dict())
-
-    juju.integrate(
-        charm_versions.self_signed_certificate.application_name,
-        f"{charm_versions.ingress.application_name}:certificates",
-    )
-
-    # hydra integrations
-    juju.integrate(
-        charm_versions.hydra.application_name, charm_versions.postgresql.application_name
-    )
-    juju.integrate(
-        f"{charm_versions.hydra.application_name}:public-route",
-        charm_versions.ingress.application_name,
-    )
-
-    # kratos integrations
-    juju.integrate(
-        charm_versions.kratos.application_name, charm_versions.postgresql.application_name
-    )
-    juju.integrate(
-        f"{charm_versions.kratos.application_name}:public-route",
-        charm_versions.ingress.application_name,
-    )
-    juju.integrate(
-        charm_versions.kratos.application_name,
-        f"{charm_versions.hydra.application_name}:hydra-endpoint-info",
-    )
-
-    # login ui integrations
-    juju.integrate(
-        charm_versions.hydra.application_name,
-        f"{charm_versions.identity_platform_login_ui_operator.application_name}:ui-endpoint-info",
-    )
-    juju.integrate(
-        charm_versions.hydra.application_name,
-        f"{charm_versions.identity_platform_login_ui_operator.application_name}:hydra-endpoint-info",
-    )
-
-    juju.integrate(
-        charm_versions.kratos.application_name,
-        f"{charm_versions.identity_platform_login_ui_operator.application_name}:ui-endpoint-info",
-    )
-    juju.integrate(
-        charm_versions.kratos.application_name,
-        f"{charm_versions.identity_platform_login_ui_operator.application_name}:kratos-info",
-    )
-
-    juju.integrate(
-        charm_versions.identity_platform_login_ui_operator.application_name,
-        charm_versions.ingress.application_name,
-    )
-
-    juju.integrate(
-        charm_versions.kratos.application_name,
-        charm_versions.kratos_external_idp_integrator.application_name,
-    )
-
-    # wait for all charms to be active/blocking
-    juju.wait(
-        lambda status: jubilant.all_active(
-            status,
-            charm_versions.postgresql.application_name,
-            charm_versions.self_signed_certificate.application_name,
-            charm_versions.hydra.application_name,
-            charm_versions.kratos.application_name,
-            charm_versions.identity_platform_login_ui_operator.application_name,
-        ),
-        delay=10,
-        timeout=2000,
-    )
-
-    juju.wait(
-        lambda status: jubilant.all_blocked(
-            status,
-            charm_versions.kratos_external_idp_integrator.application_name,
-        ),
-        delay=10,
-        timeout=1000,
-    )
-    # configure external idp integrator with external idp service (dex)
-    juju.config(
-        charm_versions.kratos_external_idp_integrator.application_name,
-        {
-            "client_id": external_idp_service.client_id,
-            "client_secret": external_idp_service.client_secret,
-            "provider": "generic",
-            "issuer_url": external_idp_service.issuer_url,
-            "scope": "profile email",
-            "provider_id": "Dex",
-        },
-    )
-
-    juju.wait(
-        lambda status: jubilant.all_active(
-            status,
-            charm_versions.postgresql.application_name,
-            charm_versions.self_signed_certificate.application_name,
-            charm_versions.hydra.application_name,
-            charm_versions.kratos.application_name,
-            charm_versions.identity_platform_login_ui_operator.application_name,
-            charm_versions.kratos_external_idp_integrator.application_name,
-        ),
-        delay=10,
-        timeout=600,
-    )
-
-    juju.integrate(
-        f"{charm_versions.oauth2proxy.application_name}:ingress",
-        charm_versions.ingress.application_name,
-    )
-    juju.integrate(
-        f"{charm_versions.oauth2proxy.application_name}:oauth",
-        charm_versions.hydra.application_name,
-    )
-    juju.config(
-        charm_versions.ingress.application_name, {"enable_experimental_forward_auth": "True"}
-    )
-    juju.integrate(
-        f"{charm_versions.ingress.application_name}:experimental-forward-auth",
-        f"{charm_versions.oauth2proxy.application_name}:forward-auth",
-    )
-    juju.integrate(
-        f"{charm_versions.oauth2proxy.application_name}:receive-ca-cert",
-        charm_versions.self_signed_certificate.application_name,
-    )
-    juju.wait(
-        lambda status: jubilant.all_active(
-            status,
-            charm_versions.oauth2proxy.application_name,
-            charm_versions.ingress.application_name,
-        ),
-        delay=10,
-        timeout=200,
-    )
-
-    juju.integrate(charm_versions.oauth2proxy.application_name, f"{APP_NAME}:oauth2-proxy")
-    juju.integrate(f"{APP_NAME}:ingress", charm_versions.ingress.application_name)
-
-    juju.wait(
-        lambda status: jubilant.all_active(
-            status,
-            charm_versions.oauth2proxy.application_name,
-            charm_versions.ingress.application_name,
-            charm_versions.postgresql.application_name,
-            charm_versions.self_signed_certificate.application_name,
-            charm_versions.hydra.application_name,
-            charm_versions.kratos.application_name,
-            charm_versions.identity_platform_login_ui_operator.application_name,
-            charm_versions.kratos_external_idp_integrator.application_name,
-        ),
-        delay=10,
-        timeout=600,
-    )
-
-    task = juju.run(
-        f"{charm_versions.kratos_external_idp_integrator.application_name}/0", "get-redirect-uri"
-    )
-    assert task.return_code == 0
-
-    logger.info("Configuring the external provider")
-    external_idp_service.update_redirect_uri(redirect_uri=task.results["redirect-uri"])
-
-    logger.info("IAM bundle deployed successfully.")
-
-
-def test_login(
+def test_login_flow(
     juju: jubilant.Juju,
     charm_versions: IntegrationTestsCharms,
     external_idp_service: ExternalIdpService,
     page: Page,
     context: BrowserContext,
 ) -> None:
-    """Test deploying the identity platform with external IdP and logging into the application."""
-    # get proxied endpoint
-    task = juju.run(f"{charm_versions.ingress.application_name}/0", "show-proxied-endpoints")
-    assert task.return_code == 0
-    history_server_proxy_endpoint = json.loads(task.results["proxied-endpoints"])[APP_NAME]["url"]
-
-    logger.info(f"History server proxy endpoint: {history_server_proxy_endpoint}")
-
-    page.goto(history_server_proxy_endpoint)
-    logger.info(f"Navigated to {history_server_proxy_endpoint}")
-
-    logger.info("Clicking on Sign in with Generic identity provider.")
-    click_on_sign_in_button_by_text(page=page, text="Sign in with Generic")
-
-    # complete login in the external identity provider
-    complete_auth_code_login(page=page, external_idp_service=external_idp_service)
-
-    # verify the correct redirect after login
-    verify_page_loads(page=page, url=history_server_proxy_endpoint)
-
-    # Verifying that the login flow was successful is application specific.
-    # The test uses Spark history server's /api/user endpoint to verify the session cookie is valid
-    history_server_session_cookie = get_cookie_from_browser_by_name(
-        browser_context=context, name="_oauth2_proxy"
+    """Deploy the iam bundle."""
+    deploy_identity_setup(
+        juju=juju,
+        charm_versions=charm_versions,
+        external_idp_service=external_idp_service,
+        ingress_mode=IngressMode.TRAEFIK,
     )
-    request = requests.get(
-        os.path.join(history_server_proxy_endpoint, "api/v1/applications"),
-        headers={"Cookie": f"_oauth2_proxy={history_server_session_cookie}"},
-        verify=False,
+    ingress_url = get_ingress_url(juju, charm_versions, IngressMode.TRAEFIK)
+    session_cookie = complete_authentication_flow(
+        juju=juju,
+        charm_versions=charm_versions,
+        external_idp_service=external_idp_service,
+        page=page,
+        context=context,
+        history_server_url=ingress_url,
     )
-    logger.info(f"Response status code from application: {request.status_code}")
-    logger.info(f"Response text from application: {request.text}")
-    assert request.status_code == 200
-    apps = request.json()
-    logger.info(f"Response JSON from application: {request.json()}")
-    assert len(apps) == 1
+    assert session_cookie is not None
+    assert_jobs_in_history_server(
+        server_url=ingress_url,
+        expected_count=1,
+        session_cookie=session_cookie,
+        verify_tls=False,
+    )
