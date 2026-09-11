@@ -47,5 +47,5 @@ def test_build_and_deploy(
     assert_jobs_in_history_server(server_url=server_url, expected_count=0)
 
     setup_spark_job(s3_bucket_and_creds=s3_bucket_and_creds)
-    run_spark_job()
+    run_spark_job(tls_ca=s3_bucket_and_creds["ca_bundle_path"])
     assert_jobs_in_history_server(server_url=server_url, expected_count=1)

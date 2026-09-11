@@ -575,13 +575,21 @@ def setup_spark_job(
     return setup_spark_output
 
 
-def run_spark_job():
+def run_spark_job(tls_ca: str | None = None):
     logger.info("Executing Spark job...")
     spark_version = get_spark_version()
-    run_spark_output = subprocess.check_output(
-        f"./tests/integration/setup/run_spark_job.sh {spark_version}", shell=True, stderr=None
-    ).decode("utf-8")
-    logger.info(f"Run spark output:\n{run_spark_output}")
+    output = ""
+    if tls_ca:
+        output = subprocess.check_output(
+            f"./tests/integration/setup/run_spark_job_tls.sh  {spark_version} {tls_ca}",
+            shell=True,
+            stderr=None,
+        ).decode("utf-8")
+    else:
+        output = subprocess.check_output(
+            f"./tests/integration/setup/run_spark_job.sh {spark_version}", shell=True, stderr=None
+        ).decode("utf-8")
+    logger.info(f"Run spark output:\n{output}")
 
 
 def _get_application_data(juju: jubilant.Juju, app_name: str, relation_name: str) -> dict:
