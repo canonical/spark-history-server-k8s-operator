@@ -269,7 +269,6 @@ def deploy_identity_setup(
     ingress_mode: IngressMode = IngressMode.TRAEFIK,
 ):
     # Deploy all charms necessary for Oauth2proxy integration
-    juju.deploy(**charm_versions.ingress.deploy_dict())
     juju.deploy(**charm_versions.oauth2proxy.deploy_dict())
     juju.deploy(**charm_versions.postgresql.deploy_dict())
     juju.deploy(**charm_versions.self_signed_certificate.deploy_dict())
@@ -280,6 +279,8 @@ def deploy_identity_setup(
     hserver_ingress_charm = charm_versions.ingress
     if ingress_mode == IngressMode.ISTIO_INGRESS:
         hserver_ingress_charm = charm_versions.istio_ingress
+        # Traefik ingress is needed for IAM bundle anyway
+        juju.deploy(**charm_versions.ingress.deploy_dict())
 
     juju.integrate(
         charm_versions.self_signed_certificate.application_name,
