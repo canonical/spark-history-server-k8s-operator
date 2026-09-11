@@ -691,49 +691,42 @@ def get_logs_in_loki(juju: jubilant.Juju, app_name: str, filter_by_label: dict[s
 
     for key, value in filter_by_label.items():
         try:
-            values = json.loads(
+            response = json.loads(
                 urllib.request.urlopen(
                     f"http://{loki_address}:3100/loki/api/v1/label/{key}/values"
                 ).read()
             )
         except Exception:
-            values = {}
-        logger.info(f"Values for label '{key}': {values}")
-        assert "success" == values["status"]
-        assert value in values["data"][0], (
+            response = {}
+        logger.info(f"Response for values for key '{key}': {response}")
+        assert "success" == response["status"]
+        assert value in response["data"][0], (
             f"Expected value '{value}' for label '{key}' not found in Loki"
         )
 
     # check for history server logs in loki
     url = f"http://{loki_address}:3100/loki/api/v1/query_range"
-    query = ",".join([f"{key}={value}" for key, value in filter_by_label.items()])
+    query = ",".join([f'{key}="{value}"' for key, value in filter_by_label.items()])
     keys = {"query": f"{{{query}}}"}
     data = urlencode(keys).encode()
 
     try:
-        query = json.loads(urllib.request.urlopen(url, data).read().decode())
-        logger.info(query)
+        response = json.loads(urllib.request.urlopen(url, data).read().decode())
+        logger.info(response)
     except Exception:
-        query = {}
+        response = {}
 
-    assert "success" == query["status"]
-    assert "stream" in query["data"]["result"][0]
+    assert "success" == response["status"], (
+        f"Failed to query Loki; query used: {query}, received response: {response}"
+    )
+    assert "stream" in response["data"]["result"][0]
     for key, value in filter_by_label.items():
-        assert value == query["data"]["result"][0]["stream"].get(key), (
+        assert value == response["data"]["result"][0]["stream"].get(key), (
             f"Expected value '{value}' for label '{key}' not found in Loki stream"
         )
 
-    logs = query["data"]["result"][0]["values"]
+    logs = response["data"]["result"][0]["values"]
     logger.info(f"Retrieved logs: {logs}")
-    return logs
-
-    # check if startup messages are there
-    c = 0
-    for log_line in logs:
-        if "INFO HistoryServer" in log_line[1]:
-            c = c + 1
-    logger.info(f"Number of line found: {c}")
-
     return logs
 
 
