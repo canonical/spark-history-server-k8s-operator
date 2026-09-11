@@ -10,12 +10,14 @@ import urllib.request
 import uuid
 from pathlib import Path
 from time import sleep
-from typing import cast
+from typing import cast, Dict, TypedDict
 from urllib.parse import urlencode
 
 import jubilant
+import lightkube
 import requests
 import yaml
+from lightkube.resources.core_v1 import Pod
 from playwright.sync_api import BrowserContext, Page
 from tenacity import Retrying, stop_after_attempt, wait_fixed
 
@@ -905,3 +907,62 @@ def curl_using_pod(
         ],
         check=False,
     )
+
+class ContainerSecurityContext(TypedDict, total=False):
+    """Kubernetes container security context UID/GID settings."""
+
+    runAsUser: int | None  # noqa N815
+    runAsGroup: int | None  # noqa N815
+    runAsNonRoot: bool | None  # noqa N815
+
+def assert_security_context(
+    lightkube_client: lightkube.Client,
+    pod_name: str,
+    container_name: str,
+    container_securitycontext_map: Dict[str, ContainerSecurityContext],
+    model_name: str,
+) -> None:
+    """Assert a container's security context matches expected UID/GID settings."""
+    containers: list = lightkube_client.get(Pod, pod_name, namespace=model_name).spec.containers
+    container = next((c for c in containers if c.name == container_name), None)
+    assert container is not None, f"Container {container_name} not found in pod {pod_name}"
+    security_context = container.securityContext
+    # assert user ID is the one defined in metadata.yaml
+    for key, value in container_securitycontext_map[container_name].items():
+        assert getattr(security_context, key) == value
+
+
+def generate_container_securitycontext_map(
+    metadata_yaml: dict, juju_user_id: int = 170
+) -> dict[str, ContainerSecurityContext]:
+    """Build a map of container names to expected security context UID/GID settings.
+
+    The map is derived from the ``uid``/``gid`` values in the ``containers`` section
+    of ``metadata.yaml``, plus a ``charm`` entry for the Juju agent container.
+    """
+    c_uid_map: dict[str, ContainerSecurityContext] = {}
+    for k, v in metadata_yaml.get("containers", {}).items():
+        c_uid_map[k] = ContainerSecurityContext(
+            runAsUser=v["uid"],
+            runAsGroup=v["gid"],
+        )
+    c_uid_map["charm"] = {"runAsUser": juju_user_id, "runAsGroup": juju_user_id}
+    return c_uid_map
+
+def get_pod_names(model: str, application_name: str) -> list[str]:
+    """Retrieve names of all pods belonging to a specific Juju application."""
+    cmd = [
+        "kubectl",
+        "get",
+        "pods",
+        f"-n{model}",
+        f"-lapp.kubernetes.io/name={application_name}",
+        "--no-headers",
+        "-o=custom-columns=NAME:.metadata.name",
+    ]
+    proc = subprocess.run(
+        cmd,
+        stdout=subprocess.PIPE,
+    )
+    stdout = proc.stdout.decode("utf8")
+    return stdout.split()

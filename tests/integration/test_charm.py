@@ -9,8 +9,10 @@ import logging
 import ssl
 import urllib.request
 from pathlib import Path
+from typing import cast
 
 import jubilant
+import lightkube
 import pytest
 import yaml
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
@@ -23,6 +25,9 @@ from .helpers import (
     get_ingress_url,
     run_spark_job,
     setup_spark_job,
+    assert_security_context,
+    generate_container_securitycontext_map,
+    get_pod_names,
 )
 from .types import IngressMode, IntegrationTestsCharms, S3Info
 
@@ -30,6 +35,7 @@ logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
+CONTAINERS_SECURITY_CONTEXT_MAP = generate_container_securitycontext_map(METADATA)
 
 
 def test_build_and_deploy(
@@ -57,6 +63,27 @@ def test_build_and_deploy(
     setup_spark_job(s3_bucket_and_creds=s3_bucket_and_creds)
     run_spark_job()
     assert_jobs_in_history_server(server_url=server_url, expected_count=1)
+
+
+@pytest.mark.parametrize("container_name", list(CONTAINERS_SECURITY_CONTEXT_MAP.keys()))
+def test_container_security_context(
+    juju: jubilant.Juju,
+    container_name: str,
+) -> None:
+    """Test container security context is correctly set.
+
+    Verify that container spec defines the security context with correct
+    user ID and group ID.
+    """
+    lightkube_client = lightkube.Client()
+    pod_name = get_pod_names(cast(str, juju.model), APP_NAME)[0]
+    assert_security_context(
+        lightkube_client,
+        pod_name,
+        container_name,
+        CONTAINERS_SECURITY_CONTEXT_MAP,
+        cast(str, juju.model),
+    )
 
 
 def test_ingress(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) -> None:

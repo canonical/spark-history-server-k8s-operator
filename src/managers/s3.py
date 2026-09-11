@@ -52,8 +52,12 @@ class S3Manager(WithLogging):
                 bucket_exists = False
 
         if not bucket_exists:
-            client.create_bucket(Bucket=bucket_name)
-            self._wait_until_exists(client, "bucket")
+            try:
+                client.create_bucket(Bucket=bucket_name)
+                self._wait_until_exists(client, "bucket")
+            except ClientError as ex:
+                self.logger.error(f"Could not create bucket {bucket_name}: {ex}")
+                return False
             self.logger.info(f"Created bucket {bucket_name}")
 
         return True
@@ -77,11 +81,17 @@ class S3Manager(WithLogging):
                 path_exists = False
 
         if not path_exists:
-            client.put_object(
-                Bucket=self.connection_info.bucket,
-                Key=os.path.join(path, ".keep"),
-            )
-            self._wait_until_exists(client, "key")
+            try:
+                client.put_object(
+                    Bucket=self.connection_info.bucket,
+                    Key=os.path.join(path, ".keep"),
+                )
+                self._wait_until_exists(client, "key")
+            except ClientError as ex:
+                self.logger.error(
+                    f"Could not create path {path} in bucket {self.connection_info.bucket}: {ex}"
+                )
+                return False
             self.logger.info(f"Created path {path} in bucket {self.connection_info.bucket}")
 
         return True
@@ -125,8 +135,13 @@ class S3Manager(WithLogging):
                 endpoint_url=self.connection_info.endpoint or "https://s3.amazonaws.com",
                 verify=ca_file.name if self.connection_info.tls_ca_chain else None,
                 config=Config(
-                    request_checksum_calculation="when_supported",
-                    response_checksum_validation="when_supported",
+                    # "when_supported" (the boto3 >= 1.36 default) makes every write use
+                    # aws-chunked encoding with a trailing CRC32 checksum. Several S3-compatible
+                    # backends (e.g. Ceph radosgw behind an Apache proxy) don't support that and
+                    # reject the request with XAmzContentSHA256Mismatch, so only compute/validate
+                    # checksums when the S3 API actually requires them.
+                    request_checksum_calculation="when_required",
+                    response_checksum_validation="when_required",
                     proxies=proxy_config,
                 ),
             )
