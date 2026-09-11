@@ -920,7 +920,9 @@ def assert_security_context(
     model_name: str,
 ) -> None:
     """Assert a container's security context matches expected UID/GID settings."""
-    containers: list = lightkube_client.get(Pod, pod_name, namespace=model_name).spec.containers
+    pod_spec = lightkube_client.get(Pod, pod_name, namespace=model_name).spec
+    assert pod_spec is not None
+    containers: list = pod_spec.containers
     container = next((c for c in containers if c.name == container_name), None)
     assert container is not None, f"Container {container_name} not found in pod {pod_name}"
     security_context = container.securityContext

@@ -30,8 +30,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Install tox
         run: pipx install tox
-      # - name: Run linters
-      #   run: tox run -e lint
+      - name: Run linters
+        run: tox run -e lint
 
   unit-test:
     name: Unit tests
