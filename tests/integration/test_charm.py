@@ -21,13 +21,13 @@ from core.context import OAUTH2_PROXY_HEADERS
 
 from .helpers import (
     assert_jobs_in_history_server,
+    assert_security_context,
     deploy_history_server_setup,
+    generate_container_securitycontext_map,
     get_ingress_url,
+    get_pod_names,
     run_spark_job,
     setup_spark_job,
-    assert_security_context,
-    generate_container_securitycontext_map,
-    get_pod_names,
 )
 from .types import IngressMode, IntegrationTestsCharms, S3Info
 

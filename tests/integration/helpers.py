@@ -10,7 +10,7 @@ import urllib.request
 import uuid
 from pathlib import Path
 from time import sleep
-from typing import cast, Dict, TypedDict
+from typing import Dict, TypedDict, cast
 from urllib.parse import urlencode
 
 import jubilant
@@ -908,12 +908,14 @@ def curl_using_pod(
         check=False,
     )
 
+
 class ContainerSecurityContext(TypedDict, total=False):
     """Kubernetes container security context UID/GID settings."""
 
     runAsUser: int | None  # noqa N815
     runAsGroup: int | None  # noqa N815
     runAsNonRoot: bool | None  # noqa N815
+
 
 def assert_security_context(
     lightkube_client: lightkube.Client,
@@ -948,6 +950,7 @@ def generate_container_securitycontext_map(
         )
     c_uid_map["charm"] = {"runAsUser": juju_user_id, "runAsGroup": juju_user_id}
     return c_uid_map
+
 
 def get_pod_names(model: str, application_name: str) -> list[str]:
     """Retrieve names of all pods belonging to a specific Juju application."""
