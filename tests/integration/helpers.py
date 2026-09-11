@@ -464,20 +464,13 @@ def deploy_o11y_setup(
     juju.deploy(**charm_versions.otel_collector.deploy_dict())
 
     logger.info("Waiting for test charm to be idle...")
-    juju.wait(
-        lambda status: jubilant.all_blocked(status, charm_versions.otel_collector.application_name)
-    )
+    juju.wait(jubilant.all_agents_idle, delay=5)
 
     juju.integrate(charm_versions.otel_collector.application_name, f"{APP_NAME}:metrics-endpoint")
     juju.integrate(charm_versions.otel_collector.application_name, f"{APP_NAME}:grafana-dashboard")
     juju.integrate(charm_versions.otel_collector.application_name, f"{APP_NAME}:logging")
+    juju.wait(jubilant.all_agents_idle, delay=5)
     juju.wait(lambda status: jubilant.all_active(status, APP_NAME), delay=10)
-    juju.wait(
-        lambda status: jubilant.all_blocked(
-            status, charm_versions.otel_collector.application_name
-        ),
-        delay=10,
-    )
 
     juju.cli("deploy", "cos-lite", "--trust")
     juju.wait(
@@ -686,15 +679,15 @@ def get_ingress_url(
 def get_logs_in_loki(juju: jubilant.Juju, app_name: str, filter_by_label: dict[str, str]):
     loki_address = get_unit_address(juju, app_name)
     try:
-        labels = json.loads(
+        response = json.loads(
             urllib.request.urlopen(f"http://{loki_address}:3100/loki/api/v1/labels").read()
         )
     except Exception:
-        labels = {}
-    logger.info(f"Labels: {labels}")
-    assert "success" == labels["status"]
+        response = {}
+    assert "success" == response["status"], "Failed to get labels from Loki"
+    labels = response["data"]
     for key in filter_by_label:
-        assert key in labels, f"Log label '{key}' not found in Loki labels"
+        assert key in labels, f"Log label '{key}' not found in Loki labels: {labels}"
 
     for key, value in filter_by_label.items():
         try:
