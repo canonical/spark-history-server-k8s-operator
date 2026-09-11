@@ -52,6 +52,7 @@ class IntegrationTestsCharms(BaseModel):
     azure_storage: CharmVersion
     loki: CharmVersion
     grafana_agent: CharmVersion
+    otel_collector: CharmVersion
     self_signed_certificate: CharmVersion
     postgresql: CharmVersion
     hydra: CharmVersion

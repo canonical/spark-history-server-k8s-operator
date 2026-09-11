@@ -12,12 +12,10 @@ import yaml
 
 from .helpers import (
     assert_jobs_in_history_server,
+    delete_azure_container,
     deploy_history_server_setup,
     run_spark_job,
     setup_spark_job,
-)
-from .test_helpers import (
-    delete_azure_container,
 )
 from .types import AzureInfo, IntegrationTestsCharms
 

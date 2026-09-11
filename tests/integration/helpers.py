@@ -2,6 +2,7 @@
 # Copyright 2026 Canonical Limited
 # See LICENSE file for licensing details.
 
+import base64
 import json
 import logging
 import subprocess
@@ -9,6 +10,7 @@ import urllib.request
 import uuid
 from pathlib import Path
 from time import sleep
+from typing import cast
 from urllib.parse import urlencode
 
 import jubilant
@@ -17,8 +19,9 @@ import yaml
 from playwright.sync_api import BrowserContext, Page
 from tenacity import Retrying, stop_after_attempt, wait_fixed
 
+from constants import JMX_EXPORTER_PORT
+
 from .oauth_tools.external_idp import ExternalIdpService
-from .test_helpers import delete_azure_container, set_s3_credentials
 from .types import AzureInfo, IngressMode, IntegrationTestsCharms, S3Info
 
 logger = logging.getLogger(__name__)
@@ -35,12 +38,14 @@ def _prepare_s3_storage_setup(
     juju: jubilant.Juju,
     charm_versions: IntegrationTestsCharms,
     s3_bucket_and_creds: S3Info,
+    s3_tls: bool = False,
 ):
     bucket = s3_bucket_and_creds["bucket"]
     access_key = s3_bucket_and_creds["access_key"]
     secret_key = s3_bucket_and_creds["secret_key"]
     endpoint = s3_bucket_and_creds["endpoint"]
     path = s3_bucket_and_creds["path"]
+    tls_ca_chain_path = s3_bucket_and_creds["ca_bundle_path"]
 
     logger.info("Deploying S3 Integrator charm")
     juju.deploy(**charm_versions.s3.deploy_dict())
@@ -53,6 +58,11 @@ def _prepare_s3_storage_setup(
         "path": path,
         "endpoint": endpoint,
     }
+    if s3_tls:
+        ca = get_certificate_from_file(tls_ca_chain_path)
+        ca_b64 = base64.b64encode(ca.encode("utf-8")).decode("utf-8")
+        configuration_parameters["tls-ca-chain"] = ca_b64
+
     juju.config(charm_versions.s3.application_name, configuration_parameters)
     juju.wait(
         lambda status: (
@@ -85,7 +95,6 @@ def _prepare_azure_storage_setup(
         "iamsecret",
         {"secret-key": azure_storage_credentials["secret-key"]},
     )
-    logger.info(f"Created secret {secret_id}")
     juju.cli("grant-secret", "iamsecret", charm_versions.azure_storage.application_name)
 
     # create azure container
@@ -115,6 +124,39 @@ def _prepare_azure_storage_setup(
 
     juju.integrate(charm_versions.azure_storage.application_name, APP_NAME)
     juju.wait(jubilant.all_active, delay=5)
+
+
+def set_s3_credentials(
+    juju: jubilant.Juju,
+    s3_app_name: str,
+    access_key: str,
+    secret_key: str,
+) -> None:
+    """Use the charm action to start a password rotation."""
+    params = {
+        "access-key": access_key,
+        "secret-key": secret_key,
+    }
+    secret_uri = juju.add_secret("s3-credentials", params)
+    juju.grant_secret(secret_uri, s3_app_name)
+    juju.config(s3_app_name, {"credentials": secret_uri})
+
+
+def delete_azure_container(container: str):
+    """Delete azure container."""
+    command = ["azcli", "storage", "container", "delete", "--name", container]
+    try:
+        output = subprocess.run(command, check=True, capture_output=True)
+        return output.stdout.decode(), output.stderr.decode(), output.returncode
+    except subprocess.CalledProcessError as e:
+        return e.stdout.decode(), e.stderr.decode(), e.returncode
+
+
+def get_certificate_from_file(filename: str) -> str:
+    """Returns the certificate as a string."""
+    with open(filename, "r") as file:
+        certificate = file.read()
+    return certificate
 
 
 def get_history_server_image_version():
@@ -156,6 +198,7 @@ def deploy_history_server_setup(
     azure_storage_credentials: AzureInfo | None = None,
     ingress_mode: IngressMode = IngressMode.NONE,
     trust: bool = False,
+    s3_tls: bool = False,
 ) -> None:
     image_version = get_history_server_image_version()
     resources = {"spark-history-server-image": image_version}
@@ -171,7 +214,7 @@ def deploy_history_server_setup(
 
     if s3_bucket_and_creds is not None:
         logger.info("Using S3 object storage with Spark History Server")
-        _prepare_s3_storage_setup(juju, charm_versions, s3_bucket_and_creds)
+        _prepare_s3_storage_setup(juju, charm_versions, s3_bucket_and_creds, s3_tls=s3_tls)
     elif azure_storage_credentials is not None:
         logger.info("Using Azure object storage with Spark History Server")
         _prepare_azure_storage_setup(juju, charm_versions, azure_storage_credentials)
@@ -411,6 +454,54 @@ def deploy_identity_setup(
     logger.info("IAM bundle deployed successfully.")
 
 
+def deploy_o11y_setup(
+    juju: jubilant.Juju,
+    charm_versions: IntegrationTestsCharms,
+) -> None:
+    logger.info("Deploying opentelemetery-collector-k8s charm...")
+    juju.deploy(**charm_versions.otel_collector.deploy_dict())
+
+    logger.info("Waiting for test charm to be idle...")
+    juju.wait(
+        lambda status: jubilant.all_blocked(status, charm_versions.otel_collector.application_name)
+    )
+
+    juju.integrate(charm_versions.otel_collector.application_name, f"{APP_NAME}:metrics-endpoint")
+    juju.integrate(charm_versions.otel_collector.application_name, f"{APP_NAME}:grafana-dashboard")
+    juju.integrate(charm_versions.otel_collector.application_name, f"{APP_NAME}:logging")
+    juju.wait(lambda status: jubilant.all_active(status, APP_NAME), delay=10)
+    juju.wait(
+        lambda status: jubilant.all_blocked(
+            status, charm_versions.otel_collector.application_name
+        ),
+        delay=10,
+    )
+
+    juju.cli("deploy", "cos-lite", "--trust")
+    juju.wait(
+        lambda status: jubilant.all_active(
+            status, "prometheus", "alertmanager", "loki", "grafana"
+        ),
+        delay=10,
+    )
+    juju.wait(
+        lambda status: jubilant.all_blocked(
+            status, charm_versions.otel_collector.application_name
+        ),
+        delay=10,
+    )
+    juju.integrate(
+        f"{charm_versions.otel_collector.application_name}:grafana-dashboards-provider", "grafana"
+    )
+    juju.integrate(
+        f"{charm_versions.otel_collector.application_name}:send-remote-write", "prometheus"
+    )
+    juju.integrate(f"{charm_versions.otel_collector.application_name}:send-loki-logs", "loki")
+
+    juju.wait(jubilant.all_active, delay=10)
+    logger.info("Observability setup deployed successfully.")
+
+
 def complete_authentication_flow(
     juju: jubilant.Juju,
     charm_versions: IntegrationTestsCharms,
@@ -519,6 +610,30 @@ def _get_application_data(juju: jubilant.Juju, app_name: str, relation_name: str
     return {relation["relation-id"]: relation["application-data"] for relation in relation_data}
 
 
+def _get_prometheus_exporter_data(host: str) -> str | None:
+    """Check if a given host has metric service available and it is publishing."""
+    url = f"http://{host}:{JMX_EXPORTER_PORT}/metrics"
+    try:
+        response = requests.get(url)
+        logger.info(f"Response: {response.text}")
+        print(response)
+    except requests.exceptions.RequestException:
+        return None
+
+    if response.status_code == 200:
+        return response.text
+
+    return None
+
+
+def _get_cos_address(juju: jubilant.Juju) -> str:
+    """Retrieve the URL where COS services are available."""
+    task = juju.run("traefik/0", "show-proxied-endpoints")
+    assert task.return_code == 0
+    endpoints = task.results["proxied-endpoints"]
+    return json.loads(endpoints)["traefik"]["url"]
+
+
 def get_unit_address(
     juju: jubilant.Juju,
     app_name: str,
@@ -527,6 +642,13 @@ def get_unit_address(
     status = juju.status()
     address = status.apps[app_name].units[f"{app_name}/{unit_number}"].address
     return address
+
+
+def _get_grafana_access(juju: jubilant.Juju) -> tuple[str, str]:
+    """Get Grafana URL and password."""
+    task = juju.run("grafana/0", "get-admin-password")
+    assert task.return_code == 0
+    return task.results["url"], task.results["admin-password"]
 
 
 def get_ingress_url(
@@ -640,6 +762,108 @@ def assert_jobs_in_history_server(
             assert len(apps) >= expected_count, (
                 f"Expected at least {expected_count} applications, got {len(apps)}"
             )
+
+
+def assert_prometheus_data_exported(
+    juju: jubilant.Juju,
+    check_field: str = "jmx_scrape_duration_seconds",
+):
+    result = True
+    status = juju.status()
+    for unit in status.apps[APP_NAME].units.values():
+        unit_ip = unit.address
+        result = result and check_field in (_get_prometheus_exporter_data(unit_ip) or "")
+    assert result is True, f"Prometheus data for field '{check_field}' not exported by all units"
+
+
+def assert_prometheus_data_published(
+    juju: jubilant.Juju,
+    check_field: str = "jmx_scrape_duration_seconds",
+):
+    # We should leave time for Prometheus data to be published
+    cos_address = _get_cos_address(juju)
+    if "http://" in cos_address:
+        cos_address = cos_address.split("//")[1]
+    url = f"http://{cos_address}/{cast(str, juju.model)}-prometheus-0/api/v1/query?query={check_field}"
+    for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(30)):
+        with attempt:
+            # Data got published to Prometheus
+            response = requests.get(url).json()
+            assert "data" in response, (
+                f"Prometheus query for field '{check_field}' failed: {response}"
+            )
+            assert "result" in response["data"], (
+                f"Prometheus query for field '{check_field}' returned no results: {response}"
+            )
+            assert len(response["data"]["result"]) > 0, (
+                f"Prometheus query for field '{check_field}' returned empty result: {response}"
+            )
+
+
+def assert_prometheus_alerts_published(
+    juju: jubilant.Juju,
+):
+    # We should leave time for Prometheus data to be published
+    cos_address = _get_cos_address(juju)
+    if "http://" in cos_address:
+        cos_address = cos_address.split("//")[1]
+    url = f"http://{cos_address}/{cast(str, juju.model)}-prometheus-0/api/v1/rules"
+    for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(30)):
+        with attempt:
+            # Alerts got published to Prometheus
+            response = requests.get(url).json()
+            assert response is not None
+            assert "data" in response, f"Prometheus query for alerts failed: {response}"
+            assert "groups" in response["data"], (
+                f"Prometheus query for alerts returned no groups: {response}"
+            )
+            assert len(response["data"]["groups"]) > 0, (
+                f"Prometheus query for alerts returned empty groups: {response}"
+            )
+
+            for alert in [
+                "Spark History Server Missing",
+                "Spark History Server Threads Dead Locked",
+            ]:
+                assert any(
+                    rule["name"] == alert
+                    for group in response["data"]["groups"]
+                    for rule in group["rules"]
+                ), f"Prometheus query for alert '{alert}' returned no matching rules: {response}"
+
+
+def assert_grafana_dashboards_published(
+    juju: jubilant.Juju,
+):
+    base_url, pw = _get_grafana_access(juju)
+    url = f"{base_url}/api/search?query=&starred=false"
+    for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(30)):
+        with attempt:
+            session = requests.Session()
+            session.auth = ("admin", pw)
+            response = session.get(url).json()
+            assert response is not None, f"Failed to get Grafana dashboards: {response}"
+            assert any(
+                board["title"] == "Spark History Server JMX Dashboard" for board in response
+            ), (
+                f"Grafana dashboard 'Spark History Server JMX Dashboard' not found in response: {response}"
+            )
+
+
+def assert_logs_published_in_loki(
+    juju: jubilant.Juju, app_name: str, filter_by_label: dict[str, str], search_phrase: str
+) -> None:
+    logs = get_logs_in_loki(juju=juju, app_name=app_name, filter_by_label=filter_by_label)
+    assert len(logs) > 0, f"No logs found for app '{app_name}' with labels '{filter_by_label}'"
+
+    c = 0
+    for log_line in logs:
+        if search_phrase in log_line[1]:
+            c = c + 1
+    logger.info(f"Number of line found: {c}")
+    assert c > 0, (
+        f"No logs found containing the phrase '{search_phrase}' with labels '{filter_by_label}'"
+    )
 
 
 def curl_using_pod(

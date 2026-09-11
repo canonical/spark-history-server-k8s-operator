@@ -136,6 +136,13 @@ def charm_versions() -> IntegrationTestsCharms:
             alias="grafana-agent-k8s",
             trust=True,
         ),
+        otel_collector=CharmVersion(
+            name="opentelemetry-collector-k8s",
+            channel="2/stable",
+            base="ubuntu@24.04",
+            alias="opentelemetry-collector-k8s",
+            trust=True,
+        ),
         self_signed_certificate=CharmVersion(
             name="self-signed-certificates",
             channel="1/stable",

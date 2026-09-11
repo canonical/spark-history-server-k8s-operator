@@ -13,11 +13,17 @@ from constants import HISTORY_SERVER_PORT
 
 from .helpers import (
     ExternalIdpService,
+    assert_grafana_dashboards_published,
     assert_jobs_in_history_server,
+    assert_logs_published_in_loki,
+    assert_prometheus_alerts_published,
+    assert_prometheus_data_exported,
+    assert_prometheus_data_published,
     complete_authentication_flow,
     curl_using_pod,
     deploy_history_server_setup,
     deploy_identity_setup,
+    deploy_o11y_setup,
     get_ingress_url,
     get_unit_address,
     run_spark_job,
@@ -147,6 +153,46 @@ def test_auth_login_with_istio_mesh(
         session_cookie=session_cookie,
         verify_tls=False,
     )
+
+
+def test_observability_with_ambient_mesh(
+    juju: jubilant.Juju,
+    charm_versions: IntegrationTestsCharms,
+    external_idp_service: ExternalIdpService,
+    page: Page,
+    context: BrowserContext,
+) -> None:
+    deploy_o11y_setup(juju=juju, charm_versions=charm_versions)
+
+    run_spark_job()
+
+    ingress_url = get_ingress_url(juju, charm_versions, IngressMode.ISTIO_INGRESS)
+    session_cookie = complete_authentication_flow(
+        juju=juju,
+        charm_versions=charm_versions,
+        external_idp_service=external_idp_service,
+        page=page,
+        context=context,
+        history_server_url=ingress_url,
+    )
+    assert session_cookie is not None
+    assert_jobs_in_history_server(
+        server_url=ingress_url,
+        expected_count=2,
+        session_cookie=session_cookie,
+        verify_tls=False,
+    )
+
+    assert_logs_published_in_loki(
+        juju=juju,
+        app_name=charm_versions.loki.application_name,
+        filter_by_label={"juju_unit": f"{APP_NAME}/0"},
+        search_phrase="INFO HistoryServer",
+    )
+    assert_prometheus_data_exported(juju, check_field="jmx_scrape_duration_seconds")
+    assert_prometheus_data_published(juju, check_field="jmx_scrape_duration_seconds")
+    assert_prometheus_alerts_published(juju)
+    assert_grafana_dashboards_published(juju)
 
 
 def test_disable_ambient_mesh(
