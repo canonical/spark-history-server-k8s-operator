@@ -33,17 +33,21 @@ def test_build_and_deploy(
     history_server_charm: Path,
     s3_bucket_and_creds: S3Info,
 ) -> None:
-    """Build the charm-under-test and deploy it together with related charms.
-
-    Assert on the unit status before any relations/configurations take place.
-    """
+    """Deploy history-server charm along with S3 integrator relation."""
     deploy_history_server_setup(
         juju=juju,
         charm_versions=charm_versions,
         history_server_charm=history_server_charm,
         s3_bucket_and_creds=s3_bucket_and_creds,
     )
+    juju.wait(jubilant.all_active)
 
+
+def test_spark_job_logs_in_history_server(
+    juju: jubilant.Juju,
+    s3_bucket_and_creds: S3Info,
+):
+    """Run a Spark job and verify that Spark job logs appear in the history server."""
     status = juju.status()
     address = status.apps[APP_NAME].units[f"{APP_NAME}/0"].address
     server_url = f"http://{address}:18080"
@@ -55,10 +59,7 @@ def test_build_and_deploy(
 
 
 def test_ingress(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) -> None:
-    """Build the charm-under-test and deploy it together with related charms.
-
-    Assert on the unit status before any relations/configurations take place.
-    """
+    """Test ingress integration with the history server charm."""
     # Deploy the charm and wait for waiting status
     juju.deploy(**charm_versions.ingress.deploy_dict())
     juju.wait(

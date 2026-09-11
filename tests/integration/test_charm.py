@@ -2,7 +2,6 @@
 # Copyright 2024 Canonical Limited
 # See LICENSE file for licensing details.
 
-# Integration Tests TBD separately in next pulse
 
 import json
 import logging
@@ -21,13 +20,13 @@ from core.context import OAUTH2_PROXY_HEADERS
 
 from .helpers import (
     assert_jobs_in_history_server,
+    assert_security_context,
     deploy_history_server_setup,
+    generate_container_securitycontext_map,
     get_ingress_url,
+    get_pod_names,
     run_spark_job,
     setup_spark_job,
-    assert_security_context,
-    generate_container_securitycontext_map,
-    get_pod_names,
 )
 from .types import IngressMode, IntegrationTestsCharms, S3Info
 
@@ -44,17 +43,21 @@ def test_build_and_deploy(
     history_server_charm: Path,
     s3_bucket_and_creds: S3Info,
 ) -> None:
-    """Build the charm-under-test and deploy it together with related charms.
-
-    Assert on the unit status before any relations/configurations take place.
-    """
+    """Deploy history-server charm along with S3 integrator relation."""
     deploy_history_server_setup(
         juju=juju,
         charm_versions=charm_versions,
         history_server_charm=history_server_charm,
         s3_bucket_and_creds=s3_bucket_and_creds,
     )
+    juju.wait(jubilant.all_active)
 
+
+def test_spark_job_logs_in_history_server(
+    juju: jubilant.Juju,
+    s3_bucket_and_creds: S3Info,
+):
+    """Run a Spark job and verify that Spark job logs appear in the history server."""
     status = juju.status()
     address = status.apps[APP_NAME].units[f"{APP_NAME}/0"].address
     server_url = f"http://{address}:18080"
@@ -87,11 +90,8 @@ def test_container_security_context(
 
 
 def test_ingress(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) -> None:
-    """Build the charm-under-test and deploy it together with related charms.
-
-    Assert on the unit status before any relations/configurations take place.
-    """
-    # Deploy the charm and wait for waiting status
+    """Verify that the History server works correctly behind an Ingress."""
+    # Deploy the ingress charm and wait for active status
     juju.deploy(**charm_versions.ingress.deploy_dict())
     juju.wait(
         lambda status: jubilant.all_active(status, charm_versions.ingress.application_name),
@@ -114,7 +114,7 @@ def test_ingress(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) ->
 def test_oauth2proxy(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) -> None:
     """Test the integration of the spark history server with Oauth2proxy.
 
-    Assert that the proxied-enpoints of the ingress are protected (err code 401).
+    Assert that the proxied-endpoints of the ingress are protected (err code 401).
     """
     # remove relation between ingress and spark-history server
     juju.remove_relation(
@@ -263,7 +263,7 @@ def test_oauth2proxy(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms
 def test_remove_oauth2proxy(juju: jubilant.Juju, charm_versions: IntegrationTestsCharms) -> None:
     """Test the removal of integration between the spark history server and Oauth2proxy.
 
-    Assert that the proxied-enpoints of the ingress are not protected.
+    Assert that the proxied-endpoints of the ingress are not protected.
     """
     # Remove of the relation between oauth2proxy and spark-history server
     juju.remove_relation(

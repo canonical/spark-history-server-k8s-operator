@@ -10,13 +10,14 @@ import urllib.request
 import uuid
 from pathlib import Path
 from time import sleep
-from typing import cast, Dict, TypedDict
+from typing import Dict, TypedDict, cast
 from urllib.parse import urlencode
 
 import jubilant
 import lightkube
 import requests
 import yaml
+from lightkube.core.exceptions import ApiError
 from lightkube.resources.core_v1 import Pod
 from playwright.sync_api import BrowserContext, Page
 from tenacity import Retrying, stop_after_attempt, wait_fixed
@@ -24,7 +25,7 @@ from tenacity import Retrying, stop_after_attempt, wait_fixed
 from constants import JMX_EXPORTER_PORT
 
 from .oauth_tools.external_idp import ExternalIdpService
-from .types import AzureInfo, IngressMode, IntegrationTestsCharms, S3Info
+from .types import AzureInfo, IngressMode, IntegrationTestsCharms, S3Info, TelemetryAgent
 
 logger = logging.getLogger(__name__)
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
@@ -33,6 +34,15 @@ CURL_IMAGE = "curlimages/curl:8.10.1"
 
 
 def _run_command(command: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    """Run a shell command and return the completed process.
+
+    Args:
+        command: The command to run as a list of strings.
+        check: Whether to raise an exception if the command fails.
+
+    Returns:
+        The completed process.
+    """
     return subprocess.run(command, check=check, capture_output=True, text=True)
 
 
@@ -42,6 +52,14 @@ def _prepare_s3_storage_setup(
     s3_bucket_and_creds: S3Info,
     s3_tls: bool = False,
 ):
+    """Prepare the S3 storage setup for the history server.
+
+    Args:
+        juju: The Juju client instance.
+        charm_versions: The versions of the charms to deploy.
+        s3_bucket_and_creds: The S3 bucket and credentials information.
+        s3_tls: Whether to enable TLS for the S3 connection.
+    """
     bucket = s3_bucket_and_creds["bucket"]
     access_key = s3_bucket_and_creds["access_key"]
     secret_key = s3_bucket_and_creds["secret_key"]
@@ -53,12 +71,18 @@ def _prepare_s3_storage_setup(
     juju.deploy(**charm_versions.s3.deploy_dict())
 
     logger.info("Setting up s3 credentials in s3-integrator charm")
-    set_s3_credentials(juju, charm_versions.s3.application_name, access_key, secret_key)
+    secret_params = {
+        "access-key": access_key,
+        "secret-key": secret_key,
+    }
+    secret_uri = juju.add_secret("s3-credentials", secret_params)
+    juju.grant_secret(secret_uri, charm_versions.s3.application_name)
 
     configuration_parameters = {
         "bucket": bucket,
         "path": path,
         "endpoint": endpoint,
+        "credentials": secret_uri,
     }
     if s3_tls:
         ca = get_certificate_from_file(tls_ca_chain_path)
@@ -90,6 +114,13 @@ def _prepare_azure_storage_setup(
     charm_versions: IntegrationTestsCharms,
     azure_storage_credentials: AzureInfo,
 ):
+    """Prepare the Azure storage setup for the history server.
+
+    Args:
+        juju: The Juju client instance.
+        charm_versions: The versions of the charms to deploy.
+        azure_storage_credentials: The Azure storage credentials information.
+    """
     juju.deploy(**charm_versions.azure_storage.deploy_dict())
 
     logger.info("Adding Juju secret for secret-key config option for azure-storage-integrator")
@@ -128,22 +159,6 @@ def _prepare_azure_storage_setup(
     juju.wait(jubilant.all_active, delay=5)
 
 
-def set_s3_credentials(
-    juju: jubilant.Juju,
-    s3_app_name: str,
-    access_key: str,
-    secret_key: str,
-) -> None:
-    """Use the charm action to start a password rotation."""
-    params = {
-        "access-key": access_key,
-        "secret-key": secret_key,
-    }
-    secret_uri = juju.add_secret("s3-credentials", params)
-    juju.grant_secret(secret_uri, s3_app_name)
-    juju.config(s3_app_name, {"credentials": secret_uri})
-
-
 def delete_azure_container(container: str):
     """Delete azure container."""
     command = ["azcli", "storage", "container", "delete", "--name", container]
@@ -162,11 +177,13 @@ def get_certificate_from_file(filename: str) -> str:
 
 
 def get_history_server_image_version():
+    """Get the image version of the Spark History Server from the metadata."""
     image_version = METADATA["resources"]["spark-history-server-image"]["upstream-source"]
     return image_version
 
 
 def get_spark_version():
+    """Get the Spark version from the Spark History Server image metadata."""
     image_version = get_history_server_image_version()
     logger.info(f"Spark History Server image version: {image_version}")
 
@@ -184,7 +201,8 @@ def get_spark_version():
 def _deploy_istio_control_plane(
     juju: jubilant.Juju,
     charm_versions: IntegrationTestsCharms,
-):
+) -> None:
+    """Deploy the Istio control plane."""
     logger.info("Deploying Istio control plane")
     juju.deploy(**charm_versions.istio.deploy_dict())
     juju.wait(
@@ -202,6 +220,7 @@ def deploy_history_server_setup(
     trust: bool = False,
     s3_tls: bool = False,
 ) -> None:
+    """Deploy the Spark History Server along with optional storage and ingress setups."""
     image_version = get_history_server_image_version()
     resources = {"spark-history-server-image": image_version}
     logger.info("Deploying Spark History Server charm")
@@ -240,22 +259,6 @@ def deploy_history_server_setup(
     logger.info(f"Deploying ingress: {ingress_app_name}")
     juju.deploy(**ingress_deploy_args)
 
-    # logger.info("Deploying self-signed-certificates for ingress")
-    # juju.deploy(**charm_versions.self_signed_certificate.deploy_dict())
-
-    # juju.wait(
-    #     lambda status: jubilant.all_active(
-    #         status, ingress_app_name, charm_versions.self_signed_certificate.application_name
-    #     ),
-    #     delay=5,
-    # )
-
-    # logger.info(f"Integrating certificates for ingress with application: {ingress_app_name}")
-    # juju.integrate(
-    #     charm_versions.self_signed_certificate.application_name,
-    #     ingress_app_name,
-    # )
-
     logger.info(f"Integrating history server with ingress: {ingress_app_name}")
     juju.integrate(f"{APP_NAME}:ingress", f"{ingress_app_name}:ingress")
     juju.wait(jubilant.all_active, delay=5)
@@ -268,8 +271,8 @@ def deploy_identity_setup(
     external_idp_service: ExternalIdpService,
     ingress_mode: IngressMode = IngressMode.TRAEFIK,
 ):
+    """Deploy the identity setup for enabling authentication for the History Server."""
     # Deploy all charms necessary for Oauth2proxy integration
-    juju.deploy(**charm_versions.ingress.deploy_dict())
     juju.deploy(**charm_versions.oauth2proxy.deploy_dict())
     juju.deploy(**charm_versions.postgresql.deploy_dict())
     juju.deploy(**charm_versions.self_signed_certificate.deploy_dict())
@@ -280,6 +283,8 @@ def deploy_identity_setup(
     hserver_ingress_charm = charm_versions.ingress
     if ingress_mode == IngressMode.ISTIO_INGRESS:
         hserver_ingress_charm = charm_versions.istio_ingress
+        # Traefik ingress is needed for IAM bundle anyway
+        juju.deploy(**charm_versions.ingress.deploy_dict())
 
     juju.integrate(
         charm_versions.self_signed_certificate.application_name,
@@ -423,7 +428,7 @@ def deploy_identity_setup(
             hserver_ingress_charm.application_name,
         ),
         delay=10,
-        timeout=200,
+        timeout=600,
     )
 
     juju.integrate(charm_versions.oauth2proxy.application_name, f"{APP_NAME}:oauth2-proxy")
@@ -441,7 +446,7 @@ def deploy_identity_setup(
             charm_versions.identity_platform_login_ui_operator.application_name,
             charm_versions.kratos_external_idp_integrator.application_name,
         ),
-        delay=10,
+        delay=30,
         timeout=600,
     )
 
@@ -459,73 +464,61 @@ def deploy_identity_setup(
 def deploy_o11y_setup(
     juju: jubilant.Juju,
     charm_versions: IntegrationTestsCharms,
+    telemetry_agent: TelemetryAgent = TelemetryAgent.GRAFANA_AGENT,
 ) -> None:
-    logger.info("Deploying opentelemetery-collector-k8s charm...")
-    juju.deploy(**charm_versions.otel_collector.deploy_dict())
+    """Deploy the observability setup including the specified telemetry agent."""
+    logger.info(f"Deploying {telemetry_agent} charm...")
+    telemetry_agent_charm = (
+        charm_versions.grafana_agent
+        if telemetry_agent == TelemetryAgent.GRAFANA_AGENT
+        else charm_versions.otel_collector
+    )
+    juju.deploy(**telemetry_agent_charm.deploy_dict())
 
     logger.info("Waiting for test charm to be idle...")
-    juju.wait(
-        lambda status: jubilant.all_blocked(status, charm_versions.otel_collector.application_name)
-    )
+    juju.wait(jubilant.all_agents_idle, delay=10)
 
-    juju.integrate(charm_versions.otel_collector.application_name, f"{APP_NAME}:metrics-endpoint")
-    juju.integrate(charm_versions.otel_collector.application_name, f"{APP_NAME}:grafana-dashboard")
-    juju.integrate(charm_versions.otel_collector.application_name, f"{APP_NAME}:logging")
+    juju.integrate(telemetry_agent_charm.application_name, f"{APP_NAME}:metrics-endpoint")
+    juju.integrate(telemetry_agent_charm.application_name, f"{APP_NAME}:grafana-dashboard")
+    juju.integrate(telemetry_agent_charm.application_name, f"{APP_NAME}:logging")
+    juju.wait(jubilant.all_agents_idle, delay=10)
     juju.wait(lambda status: jubilant.all_active(status, APP_NAME), delay=10)
-    juju.wait(
-        lambda status: jubilant.all_blocked(
-            status, charm_versions.otel_collector.application_name
-        ),
-        delay=10,
-    )
 
     juju.cli("deploy", "cos-lite", "--trust")
-    juju.wait(
-        lambda status: jubilant.all_active(
-            status, "prometheus", "alertmanager", "loki", "grafana"
-        ),
-        delay=10,
-    )
-    juju.wait(
-        lambda status: jubilant.all_blocked(
-            status, charm_versions.otel_collector.application_name
-        ),
-        delay=10,
-    )
-    juju.integrate(
-        f"{charm_versions.otel_collector.application_name}:grafana-dashboards-provider", "grafana"
-    )
-    juju.integrate(
-        f"{charm_versions.otel_collector.application_name}:send-remote-write", "prometheus"
-    )
-    juju.integrate(f"{charm_versions.otel_collector.application_name}:send-loki-logs", "loki")
+    juju.wait(jubilant.all_agents_idle, delay=10)
 
-    juju.wait(jubilant.all_active, delay=10)
+    juju.integrate(
+        f"{telemetry_agent_charm.application_name}:grafana-dashboards-provider", "grafana"
+    )
+    juju.integrate(f"{telemetry_agent_charm.application_name}:send-remote-write", "prometheus")
+    juju.integrate(f"{telemetry_agent_charm.application_name}", "loki:logging")
+
+    juju.wait(jubilant.all_active, delay=20, timeout=600)
     logger.info("Observability setup deployed successfully.")
 
 
 def complete_authentication_flow(
-    juju: jubilant.Juju,
-    charm_versions: IntegrationTestsCharms,
     external_idp_service: ExternalIdpService,
     page: Page,
     context: BrowserContext,
     history_server_url: str,
 ):
-    logger.info(f"Navigating to {history_server_url}")
-    page.goto(history_server_url)
+    """Complete the OAuth2 authentication flow for the History Server."""
+    for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(10)):
+        with attempt:
+            logger.info(f"Navigating to {history_server_url}")
+            page.goto(history_server_url)
+            logger.info("Clicking on Sign in,  with Generic identity provider...")
+            with page.expect_navigation(timeout=30_000):
+                page.get_by_text("Sign in with Generic").click(timeout=30_000)
 
-    logger.info("Clicking on Sign in with Generic identity provider...")
-    with page.expect_navigation():
-        page.get_by_text("Sign in with Generic").click()
+            logger.info("Completing login in the external identity provider...")
+            with page.expect_navigation(timeout=30_000):
+                external_idp_service.complete_user_login(page)
+            logger.info(f"Login flow completed: {page.url}")
 
-    logger.info("Completing login in the external identity provider...")
-    with page.expect_navigation():
-        external_idp_service.complete_user_login(page)
-    logger.info(f"Login flow completed: {page.url}")
-
-    logger.info("Verifying the correct redirect after login")
-    page.wait_for_url(history_server_url)
+            logger.info("Verifying the correct redirect after login")
+            page.wait_for_url(history_server_url, timeout=30_000)
 
     logger.info("Verifying that the login flow was successful...")
     # The test uses Spark history server's /api/user endpoint to verify the session cookie is valid
@@ -544,6 +537,7 @@ def setup_spark_job(
     s3_bucket_and_creds: S3Info | None = None,
     azure_storage_credentials: AzureInfo | None = None,
 ):
+    """Set up a service account for running Spark jobs with the specified storage backend."""
     image_version = get_history_server_image_version()
     if s3_bucket_and_creds is not None:
         logger.info("Setting up Spark job with S3 storage")
@@ -575,13 +569,26 @@ def setup_spark_job(
     return setup_spark_output
 
 
-def run_spark_job():
+def run_spark_job(tls_ca: str | None = None) -> str:
+    """Run a Spark job, optionally with TLS configuration."""
     logger.info("Executing Spark job...")
     spark_version = get_spark_version()
-    run_spark_output = subprocess.check_output(
-        f"./tests/integration/setup/run_spark_job.sh {spark_version}", shell=True, stderr=None
-    ).decode("utf-8")
-    logger.info(f"Run spark output:\n{run_spark_output}")
+    output = ""
+    if tls_ca:
+        output = subprocess.check_output(
+            f"./tests/integration/setup/run_spark_job_tls.sh  {spark_version} {tls_ca}",
+            shell=True,
+            stderr=None,
+        ).decode("utf-8")
+    else:
+        output = subprocess.check_output(
+            f"./tests/integration/setup/run_spark_job.sh {spark_version}",
+            shell=True,
+            stderr=None,
+            timeout=10 * 60,
+        ).decode("utf-8")
+    logger.info(f"Run spark output:\n{output}")
+    return output
 
 
 def _get_application_data(juju: jubilant.Juju, app_name: str, relation_name: str) -> dict:
@@ -641,6 +648,7 @@ def get_unit_address(
     app_name: str,
     unit_number: int = 0,
 ) -> str:
+    """Retrieve the IP address of a specific unit of an application."""
     status = juju.status()
     address = status.apps[app_name].units[f"{app_name}/{unit_number}"].address
     return address
@@ -656,6 +664,7 @@ def _get_grafana_access(juju: jubilant.Juju) -> tuple[str, str]:
 def get_ingress_url(
     juju: jubilant.Juju, charm_versions: IntegrationTestsCharms, ingress_mode: IngressMode
 ) -> str:
+    """Retrieve the ingress URL for the History Server based on the ingress mode."""
     if ingress_mode == IngressMode.ISTIO_INGRESS:
         app_data = _get_application_data(juju, APP_NAME, "ingress")
         ingress_data = next(iter(app_data.values()), None)
@@ -676,63 +685,57 @@ def get_ingress_url(
 
 
 def get_logs_in_loki(juju: jubilant.Juju, app_name: str, filter_by_label: dict[str, str]):
+    """Retrieve logs from Loki for a specific application filtered by labels."""
     loki_address = get_unit_address(juju, app_name)
     try:
-        labels = json.loads(
+        response = json.loads(
             urllib.request.urlopen(f"http://{loki_address}:3100/loki/api/v1/labels").read()
         )
     except Exception:
-        labels = {}
-    logger.info(f"Labels: {labels}")
-    assert "success" == labels["status"]
+        response = {}
+    assert "success" == response["status"], "Failed to get labels from Loki"
+    labels = response["data"]
     for key in filter_by_label:
-        assert key in labels, f"Log label '{key}' not found in Loki labels"
+        assert key in labels, f"Log label '{key}' not found in Loki labels: {labels}"
 
     for key, value in filter_by_label.items():
         try:
-            values = json.loads(
+            response = json.loads(
                 urllib.request.urlopen(
                     f"http://{loki_address}:3100/loki/api/v1/label/{key}/values"
                 ).read()
             )
         except Exception:
-            values = {}
-        logger.info(f"Values for label '{key}': {values}")
-        assert "success" == values["status"]
-        assert value in values["data"][0], (
+            response = {}
+        logger.info(f"Response for values for key '{key}': {response}")
+        assert "success" == response["status"]
+        assert value in response["data"][0], (
             f"Expected value '{value}' for label '{key}' not found in Loki"
         )
 
     # check for history server logs in loki
     url = f"http://{loki_address}:3100/loki/api/v1/query_range"
-    query = ",".join([f"{key}={value}" for key, value in filter_by_label.items()])
+    query = ",".join([f'{key}="{value}"' for key, value in filter_by_label.items()])
     keys = {"query": f"{{{query}}}"}
     data = urlencode(keys).encode()
 
     try:
-        query = json.loads(urllib.request.urlopen(url, data).read().decode())
-        logger.info(query)
+        response = json.loads(urllib.request.urlopen(url, data).read().decode())
+        logger.info(response)
     except Exception:
-        query = {}
+        response = {}
 
-    assert "success" == query["status"]
-    assert "stream" in query["data"]["result"][0]
+    assert "success" == response["status"], (
+        f"Failed to query Loki; query used: {query}, received response: {response}"
+    )
+    assert "stream" in response["data"]["result"][0]
     for key, value in filter_by_label.items():
-        assert value == query["data"]["result"][0]["stream"].get(key), (
+        assert value == response["data"]["result"][0]["stream"].get(key), (
             f"Expected value '{value}' for label '{key}' not found in Loki stream"
         )
 
-    logs = query["data"]["result"][0]["values"]
+    logs = response["data"]["result"][0]["values"]
     logger.info(f"Retrieved logs: {logs}")
-    return logs
-
-    # check if startup messages are there
-    c = 0
-    for log_line in logs:
-        if "INFO HistoryServer" in log_line[1]:
-            c = c + 1
-    logger.info(f"Number of line found: {c}")
-
     return logs
 
 
@@ -742,6 +745,7 @@ def assert_jobs_in_history_server(
     session_cookie: str | None = None,
     verify_tls: bool = True,
 ) -> None:
+    """Assert that the History Server has the expected number of jobs."""
     applications_url = f"{server_url.rstrip('/')}/api/v1/applications"
     cookies = {"_oauth2_proxy": session_cookie} if session_cookie is not None else None
 
@@ -769,7 +773,8 @@ def assert_jobs_in_history_server(
 def assert_prometheus_data_exported(
     juju: jubilant.Juju,
     check_field: str = "jmx_scrape_duration_seconds",
-):
+) -> None:
+    """Assert that Prometheus data for the specified field is exported by all units."""
     result = True
     status = juju.status()
     for unit in status.apps[APP_NAME].units.values():
@@ -781,7 +786,8 @@ def assert_prometheus_data_exported(
 def assert_prometheus_data_published(
     juju: jubilant.Juju,
     check_field: str = "jmx_scrape_duration_seconds",
-):
+) -> None:
+    """Assert that Prometheus data for the specified field is published."""
     # We should leave time for Prometheus data to be published
     cos_address = _get_cos_address(juju)
     if "http://" in cos_address:
@@ -804,7 +810,8 @@ def assert_prometheus_data_published(
 
 def assert_prometheus_alerts_published(
     juju: jubilant.Juju,
-):
+) -> None:
+    """Assert that Prometheus alerts are published."""
     # We should leave time for Prometheus data to be published
     cos_address = _get_cos_address(juju)
     if "http://" in cos_address:
@@ -836,7 +843,8 @@ def assert_prometheus_alerts_published(
 
 def assert_grafana_dashboards_published(
     juju: jubilant.Juju,
-):
+) -> None:
+    """Assert that Grafana dashboards are published."""
     base_url, pw = _get_grafana_access(juju)
     url = f"{base_url}/api/search?query=&starred=false"
     for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(30)):
@@ -855,17 +863,18 @@ def assert_grafana_dashboards_published(
 def assert_logs_published_in_loki(
     juju: jubilant.Juju, app_name: str, filter_by_label: dict[str, str], search_phrase: str
 ) -> None:
-    logs = get_logs_in_loki(juju=juju, app_name=app_name, filter_by_label=filter_by_label)
-    assert len(logs) > 0, f"No logs found for app '{app_name}' with labels '{filter_by_label}'"
+    """Assert that logs containing the specified search phrase are published in Loki."""
+    for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(10)):
+        with attempt:
+            logs = get_logs_in_loki(juju=juju, app_name=app_name, filter_by_label=filter_by_label)
+            assert len(logs) > 0, (
+                f"No logs found for app '{app_name}' with labels '{filter_by_label}'"
+            )
 
-    c = 0
-    for log_line in logs:
-        if search_phrase in log_line[1]:
-            c = c + 1
-    logger.info(f"Number of line found: {c}")
-    assert c > 0, (
-        f"No logs found containing the phrase '{search_phrase}' with labels '{filter_by_label}'"
-    )
+            c = len([log_line for log_line in logs if search_phrase in log_line[1]])
+            assert c > 0, (
+                f"No logs found containing the phrase '{search_phrase}' with labels '{filter_by_label}' Logs: {logs}"
+            )
 
 
 def curl_using_pod(
@@ -873,6 +882,7 @@ def curl_using_pod(
     url: str,
     labels: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
+    """Run a curl command from a temporary pod in the specified namespace."""
     pod_name = f"ambient-curl-{uuid.uuid4()}"
 
     labels_args = []
@@ -908,12 +918,14 @@ def curl_using_pod(
         check=False,
     )
 
+
 class ContainerSecurityContext(TypedDict, total=False):
     """Kubernetes container security context UID/GID settings."""
 
     runAsUser: int | None  # noqa N815
     runAsGroup: int | None  # noqa N815
     runAsNonRoot: bool | None  # noqa N815
+
 
 def assert_security_context(
     lightkube_client: lightkube.Client,
@@ -923,7 +935,9 @@ def assert_security_context(
     model_name: str,
 ) -> None:
     """Assert a container's security context matches expected UID/GID settings."""
-    containers: list = lightkube_client.get(Pod, pod_name, namespace=model_name).spec.containers
+    pod_spec = lightkube_client.get(Pod, pod_name, namespace=model_name).spec
+    assert pod_spec is not None
+    containers: list = pod_spec.containers
     container = next((c for c in containers if c.name == container_name), None)
     assert container is not None, f"Container {container_name} not found in pod {pod_name}"
     security_context = container.securityContext
@@ -949,6 +963,7 @@ def generate_container_securitycontext_map(
     c_uid_map["charm"] = {"runAsUser": juju_user_id, "runAsGroup": juju_user_id}
     return c_uid_map
 
+
 def get_pod_names(model: str, application_name: str) -> list[str]:
     """Retrieve names of all pods belonging to a specific Juju application."""
     cmd = [
@@ -966,3 +981,20 @@ def get_pod_names(model: str, application_name: str) -> list[str]:
     )
     stdout = proc.stdout.decode("utf8")
     return stdout.split()
+
+
+def pod_has_labels(
+    namespace: str,
+    pod_name: str,
+    labels: dict[str, str],
+) -> bool:
+    """Verify and return bool whether the given pod has all the given labels."""
+    client = lightkube.Client()
+    try:
+        pod = client.get(Pod, name=pod_name, namespace=namespace)
+        if pod.metadata is None or pod.metadata.labels is None:
+            return False
+        return all(pod.metadata.labels.get(k) == v for k, v in labels.items())
+    except ApiError as e:
+        logger.error(f"Failed to get pod {pod_name} in namespace {namespace}: {e}")
+        return False

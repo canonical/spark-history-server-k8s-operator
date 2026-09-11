@@ -32,20 +32,23 @@ def test_build_and_deploy(
     azure_storage_credentials: AzureInfo,
     history_server_charm: Path,
 ) -> None:
-    """Build the charm-under-test and deploy it together with related charms.
-
-    Assert on the unit status before any relations/configurations take place.
-    """
+    """Deploy history-server charm along with Azure Storage integrator relation."""
     deploy_history_server_setup(
         juju=juju,
         charm_versions=charm_versions,
         history_server_charm=history_server_charm,
         azure_storage_credentials=azure_storage_credentials,
     )
-    status = juju.wait(jubilant.all_active, delay=5)
+    juju.wait(jubilant.all_active, delay=5)
 
+
+def test_spark_job_logs_in_history_server(
+    juju: jubilant.Juju,
+    azure_storage_credentials: AzureInfo,
+):
+    """Run a Spark job and verify that Spark job logs appear in the history server."""
     logger.info("Verifying history server has no app entries")
-
+    status = juju.status()
     address = status.apps[APP_NAME].units[f"{APP_NAME}/0"].address
     server_url = f"http://{address}:18080"
     assert_jobs_in_history_server(server_url=server_url, expected_count=0)

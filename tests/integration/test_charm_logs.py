@@ -21,7 +21,7 @@ from .helpers import (
     run_spark_job,
     setup_spark_job,
 )
-from .types import IntegrationTestsCharms, S3Info
+from .types import IntegrationTestsCharms, S3Info, TelemetryAgent
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +35,7 @@ def test_build_and_deploy(
     history_server_charm: Path,
     s3_bucket_and_creds: S3Info,
 ) -> None:
-    """Build the charm-under-test and deploy it together with related charms.
-
-    Assert on the output of collected Loki labels and logs.
-    """
+    """Deploy history-server charm along with S3 integrator relation."""
     deploy_history_server_setup(
         juju=juju,
         charm_versions=charm_versions,
@@ -56,16 +53,15 @@ def test_loki_integration(
     charm_versions: IntegrationTestsCharms,
     s3_bucket_and_creds: S3Info,
 ) -> None:
-    """Check that logs are forwarded to Loki.
-
-    Assert on the unit status before any relations/configurations take place.
-    """
+    """Check that logs are forwarded to Loki."""
     logger.info("Verifying history server has no app entries")
     address = get_unit_address(juju, APP_NAME)
     history_server_url = f"http://{address}:18080"
     assert_jobs_in_history_server(server_url=history_server_url, expected_count=0)
 
-    deploy_o11y_setup(juju=juju, charm_versions=charm_versions)
+    deploy_o11y_setup(
+        juju=juju, charm_versions=charm_versions, telemetry_agent=TelemetryAgent.GRAFANA_AGENT
+    )
     juju.wait(jubilant.all_active, delay=10)
 
     setup_spark_job(s3_bucket_and_creds=s3_bucket_and_creds)
@@ -85,10 +81,7 @@ def test_loki_integration(
 def test_history_server_cos_integration(
     juju: jubilant.Juju, charm_versions: IntegrationTestsCharms
 ) -> None:
-    """Check that the integration with cos work correctly.
-
-    Assert on absences of labels/dashboards/alert rules.
-    """
+    """Check that the integration with cos work correctly."""
     assert_prometheus_data_exported(juju, check_field="jmx_scrape_duration_seconds")
     assert_prometheus_data_published(juju, check_field="jmx_scrape_duration_seconds")
     assert_prometheus_alerts_published(juju)

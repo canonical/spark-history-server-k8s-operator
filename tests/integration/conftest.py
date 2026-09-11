@@ -84,7 +84,7 @@ def charm_versions() -> IntegrationTestsCharms:
             name="traefik-k8s",
             channel="latest/edge",
             base="ubuntu@20.04",
-            alias="traefik-k8s",
+            alias="traefik-public",
             trust=True,
         ),
         istio=CharmVersion(
@@ -113,7 +113,7 @@ def charm_versions() -> IntegrationTestsCharms:
         ),
         oauth2proxy=CharmVersion(
             name="oauth2-proxy-k8s",
-            channel="latest/edge/fix-istio",
+            channel="latest/edge",
             base="ubuntu@22.04",
         ),
         azure_storage=CharmVersion(

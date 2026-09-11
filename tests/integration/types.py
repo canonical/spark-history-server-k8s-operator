@@ -42,6 +42,8 @@ class CharmVersion(BaseModel):
 
 
 class IntegrationTestsCharms(BaseModel):
+    """Encapsulation of all charm versions used in integration tests."""
+
     s3: CharmVersion
     ingress: CharmVersion
     istio: CharmVersion
@@ -87,6 +89,15 @@ S3Info = TypedDict(
 
 
 class IngressMode(Enum):
+    """The different possible ingress modes for the history server charm."""
+
     NONE = "none"
     TRAEFIK = "traefik"
     ISTIO_INGRESS = "istio-ingress"
+
+
+class TelemetryAgent(Enum):
+    """The different possible telemetry agents for the history server charm."""
+
+    GRAFANA_AGENT = "grafana-agent"
+    OTEL_COLLECTOR = "otel-collector"

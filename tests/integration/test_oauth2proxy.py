@@ -34,10 +34,7 @@ def test_build_and_deploy(
     history_server_charm: Path,
     s3_bucket_and_creds: S3Info,
 ) -> None:
-    """Build the charm-under-test and deploy it together with related charms.
-
-    Assert on the unit status before any relations/configurations take place.
-    """
+    """Deploy history-server charm along with S3 integrator relation."""
     deploy_history_server_setup(
         juju=juju,
         charm_versions=charm_versions,
@@ -45,8 +42,14 @@ def test_build_and_deploy(
         s3_bucket_and_creds=s3_bucket_and_creds,
         ingress_mode=IngressMode.TRAEFIK,
     )
-    status = juju.wait(jubilant.all_active)
+    juju.wait(jubilant.all_active)
 
+
+def test_spark_job_logs_in_history_server(
+    juju: jubilant.Juju,
+    s3_bucket_and_creds: S3Info,
+) -> None:
+    status = juju.status()
     address = status.apps[APP_NAME].units[f"{APP_NAME}/0"].address
     server_url = f"http://{address}:18080"
     logger.info("Verifying history server has no app entries")
@@ -66,7 +69,7 @@ def test_login_flow(
     page: Page,
     context: BrowserContext,
 ) -> None:
-    """Deploy the iam bundle."""
+    """Test authentication by deploying the iam bundle and completing the OAuth2 proxy login flow."""
     deploy_identity_setup(
         juju=juju,
         charm_versions=charm_versions,
@@ -75,8 +78,6 @@ def test_login_flow(
     )
     ingress_url = get_ingress_url(juju, charm_versions, IngressMode.TRAEFIK)
     session_cookie = complete_authentication_flow(
-        juju=juju,
-        charm_versions=charm_versions,
         external_idp_service=external_idp_service,
         page=page,
         context=context,

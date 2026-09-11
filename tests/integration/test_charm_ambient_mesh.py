@@ -4,6 +4,7 @@
 
 import logging
 from pathlib import Path
+from typing import cast
 
 import jubilant
 import yaml
@@ -25,17 +26,21 @@ from .helpers import (
     deploy_identity_setup,
     deploy_o11y_setup,
     get_ingress_url,
+    get_pod_names,
     get_unit_address,
+    pod_has_labels,
     run_spark_job,
     setup_spark_job,
 )
-from .types import IngressMode, IntegrationTestsCharms, S3Info
+from .types import IngressMode, IntegrationTestsCharms, S3Info, TelemetryAgent
 
 logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
 CURL_IMAGE = "curlimages/curl:8.10.1"
+AMBIENT_MESH_POD_LABEL_KEY = "istio.io/dataplane-mode"
+AMBIENT_MESH_POD_LABEL_VALUE = "ambient"
 
 
 def test_deploy_history_server_setup_with_istio_ingress(
@@ -44,6 +49,7 @@ def test_deploy_history_server_setup_with_istio_ingress(
     history_server_charm: Path,
     s3_bucket_and_creds: S3Info,
 ) -> None:
+    """Test deploying the History Server setup with Istio ingress."""
     deploy_history_server_setup(
         juju=juju,
         charm_versions=charm_versions,
@@ -60,6 +66,7 @@ def test_run_spark_job_before_meshing(
     charm_versions: IntegrationTestsCharms,
     s3_bucket_and_creds: S3Info,
 ) -> None:
+    """Test running a Spark job before enabling the ambient mesh."""
     ingress_url = get_ingress_url(juju, charm_versions, IngressMode.ISTIO_INGRESS)
     setup_spark_job(s3_bucket_and_creds=s3_bucket_and_creds)
     assert_jobs_in_history_server(server_url=ingress_url, expected_count=0, verify_tls=False)
@@ -70,6 +77,7 @@ def test_run_spark_job_before_meshing(
 def test_access_from_unmeshed_pod_before_meshing(
     juju: jubilant.Juju,
 ) -> None:
+    """Test the access to the History Server from an unmeshed pod before enabling the ambient mesh."""
     pod_ip = get_unit_address(juju, APP_NAME)
     pod_url = f"http://{pod_ip}:{HISTORY_SERVER_PORT}"
     curl_process = curl_using_pod(namespace=juju.model or "default", url=pod_url)
@@ -81,6 +89,7 @@ def test_enable_ambient_mesh(
     juju: jubilant.Juju,
     charm_versions: IntegrationTestsCharms,
 ) -> None:
+    """Test enabling the ambient mesh."""
     logger.info("Deploying istio beacon charm")
     juju.deploy(**charm_versions.istio_beacon.deploy_dict())
     juju.wait(lambda status: jubilant.all_agents_idle(status) and jubilant.all_active(status))
@@ -92,20 +101,28 @@ def test_enable_ambient_mesh(
     juju.wait(
         lambda status: jubilant.all_agents_idle(status) and jubilant.all_active(status), delay=5
     )
+    for pod_name in get_pod_names(cast(str, juju.model), APP_NAME):
+        assert pod_has_labels(
+            namespace=cast(str, juju.model),
+            pod_name=pod_name,
+            labels={AMBIENT_MESH_POD_LABEL_KEY: AMBIENT_MESH_POD_LABEL_VALUE},
+        )
 
 
-def test_access_from_unmeshed_pod_after_meshing(
+def test_blocked_access_from_unmeshed_pod_after_meshing(
     juju: jubilant.Juju,
 ) -> None:
+    """Test access to the History Server from an unmeshed pod is blocked after enabling the ambient mesh."""
     pod_ip = get_unit_address(juju, APP_NAME)
     pod_url = f"http://{pod_ip}:{HISTORY_SERVER_PORT}"
     curl_process = curl_using_pod(namespace=juju.model or "default", url=pod_url)
     assert curl_process.returncode != 0
 
 
-def test_access_from_meshed_pod_but_no_policy_after_meshing(
+def test_blocked_access_from_meshed_pod_but_no_policy_after_meshing(
     juju: jubilant.Juju,
 ) -> None:
+    """Test access to the History Server from a meshed pod without an appropriate policy is blocked."""
     pod_ip = get_unit_address(juju, APP_NAME)
     pod_url = f"http://{pod_ip}:{HISTORY_SERVER_PORT}"
     curl_process = curl_using_pod(
@@ -120,6 +137,7 @@ def test_access_via_ingress_after_meshing(
     juju: jubilant.Juju,
     charm_versions: IntegrationTestsCharms,
 ) -> None:
+    """Test access to the History Server via the ingress is successful after enabling the ambient mesh."""
     ingress_url = get_ingress_url(juju, charm_versions, IngressMode.ISTIO_INGRESS)
     assert_jobs_in_history_server(server_url=ingress_url, expected_count=1, verify_tls=False)
 
@@ -131,6 +149,7 @@ def test_auth_login_with_istio_mesh(
     page: Page,
     context: BrowserContext,
 ):
+    """Test history server authentication with Istio mesh enabled."""
     deploy_identity_setup(
         juju=juju,
         charm_versions=charm_versions,
@@ -139,8 +158,6 @@ def test_auth_login_with_istio_mesh(
     )
     ingress_url = get_ingress_url(juju, charm_versions, IngressMode.ISTIO_INGRESS)
     session_cookie = complete_authentication_flow(
-        juju=juju,
-        charm_versions=charm_versions,
         external_idp_service=external_idp_service,
         page=page,
         context=context,
@@ -162,14 +179,24 @@ def test_observability_with_ambient_mesh(
     page: Page,
     context: BrowserContext,
 ) -> None:
-    deploy_o11y_setup(juju=juju, charm_versions=charm_versions)
+    """Test observability features with the ambient mesh enabled."""
+    deploy_o11y_setup(
+        juju=juju, charm_versions=charm_versions, telemetry_agent=TelemetryAgent.OTEL_COLLECTOR
+    )
+
+    logger.info("Putting opentelemetry-collector-k8s into ambient mesh...")
+    juju.integrate(
+        f"{charm_versions.otel_collector.application_name}:service-mesh",
+        f"{charm_versions.istio_beacon.application_name}:service-mesh",
+    )
+    juju.wait(
+        lambda status: jubilant.all_agents_idle(status) and jubilant.all_active(status), delay=30
+    )
 
     run_spark_job()
 
     ingress_url = get_ingress_url(juju, charm_versions, IngressMode.ISTIO_INGRESS)
     session_cookie = complete_authentication_flow(
-        juju=juju,
-        charm_versions=charm_versions,
         external_idp_service=external_idp_service,
         page=page,
         context=context,
@@ -199,6 +226,7 @@ def test_disable_ambient_mesh(
     juju: jubilant.Juju,
     charm_versions: IntegrationTestsCharms,
 ) -> None:
+    """Test disabling the ambient mesh for the history server charm."""
     logger.info("Disabling ambient mesh for history server charm")
     juju.remove_relation(
         f"{APP_NAME}:service-mesh", f"{charm_versions.istio_beacon.application_name}:service-mesh"
@@ -206,11 +234,18 @@ def test_disable_ambient_mesh(
     juju.wait(
         lambda status: jubilant.all_agents_idle(status) and jubilant.all_active(status), delay=5
     )
+    for pod_name in get_pod_names(cast(str, juju.model), APP_NAME):
+        assert pod_has_labels(
+            namespace=cast(str, juju.model),
+            pod_name=pod_name,
+            labels={AMBIENT_MESH_POD_LABEL_KEY: AMBIENT_MESH_POD_LABEL_VALUE},
+        )
 
 
 def test_access_from_unmeshed_pod_after_unmeshing(
     juju: jubilant.Juju,
 ) -> None:
+    """Test accessing the History Server from an unmeshed pod after the ambient mesh has been disabled."""
     pod_ip = get_unit_address(juju, APP_NAME)
     pod_url = f"http://{pod_ip}:{HISTORY_SERVER_PORT}"
     curl_process = curl_using_pod(namespace=juju.model or "default", url=pod_url)
@@ -225,10 +260,9 @@ def test_access_via_ingress_after_unmeshing(
     page: Page,
     context: BrowserContext,
 ) -> None:
+    """Test accessing the History Server via ingress after the ambient mesh has been disabled."""
     ingress_url = get_ingress_url(juju, charm_versions, IngressMode.ISTIO_INGRESS)
     session_cookie = complete_authentication_flow(
-        juju=juju,
-        charm_versions=charm_versions,
         external_idp_service=external_idp_service,
         page=page,
         context=context,
@@ -238,9 +272,3 @@ def test_access_via_ingress_after_unmeshing(
     assert_jobs_in_history_server(
         server_url=ingress_url, expected_count=1, session_cookie=session_cookie, verify_tls=False
     )
-
-
-def test_sleep():
-    import time
-
-    time.sleep(2 * 60 * 60)
