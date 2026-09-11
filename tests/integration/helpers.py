@@ -481,12 +481,7 @@ def deploy_o11y_setup(
     juju.wait(lambda status: jubilant.all_active(status, APP_NAME), delay=10)
 
     juju.cli("deploy", "cos-lite", "--trust")
-    juju.wait(
-        lambda status: jubilant.all_active(
-            status, "prometheus", "alertmanager", "loki", "grafana"
-        ),
-        delay=10,
-    )
+    juju.wait(jubilant.all_agents_idle, delay=5)
 
     juju.integrate(
         f"{telemetry_agent_charm.application_name}:grafana-dashboards-provider", "grafana"
@@ -494,7 +489,7 @@ def deploy_o11y_setup(
     juju.integrate(f"{telemetry_agent_charm.application_name}:send-remote-write", "prometheus")
     juju.integrate(f"{telemetry_agent_charm.application_name}", "loki:logging")
 
-    juju.wait(jubilant.all_active, delay=10)
+    juju.wait(jubilant.all_active, delay=10, timeout=600)
     logger.info("Observability setup deployed successfully.")
 
 
@@ -581,7 +576,10 @@ def run_spark_job(tls_ca: str | None = None):
         ).decode("utf-8")
     else:
         output = subprocess.check_output(
-            f"./tests/integration/setup/run_spark_job.sh {spark_version}", shell=True, stderr=None
+            f"./tests/integration/setup/run_spark_job.sh {spark_version}",
+            shell=True,
+            stderr=None,
+            timeout=10 * 60,
         ).decode("utf-8")
     logger.info(f"Run spark output:\n{output}")
 
