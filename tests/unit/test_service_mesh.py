@@ -15,11 +15,13 @@ SERVICE_MESH_RELATION = "service-mesh"
 LABEL_CONFIGMAP_NAME = "juju-service-mesh-spark-history-server-k8s-labels"
 
 
+@patch("charms.istio_beacon_k8s.v0.service_mesh.Client")
 @patch("charms.istio_beacon_k8s.v0.service_mesh.reconcile_charm_labels")
 @patch("workload.SparkHistoryServer.exec")
 def test_service_mesh_relation_adds_labels(
     exec_calls,
     reconcile_charm_labels,
+    client_class,
     history_server_ctx: "Context[SparkHistoryServerCharm]",
     history_server_container: Container,
 ) -> None:
