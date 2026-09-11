@@ -24,7 +24,7 @@ from tenacity import Retrying, stop_after_attempt, wait_fixed
 from constants import JMX_EXPORTER_PORT
 
 from .oauth_tools.external_idp import ExternalIdpService
-from .types import AzureInfo, IngressMode, IntegrationTestsCharms, S3Info
+from .types import AzureInfo, IngressMode, IntegrationTestsCharms, S3Info, TelemetryAgent
 
 logger = logging.getLogger(__name__)
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
@@ -460,16 +460,23 @@ def deploy_identity_setup(
 def deploy_o11y_setup(
     juju: jubilant.Juju,
     charm_versions: IntegrationTestsCharms,
+    telemetry_agent: TelemetryAgent = TelemetryAgent.GRAFANA_AGENT,
 ) -> None:
-    logger.info("Deploying opentelemetery-collector-k8s charm...")
-    juju.deploy(**charm_versions.otel_collector.deploy_dict())
+    logger.info(f"Deploying {telemetry_agent} charm...")
+
+    telemetry_agent_charm = (
+        charm_versions.grafana_agent
+        if telemetry_agent == TelemetryAgent.GRAFANA_AGENT
+        else charm_versions.otel_collector
+    )
+    juju.deploy(**telemetry_agent_charm.deploy_dict())
 
     logger.info("Waiting for test charm to be idle...")
     juju.wait(jubilant.all_agents_idle, delay=5)
 
-    juju.integrate(charm_versions.otel_collector.application_name, f"{APP_NAME}:metrics-endpoint")
-    juju.integrate(charm_versions.otel_collector.application_name, f"{APP_NAME}:grafana-dashboard")
-    juju.integrate(charm_versions.otel_collector.application_name, f"{APP_NAME}:logging")
+    juju.integrate(telemetry_agent_charm.application_name, f"{APP_NAME}:metrics-endpoint")
+    juju.integrate(telemetry_agent_charm.application_name, f"{APP_NAME}:grafana-dashboard")
+    juju.integrate(telemetry_agent_charm.application_name, f"{APP_NAME}:logging")
     juju.wait(jubilant.all_agents_idle, delay=5)
     juju.wait(lambda status: jubilant.all_active(status, APP_NAME), delay=10)
 
@@ -480,19 +487,12 @@ def deploy_o11y_setup(
         ),
         delay=10,
     )
-    juju.wait(
-        lambda status: jubilant.all_blocked(
-            status, charm_versions.otel_collector.application_name
-        ),
-        delay=10,
-    )
+
     juju.integrate(
-        f"{charm_versions.otel_collector.application_name}:grafana-dashboards-provider", "grafana"
+        f"{telemetry_agent_charm.application_name}:grafana-dashboards-provider", "grafana"
     )
-    juju.integrate(
-        f"{charm_versions.otel_collector.application_name}:send-remote-write", "prometheus"
-    )
-    juju.integrate(f"{charm_versions.otel_collector.application_name}:send-loki-logs", "loki")
+    juju.integrate(f"{telemetry_agent_charm.application_name}:send-remote-write", "prometheus")
+    juju.integrate(f"{telemetry_agent_charm.application_name}", "loki:logging")
 
     juju.wait(jubilant.all_active, delay=10)
     logger.info("Observability setup deployed successfully.")

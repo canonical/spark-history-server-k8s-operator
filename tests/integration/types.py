@@ -90,3 +90,8 @@ class IngressMode(Enum):
     NONE = "none"
     TRAEFIK = "traefik"
     ISTIO_INGRESS = "istio-ingress"
+
+
+class TelemetryAgent(Enum):
+    GRAFANA_AGENT = "grafana-agent"
+    OTEL_COLLECTOR = "otel-collector"

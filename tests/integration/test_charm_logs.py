@@ -21,7 +21,7 @@ from .helpers import (
     run_spark_job,
     setup_spark_job,
 )
-from .types import IntegrationTestsCharms, S3Info
+from .types import IntegrationTestsCharms, S3Info, TelemetryAgent
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,9 @@ def test_loki_integration(
     history_server_url = f"http://{address}:18080"
     assert_jobs_in_history_server(server_url=history_server_url, expected_count=0)
 
-    deploy_o11y_setup(juju=juju, charm_versions=charm_versions)
+    deploy_o11y_setup(
+        juju=juju, charm_versions=charm_versions, telemetry_agent=TelemetryAgent.GRAFANA_AGENT
+    )
     juju.wait(jubilant.all_active, delay=10)
 
     setup_spark_job(s3_bucket_and_creds=s3_bucket_and_creds)

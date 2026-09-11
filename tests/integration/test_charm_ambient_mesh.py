@@ -29,7 +29,7 @@ from .helpers import (
     run_spark_job,
     setup_spark_job,
 )
-from .types import IngressMode, IntegrationTestsCharms, S3Info
+from .types import IngressMode, IntegrationTestsCharms, S3Info, TelemetryAgent
 
 logger = logging.getLogger(__name__)
 
@@ -162,7 +162,9 @@ def test_observability_with_ambient_mesh(
     page: Page,
     context: BrowserContext,
 ) -> None:
-    deploy_o11y_setup(juju=juju, charm_versions=charm_versions)
+    deploy_o11y_setup(
+        juju=juju, charm_versions=charm_versions, telemetry_agent=TelemetryAgent.OTEL_COLLECTOR
+    )
 
     logger.info("Putting opentelemetry-collector-k8s into ambient mesh...")
     juju.integrate(
