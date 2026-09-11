@@ -164,6 +164,15 @@ def test_observability_with_ambient_mesh(
 ) -> None:
     deploy_o11y_setup(juju=juju, charm_versions=charm_versions)
 
+    logger.info("Putting opentelemetry-collector-k8s into ambient mesh...")
+    juju.integrate(
+        f"{charm_versions.otel_collector.application_name}:service-mesh",
+        f"{charm_versions.istio_beacon.application_name}:service-mesh",
+    )
+    juju.wait(
+        lambda status: jubilant.all_agents_idle(status) and jubilant.all_active(status), delay=5
+    )
+
     run_spark_job()
 
     ingress_url = get_ingress_url(juju, charm_versions, IngressMode.ISTIO_INGRESS)

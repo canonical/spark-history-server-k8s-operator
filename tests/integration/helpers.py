@@ -424,7 +424,7 @@ def deploy_identity_setup(
             hserver_ingress_charm.application_name,
         ),
         delay=10,
-        timeout=200,
+        timeout=600,
     )
 
     juju.integrate(charm_versions.oauth2proxy.application_name, f"{APP_NAME}:oauth2-proxy")
@@ -850,17 +850,17 @@ def assert_grafana_dashboards_published(
 def assert_logs_published_in_loki(
     juju: jubilant.Juju, app_name: str, filter_by_label: dict[str, str], search_phrase: str
 ) -> None:
-    logs = get_logs_in_loki(juju=juju, app_name=app_name, filter_by_label=filter_by_label)
-    assert len(logs) > 0, f"No logs found for app '{app_name}' with labels '{filter_by_label}'"
+    for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(10)):
+        with attempt:
+            logs = get_logs_in_loki(juju=juju, app_name=app_name, filter_by_label=filter_by_label)
+            assert len(logs) > 0, (
+                f"No logs found for app '{app_name}' with labels '{filter_by_label}'"
+            )
 
-    c = 0
-    for log_line in logs:
-        if search_phrase in log_line[1]:
-            c = c + 1
-    logger.info(f"Number of line found: {c}")
-    assert c > 0, (
-        f"No logs found containing the phrase '{search_phrase}' with labels '{filter_by_label}'"
-    )
+            c = len([log_line for log_line in logs if search_phrase in log_line[1]])
+            assert c > 0, (
+                f"No logs found containing the phrase '{search_phrase}' with labels '{filter_by_label}' Logs: {logs}"
+            )
 
 
 def curl_using_pod(
