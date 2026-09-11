@@ -6,6 +6,7 @@ from unittest.mock import Mock
 
 import boto3
 import pytest
+from botocore.exceptions import ClientError
 from moto import mock_aws
 
 from core.domain import S3ConnectionInfo
@@ -114,6 +115,81 @@ def test_path_existing_still_ok_on_verify(s3: S3Client) -> None:
     assert len(buckets := s3.list_buckets()["Buckets"]) == 1
     # Note that the path provided as been transformed into a directory structure
     assert "Contents" in s3.list_objects_v2(Bucket=bucket_name, Prefix="path/", MaxKeys=3)
+
+
+def test_verify_uses_when_required_checksum_config(s3: S3Client, monkeypatch) -> None:
+    """verify() must not opt in to flexible checksums (aws-chunked + trailing CRC).
+
+    Several S3-compatible backends (e.g. Ceph radosgw behind a proxy) reject those
+    requests with XAmzContentSHA256Mismatch, so we only compute/validate checksums
+    when the S3 API actually requires them.
+    """
+    # Given
+    connection_info = Mock(spec=S3ConnectionInfo)
+    connection_info.endpoint = ""
+    connection_info.access_key = ""
+    connection_info.secret_key = ""
+    connection_info.bucket = "test_bucket"
+    connection_info.path = "path"
+    connection_info.tls_ca_chain = []
+    connection_info.region = ""
+    s3_manager = S3Manager(connection_info)
+
+    captured_configs = []
+    original_client = s3_manager.session.client
+
+    def capturing_client(*args, **kwargs):
+        captured_configs.append(kwargs["config"])
+        return original_client(*args, **kwargs)
+
+    monkeypatch.setattr(s3_manager.session, "client", capturing_client)
+
+    # When
+    s3_manager.verify()
+
+    # Then
+    assert captured_configs
+    assert captured_configs[0].request_checksum_calculation == "when_required"
+    assert captured_configs[0].response_checksum_validation == "when_required"
+
+
+def test_get_or_create_bucket_does_not_raise_on_client_error() -> None:
+    """A ClientError while creating the bucket must be reported, not propagated."""
+    # Given
+    connection_info = Mock(spec=S3ConnectionInfo)
+    connection_info.bucket = "test_bucket"
+    s3_manager = S3Manager(connection_info)
+
+    client = Mock()
+    client.head_bucket.side_effect = ClientError(
+        {"Error": {"Code": "404", "Message": "Not Found"}}, "HeadBucket"
+    )
+    client.create_bucket.side_effect = ClientError(
+        {"Error": {"Code": "400", "Message": "XAmzContentSHA256Mismatch"}}, "CreateBucket"
+    )
+
+    # When / Then
+    assert s3_manager.get_or_create_bucket(client) is False
+
+
+def test_ensure_path_does_not_raise_on_client_error() -> None:
+    """A ClientError while writing the '.keep' marker must be reported, not propagated."""
+    # Given
+    connection_info = Mock(spec=S3ConnectionInfo)
+    connection_info.bucket = "test_bucket"
+    connection_info.path = "path"
+    s3_manager = S3Manager(connection_info)
+
+    client = Mock()
+    client.head_object.side_effect = ClientError(
+        {"Error": {"Code": "404", "Message": "Not Found"}}, "HeadObject"
+    )
+    client.put_object.side_effect = ClientError(
+        {"Error": {"Code": "400", "Message": "XAmzContentSHA256Mismatch"}}, "PutObject"
+    )
+
+    # When / Then
+    assert s3_manager.ensure_path(client) is False
 
 
 @pytest.mark.parametrize(
