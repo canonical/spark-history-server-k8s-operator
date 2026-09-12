@@ -30,8 +30,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Install tox
         run: pipx install tox
-      # - name: Run linters
-      #   run: tox run -e lint
+      - name: Run linters
+        run: tox run -e lint
 
   unit-test:
     name: Unit tests
@@ -42,10 +42,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Install tox
         run: pipx install tox
-      # - name: Run tests
-      #   run: tox run -e format
-      # - name: Run tests
-      #   run: tox run -e unit
+      - name: Run tests
+        run: tox run -e format
+      - name: Run tests
+        run: tox run -e unit
 
   build:
     name: Build charms
@@ -94,7 +94,7 @@ jobs:
           # - Obs and identity charms not available for arm64, so we don't run the tests using
           #   those charms on the arm64 runner.
           ARM_TASKS = {"integration-tls"}
-          JAMMY_LARGE_TASKS = {"integration-tls", "integration-logs"}
+          JAMMY_LARGE_TASKS = {"integration-tls", "integration-logs", "integration-mesh"}
 
           jobs = []
           for job in spread_jobs:
@@ -105,6 +105,8 @@ jobs:
               if runner == "ubuntu-22.04-arm" and task_name not in ARM_TASKS:
                   continue
               if runner == "self-hosted-linux-amd64-jammy-large" and task_name not in JAMMY_LARGE_TASKS:
+                  continue
+              if runner == "ubuntu-22.04" and task_name in JAMMY_LARGE_TASKS:
                   continue
 
               if runner.endswith("-arm"):
@@ -174,8 +176,6 @@ jobs:
         with:
           pattern: ${{ needs.build.outputs.artifact-prefix }}-*
           merge-multiple: true
-      - name: Setup upterm session
-        uses: owenthereal/action-upterm@v1
       - name: Run spread job
         timeout-minutes: 110
         id: spread
