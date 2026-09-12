@@ -249,10 +249,3 @@ def test_access_via_ingress_after_unmeshing(
     assert_jobs_in_history_server(
         server_url=ingress_url, expected_count=1, session_cookie=session_cookie, verify_tls=False
     )
-
-
-def test_sleep():
-    import time
-
-    logger.error("SLEEPING")
-    time.sleep(2 * 60 * 60)
