@@ -426,7 +426,7 @@ def deploy_identity_setup(
             charm_versions.identity_platform_login_ui_operator.application_name,
             charm_versions.kratos_external_idp_integrator.application_name,
         ),
-        delay=10,
+        delay=30,
         timeout=600,
     )
 
@@ -489,8 +489,11 @@ def complete_authentication_flow(
     page.goto(history_server_url)
 
     logger.info("Clicking on Sign in with Generic identity provider...")
-    with page.expect_navigation():
-        page.get_by_text("Sign in with Generic").click()
+    for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(10)):
+        with attempt:
+            page.reload()
+            with page.expect_navigation():
+                page.get_by_text("Sign in with Generic").click(timeout=15_000)
 
     logger.info("Completing login in the external identity provider...")
     with page.expect_navigation():
