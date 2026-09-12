@@ -18,5 +18,7 @@ prepare: |
     > "$SPREAD_PATH/.env"
 
 execute: |
+  pipx install playwright
+  playwright install-deps
   cd "$SPREAD_PATH"
   tox run -e integration-mesh -- --model testing --keep-models
