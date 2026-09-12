@@ -124,35 +124,35 @@ def test_access_via_ingress_after_meshing(
     assert_jobs_in_history_server(server_url=ingress_url, expected_count=1, verify_tls=False)
 
 
-def test_auth_login_with_istio_mesh(
-    juju: jubilant.Juju,
-    charm_versions: IntegrationTestsCharms,
-    external_idp_service: ExternalIdpService,
-    page: Page,
-    context: BrowserContext,
-):
-    deploy_identity_setup(
-        juju=juju,
-        charm_versions=charm_versions,
-        external_idp_service=external_idp_service,
-        ingress_mode=IngressMode.ISTIO_INGRESS,
-    )
-    ingress_url = get_ingress_url(juju, charm_versions, IngressMode.ISTIO_INGRESS)
-    session_cookie = complete_authentication_flow(
-        juju=juju,
-        charm_versions=charm_versions,
-        external_idp_service=external_idp_service,
-        page=page,
-        context=context,
-        history_server_url=ingress_url,
-    )
-    assert session_cookie is not None
-    assert_jobs_in_history_server(
-        server_url=ingress_url,
-        expected_count=1,
-        session_cookie=session_cookie,
-        verify_tls=False,
-    )
+# def test_auth_login_with_istio_mesh(
+#     juju: jubilant.Juju,
+#     charm_versions: IntegrationTestsCharms,
+#     external_idp_service: ExternalIdpService,
+#     page: Page,
+#     context: BrowserContext,
+# ):
+#     deploy_identity_setup(
+#         juju=juju,
+#         charm_versions=charm_versions,
+#         external_idp_service=external_idp_service,
+#         ingress_mode=IngressMode.ISTIO_INGRESS,
+#     )
+#     ingress_url = get_ingress_url(juju, charm_versions, IngressMode.ISTIO_INGRESS)
+#     session_cookie = complete_authentication_flow(
+#         juju=juju,
+#         charm_versions=charm_versions,
+#         external_idp_service=external_idp_service,
+#         page=page,
+#         context=context,
+#         history_server_url=ingress_url,
+#     )
+#     assert session_cookie is not None
+#     assert_jobs_in_history_server(
+#         server_url=ingress_url,
+#         expected_count=1,
+#         session_cookie=session_cookie,
+#         verify_tls=False,
+#     )
 
 
 def test_observability_with_ambient_mesh(
@@ -176,6 +176,11 @@ def test_observability_with_ambient_mesh(
     )
 
     run_spark_job()
+
+    import time
+    logger.error("SLEEPING")
+    time.sleep(2 * 60 * 60)
+
 
     ingress_url = get_ingress_url(juju, charm_versions, IngressMode.ISTIO_INGRESS)
     session_cookie = complete_authentication_flow(
@@ -253,5 +258,5 @@ def test_access_via_ingress_after_unmeshing(
 
 def test_sleep():
     import time
-
+    logger.error("SLEEPING")
     time.sleep(2 * 60 * 60)

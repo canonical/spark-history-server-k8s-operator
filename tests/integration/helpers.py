@@ -240,22 +240,6 @@ def deploy_history_server_setup(
     logger.info(f"Deploying ingress: {ingress_app_name}")
     juju.deploy(**ingress_deploy_args)
 
-    # logger.info("Deploying self-signed-certificates for ingress")
-    # juju.deploy(**charm_versions.self_signed_certificate.deploy_dict())
-
-    # juju.wait(
-    #     lambda status: jubilant.all_active(
-    #         status, ingress_app_name, charm_versions.self_signed_certificate.application_name
-    #     ),
-    #     delay=5,
-    # )
-
-    # logger.info(f"Integrating certificates for ingress with application: {ingress_app_name}")
-    # juju.integrate(
-    #     charm_versions.self_signed_certificate.application_name,
-    #     ingress_app_name,
-    # )
-
     logger.info(f"Integrating history server with ingress: {ingress_app_name}")
     juju.integrate(f"{APP_NAME}:ingress", f"{ingress_app_name}:ingress")
     juju.wait(jubilant.all_active, delay=5)
