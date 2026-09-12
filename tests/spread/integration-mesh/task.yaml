@@ -4,7 +4,7 @@
 summary: integration-mesh pytest suite
 
 systems:
-  - ubuntu-22.04
+  - self-hosted-linux-amd64-jammy-large
 
 prepare: |
   microceph cluster bootstrap

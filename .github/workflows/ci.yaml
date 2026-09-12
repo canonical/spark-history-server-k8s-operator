@@ -94,7 +94,8 @@ jobs:
           # - Obs and identity charms not available for arm64, so we don't run the tests using
           #   those charms on the arm64 runner.
           ARM_TASKS = {"integration-tls"}
-          JAMMY_LARGE_TASKS = {"integration-tls", "integration-logs", "integration-mesh"}
+          JAMMY_LARGE_TASKS = {"integration-tls", "integration-logs"}
+          JAMMY_LARGE_ONLY_TASKS = {"integration-mesh"} # Needs larger runner with more resources
 
           jobs = []
           for job in spread_jobs:
@@ -106,7 +107,7 @@ jobs:
                   continue
               if runner == "self-hosted-linux-amd64-jammy-large" and task_name not in JAMMY_LARGE_TASKS:
                   continue
-              if runner == "ubuntu-22.04" and task_name in JAMMY_LARGE_TASKS:
+              if runner == "ubuntu-22.04" and task_name in JAMMY_LARGE_ONLY_TASKS:
                   continue
 
               if runner.endswith("-arm"):
@@ -212,6 +213,10 @@ jobs:
         timeout-minutes: 1
         if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
         run: sudo kubectl logs -n default -l spark-role=driver --all-containers=true --prefix=true | tee ~/logs/spark-driver-logs.txt
+      - name: Spark executor logs
+        timeout-minutes: 1
+        if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
+        run: sudo kubectl logs -n default -l spark-role=executor --all-containers=true --prefix=true | tee ~/logs/spark-executor-logs.txt
       - name: ztunnel logs
         timeout-minutes: 1
         if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
