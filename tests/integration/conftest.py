@@ -84,7 +84,28 @@ def charm_versions() -> IntegrationTestsCharms:
             name="traefik-k8s",
             channel="latest/edge",
             base="ubuntu@20.04",
-            alias="traefik-k8s",
+            alias="traefik-public",
+            trust=True,
+        ),
+        istio=CharmVersion(
+            name="istio-k8s",
+            channel="2/stable",
+            base="ubuntu@24.04",
+            alias="istio-k8s",
+            trust=True,
+        ),
+        istio_beacon=CharmVersion(
+            name="istio-beacon-k8s",
+            channel="2/stable",
+            base="ubuntu@22.04",
+            alias="istio-beacon-k8s",
+            trust=True,
+        ),
+        istio_ingress=CharmVersion(
+            name="istio-ingress-k8s",
+            channel="2/stable",
+            base="ubuntu@24.04",
+            alias="istio-ingress-k8s",
             trust=True,
         ),
         oathkeeper=CharmVersion(
@@ -92,7 +113,7 @@ def charm_versions() -> IntegrationTestsCharms:
         ),
         oauth2proxy=CharmVersion(
             name="oauth2-proxy-k8s",
-            channel="latest/edge",
+            channel="latest/edge/fix-istio",
             base="ubuntu@22.04",
         ),
         azure_storage=CharmVersion(
@@ -113,6 +134,13 @@ def charm_versions() -> IntegrationTestsCharms:
             channel="1/stable",
             base="ubuntu@22.04",
             alias="grafana-agent-k8s",
+            trust=True,
+        ),
+        otel_collector=CharmVersion(
+            name="opentelemetry-collector-k8s",
+            channel="2/stable",
+            base="ubuntu@24.04",
+            alias="opentelemetry-collector-k8s",
             trust=True,
         ),
         self_signed_certificate=CharmVersion(

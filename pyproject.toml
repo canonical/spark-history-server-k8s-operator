@@ -28,6 +28,9 @@ jsonschema = "*"
 # loki_k8s/v1/loki_push_api.py
 # prometheus_k8s/v0/prometheus_scrape.py
 cosl = "*"
+# istio_beacon_k8s/v0/service_mesh.py
+charmed-service-mesh-helpers = ">=0.2.0"
+lightkube-extensions = "*"
 
 [tool.poetry.group.format]
 optional = true
@@ -109,6 +112,7 @@ module = [
   "charms.oauth2_proxy_k8s.*",
   "charms.oathkeeper.*",
   "charms.traefik_k8s.*",
+  "charms.istio_beacon_k8s.*",
 ]
 ignore_missing_imports = true
 

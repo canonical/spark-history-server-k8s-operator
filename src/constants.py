@@ -7,6 +7,7 @@
 """Literals and constants."""
 
 CONTAINER = "spark-history-server"
+HISTORY_SERVER_PORT = 18080
 
 PEBBLE_USER = ("_daemon_", "_daemon_")
 S3_RELATION_NAME = "s3-credentials"

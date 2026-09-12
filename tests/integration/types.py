@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
+
+from enum import Enum
 from typing import TypedDict
 
 from pydantic import BaseModel
@@ -42,11 +44,15 @@ class CharmVersion(BaseModel):
 class IntegrationTestsCharms(BaseModel):
     s3: CharmVersion
     ingress: CharmVersion
+    istio: CharmVersion
+    istio_beacon: CharmVersion
+    istio_ingress: CharmVersion
     oathkeeper: CharmVersion
     oauth2proxy: CharmVersion
     azure_storage: CharmVersion
     loki: CharmVersion
     grafana_agent: CharmVersion
+    otel_collector: CharmVersion
     self_signed_certificate: CharmVersion
     postgresql: CharmVersion
     hydra: CharmVersion
@@ -78,3 +84,14 @@ S3Info = TypedDict(
         "ca_bundle_path": str,
     },
 )
+
+
+class IngressMode(Enum):
+    NONE = "none"
+    TRAEFIK = "traefik"
+    ISTIO_INGRESS = "istio-ingress"
+
+
+class TelemetryAgent(Enum):
+    GRAFANA_AGENT = "grafana-agent"
+    OTEL_COLLECTOR = "otel-collector"
