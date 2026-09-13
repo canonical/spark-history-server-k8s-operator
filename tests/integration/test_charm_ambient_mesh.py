@@ -235,7 +235,7 @@ def test_disable_ambient_mesh(
         lambda status: jubilant.all_agents_idle(status) and jubilant.all_active(status), delay=5
     )
     for pod_name in get_pod_names(cast(str, juju.model), APP_NAME):
-        assert pod_has_labels(
+        assert not pod_has_labels(
             namespace=cast(str, juju.model),
             pod_name=pod_name,
             labels={AMBIENT_MESH_POD_LABEL_KEY: AMBIENT_MESH_POD_LABEL_VALUE},
