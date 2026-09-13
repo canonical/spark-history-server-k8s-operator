@@ -202,6 +202,9 @@ jobs:
         timeout-minutes: 3
         if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
         run: sudo juju debug-log --color --replay --no-tail | tee ~/logs/juju-debug-log.txt
+      - name: SSH Session
+        if: failure()
+        uses: mxschmitt/action-tmate@v3
       - name: Disk usage
         timeout-minutes: 1
         if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
