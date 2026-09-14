@@ -793,7 +793,7 @@ def assert_prometheus_data_published(
     if "http://" in cos_address:
         cos_address = cos_address.split("//")[1]
     url = f"http://{cos_address}/{cast(str, juju.model)}-prometheus-0/api/v1/query?query={check_field}"
-    for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(30)):
+    for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(30), reraise=True):
         with attempt:
             # Data got published to Prometheus
             response = requests.get(url).json()
@@ -817,7 +817,7 @@ def assert_prometheus_alerts_published(
     if "http://" in cos_address:
         cos_address = cos_address.split("//")[1]
     url = f"http://{cos_address}/{cast(str, juju.model)}-prometheus-0/api/v1/rules"
-    for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(30)):
+    for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(30), reraise=True):
         with attempt:
             # Alerts got published to Prometheus
             response = requests.get(url).json()
@@ -847,7 +847,7 @@ def assert_grafana_dashboards_published(
     """Assert that Grafana dashboards are published."""
     base_url, pw = _get_grafana_access(juju)
     url = f"{base_url}/api/search?query=&starred=false"
-    for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(30)):
+    for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(30), reraise=True):
         with attempt:
             session = requests.Session()
             session.auth = ("admin", pw)
@@ -864,7 +864,7 @@ def assert_logs_published_in_loki(
     juju: jubilant.Juju, app_name: str, filter_by_label: dict[str, str], search_phrase: str
 ) -> None:
     """Assert that logs containing the specified search phrase are published in Loki."""
-    for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(10)):
+    for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(10), reraise=True):
         with attempt:
             logs = get_logs_in_loki(juju=juju, app_name=app_name, filter_by_label=filter_by_label)
             assert len(logs) > 0, (
