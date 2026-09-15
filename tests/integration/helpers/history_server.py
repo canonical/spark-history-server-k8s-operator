@@ -11,11 +11,11 @@ import requests
 import yaml
 from tenacity import Retrying, stop_after_attempt, wait_fixed
 
+from ..types import AzureInfo, IngressMode, IntegrationTestsCharms, S3Info
 from .azure_storage import prepare_azure_storage_setup
 from .istio import deploy_istio_control_plane
 from .juju import get_application_data
 from .s3 import prepare_s3_storage_setup
-from ..types import AzureInfo, IngressMode, IntegrationTestsCharms, S3Info
 
 logger = logging.getLogger(__name__)
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())

@@ -6,8 +6,8 @@ import json
 import logging
 import subprocess
 
-from .history_server import get_history_server_image_version
 from ..types import AzureInfo, S3Info
+from .history_server import get_history_server_image_version
 
 logger = logging.getLogger(__name__)
 
