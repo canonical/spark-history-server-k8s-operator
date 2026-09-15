@@ -10,13 +10,13 @@ from urllib.parse import urlencode
 
 import jubilant
 import requests
-from helpers.history_server import APP_NAME
-from helpers.juju import get_unit_address
 from tenacity import Retrying, stop_after_attempt, wait_fixed
 
 from constants import JMX_EXPORTER_PORT
 
 from ..types import IntegrationTestsCharms, TelemetryAgent
+from .history_server import APP_NAME
+from .juju import get_unit_address
 
 logger = logging.getLogger(__name__)
 

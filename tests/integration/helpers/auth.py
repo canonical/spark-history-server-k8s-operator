@@ -5,12 +5,12 @@
 import logging
 
 import jubilant
-from helpers.history_server import APP_NAME
 from playwright.sync_api import BrowserContext, Page
 from tenacity import Retrying, stop_after_attempt, wait_fixed
 
 from ..oauth_tools.external_idp import ExternalIdpService
 from ..types import IngressMode, IntegrationTestsCharms
+from .history_server import APP_NAME
 
 logger = logging.getLogger(__name__)
 
