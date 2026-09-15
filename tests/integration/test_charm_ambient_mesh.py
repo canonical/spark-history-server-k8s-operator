@@ -12,33 +12,29 @@ from playwright.sync_api import BrowserContext, Page
 
 from constants import HISTORY_SERVER_PORT
 
-from .helpers import (
-    ExternalIdpService,
+from .helpers.auth import ExternalIdpService, complete_authentication_flow, deploy_identity_setup
+from .helpers.cos import (
     assert_grafana_dashboards_published,
-    assert_jobs_in_history_server,
     assert_logs_published_in_loki,
     assert_prometheus_alerts_published,
     assert_prometheus_data_exported,
     assert_prometheus_data_published,
-    complete_authentication_flow,
-    curl_using_pod,
-    deploy_history_server_setup,
-    deploy_identity_setup,
-    deploy_o11y_setup,
-    get_ingress_url,
-    get_pod_names,
-    get_unit_address,
-    pod_has_labels,
-    run_spark_job,
-    setup_spark_job,
+    deploy_observability_setup,
 )
+from .helpers.history_server import (
+    assert_jobs_in_history_server,
+    deploy_history_server_setup,
+    get_ingress_url,
+)
+from .helpers.juju import get_pod_names, get_unit_address
+from .helpers.k8s import curl_using_pod, pod_has_labels
+from .helpers.spark import run_spark_job, setup_spark_job
 from .types import IngressMode, IntegrationTestsCharms, S3Info, TelemetryAgent
 
 logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
-CURL_IMAGE = "curlimages/curl:8.10.1"
 AMBIENT_MESH_POD_LABEL_KEY = "istio.io/dataplane-mode"
 AMBIENT_MESH_POD_LABEL_VALUE = "ambient"
 
@@ -180,7 +176,7 @@ def test_observability_with_ambient_mesh(
     context: BrowserContext,
 ) -> None:
     """Test observability features with the ambient mesh enabled."""
-    deploy_o11y_setup(
+    deploy_observability_setup(
         juju=juju, charm_versions=charm_versions, telemetry_agent=TelemetryAgent.OTEL_COLLECTOR
     )
 

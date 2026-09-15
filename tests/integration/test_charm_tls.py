@@ -8,13 +8,9 @@ from pathlib import Path
 import jubilant
 import yaml
 
-from .helpers import (
-    assert_jobs_in_history_server,
-    deploy_history_server_setup,
-    get_unit_address,
-    run_spark_job,
-    setup_spark_job,
-)
+from .helpers.history_server import assert_jobs_in_history_server, deploy_history_server_setup
+from .helpers.juju import get_unit_address
+from .helpers.spark import run_spark_job, setup_spark_job
 from .types import IntegrationTestsCharms, S3Info
 
 logger = logging.getLogger(__name__)

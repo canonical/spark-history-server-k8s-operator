@@ -12,13 +12,12 @@ import yaml
 
 from core.context import AUTH_PROXY_HEADERS
 
-from .helpers import (
+from .helpers.history_server import (
     assert_jobs_in_history_server,
     deploy_history_server_setup,
     get_ingress_url,
-    run_spark_job,
-    setup_spark_job,
 )
+from .helpers.spark import run_spark_job, setup_spark_job
 from .types import IngressMode, IntegrationTestsCharms, S3Info
 
 logger = logging.getLogger(__name__)

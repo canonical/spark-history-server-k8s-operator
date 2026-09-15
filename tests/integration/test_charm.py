@@ -18,16 +18,14 @@ from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from core.context import OAUTH2_PROXY_HEADERS
 
-from .helpers import (
+from .helpers.history_server import (
     assert_jobs_in_history_server,
-    assert_security_context,
     deploy_history_server_setup,
-    generate_container_securitycontext_map,
     get_ingress_url,
-    get_pod_names,
-    run_spark_job,
-    setup_spark_job,
 )
+from .helpers.juju import get_pod_names
+from .helpers.k8s import assert_security_context, generate_container_securitycontext_map
+from .helpers.spark import run_spark_job, setup_spark_job
 from .types import IngressMode, IntegrationTestsCharms, S3Info
 
 logger = logging.getLogger(__name__)

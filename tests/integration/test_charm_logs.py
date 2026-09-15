@@ -8,19 +8,17 @@ from pathlib import Path
 import jubilant
 import yaml
 
-from .helpers import (
+from .helpers.cos import (
     assert_grafana_dashboards_published,
-    assert_jobs_in_history_server,
     assert_logs_published_in_loki,
     assert_prometheus_alerts_published,
     assert_prometheus_data_exported,
     assert_prometheus_data_published,
-    deploy_history_server_setup,
-    deploy_o11y_setup,
-    get_unit_address,
-    run_spark_job,
-    setup_spark_job,
+    deploy_observability_setup,
 )
+from .helpers.history_server import assert_jobs_in_history_server, deploy_history_server_setup
+from .helpers.juju import get_unit_address
+from .helpers.spark import run_spark_job, setup_spark_job
 from .types import IntegrationTestsCharms, S3Info, TelemetryAgent
 
 logger = logging.getLogger(__name__)
@@ -59,7 +57,7 @@ def test_loki_integration(
     history_server_url = f"http://{address}:18080"
     assert_jobs_in_history_server(server_url=history_server_url, expected_count=0)
 
-    deploy_o11y_setup(
+    deploy_observability_setup(
         juju=juju, charm_versions=charm_versions, telemetry_agent=TelemetryAgent.GRAFANA_AGENT
     )
     juju.wait(jubilant.all_active, delay=10)
@@ -79,7 +77,7 @@ def test_loki_integration(
 
 
 def test_history_server_cos_integration(
-    juju: jubilant.Juju, charm_versions: IntegrationTestsCharms
+    juju: jubilant.Juju,
 ) -> None:
     """Check that the integration with cos work correctly."""
     assert_prometheus_data_exported(juju, check_field="jmx_scrape_duration_seconds")

@@ -9,15 +9,13 @@ import jubilant
 import yaml
 from playwright.sync_api import BrowserContext, Page
 
-from .helpers import (
+from .helpers.auth import complete_authentication_flow, deploy_identity_setup
+from .helpers.history_server import (
     assert_jobs_in_history_server,
-    complete_authentication_flow,
     deploy_history_server_setup,
-    deploy_identity_setup,
     get_ingress_url,
-    run_spark_job,
-    setup_spark_job,
 )
+from .helpers.spark import run_spark_job, setup_spark_job
 from .oauth_tools.external_idp import ExternalIdpService
 from .types import IngressMode, IntegrationTestsCharms, S3Info
 

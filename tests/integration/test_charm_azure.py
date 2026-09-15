@@ -10,13 +10,9 @@ from pathlib import Path
 import jubilant
 import yaml
 
-from .helpers import (
-    assert_jobs_in_history_server,
-    delete_azure_container,
-    deploy_history_server_setup,
-    run_spark_job,
-    setup_spark_job,
-)
+from .helpers.azure_storage import delete_azure_container
+from .helpers.history_server import assert_jobs_in_history_server, deploy_history_server_setup
+from .helpers.spark import run_spark_job, setup_spark_job
 from .types import AzureInfo, IntegrationTestsCharms
 
 logger = logging.getLogger(__name__)
