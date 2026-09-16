@@ -44,6 +44,7 @@ def test_deploy_history_server_setup_with_istio_ingress(
     charm_versions: IntegrationTestsCharms,
     history_server_charm: Path,
     s3_bucket_and_creds: S3Info,
+    kubernetes_provider: str,
 ) -> None:
     """Test deploying the History Server setup with Istio ingress."""
     deploy_history_server_setup(
@@ -53,6 +54,7 @@ def test_deploy_history_server_setup_with_istio_ingress(
         s3_bucket_and_creds=s3_bucket_and_creds,
         ingress_mode=IngressMode.ISTIO_INGRESS,
         trust=True,
+        kubernetes_provider=kubernetes_provider,
     )
     juju.wait(lambda status: jubilant.all_agents_idle(status) and jubilant.all_active(status))
 

@@ -218,6 +218,10 @@ jobs:
         timeout-minutes: 1
         if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
         run: sudo kubectl logs -n testing -l app=ztunnel --all-containers=true | tee ~/logs/ztunnel-logs.txt
+      - name: waypoint logs
+        timeout-minutes: 1
+        if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
+        run: sudo kubectl logs -n testing -l istio.io/waypoint-for=service --all-containers=true --prefix=true | tee ~/logs/waypoint-logs.txt
       - name: Disk usage
         timeout-minutes: 1
         if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}

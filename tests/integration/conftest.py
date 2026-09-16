@@ -281,6 +281,13 @@ def platform() -> str:
 
 
 @pytest.fixture(scope="module")
+def kubernetes_provider(juju: jubilant.Juju) -> str:
+    """Kubernetes provider ('microk8s' or 'k8s') backing the Juju model."""
+    cloud = juju.status().model.cloud
+    return "microk8s" if "microk8s" in cloud.lower() else "k8s"
+
+
+@pytest.fixture(scope="module")
 def history_server_charm(platform: str) -> Path:
     """Path to the packed history server charm."""
     if not (path := next(iter(Path.cwd().glob(f"*-{platform}.charm")), None)):

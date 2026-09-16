@@ -37,6 +37,7 @@ def deploy_history_server_setup(
     ingress_mode: IngressMode = IngressMode.NONE,
     trust: bool = False,
     s3_tls: bool = False,
+    kubernetes_provider: str = "microk8s",
 ) -> None:
     """Deploy the Spark History Server along with optional storage and ingress setups."""
     image_version = get_history_server_image_version()
@@ -70,7 +71,7 @@ def deploy_history_server_setup(
         ingress_deploy_args = charm_versions.ingress.deploy_dict()
     elif ingress_mode is IngressMode.ISTIO_INGRESS:
         logger.info("Ingress is enabled for Spark History Server using Istio")
-        deploy_istio_control_plane(juju, charm_versions)
+        deploy_istio_control_plane(juju, charm_versions, kubernetes_provider)
         ingress_app_name = charm_versions.istio_ingress.application_name
         ingress_deploy_args = charm_versions.istio_ingress.deploy_dict()
 
