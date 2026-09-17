@@ -78,6 +78,11 @@ RETRYABLE_CLIENT_ERROR_CODES = {
     "SlowDown",
 }
 
+IDEMPOTENT_BUCKET_CREATE_ERROR_CODES = {
+    "BucketAlreadyExists",
+    "BucketAlreadyOwnedByYou",
+}
+
 
 def _client_error_code(error: ClientError) -> str:
     """Return the AWS error code for a botocore ClientError."""
@@ -163,6 +168,9 @@ class S3Manager(WithLogging):
                 client.create_bucket(Bucket=bucket_name)
                 self._wait_until_exists(client, "bucket")
             except ClientError as ex:
+                if _client_error_code(ex) in IDEMPOTENT_BUCKET_CREATE_ERROR_CODES:
+                    self._wait_until_exists(client, "bucket")
+                    return S3VerificationResult.SUCCESS
                 self.logger.error(f"Could not create bucket {bucket_name}: {ex}")
                 return self._verification_error_result(ex)
             self.logger.info(f"Created bucket {bucket_name}")

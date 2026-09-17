@@ -339,6 +339,28 @@ def test_get_or_create_bucket_returns_unknown_error_on_non_auth_client_error() -
     assert s3_manager.get_or_create_bucket(client) == S3VerificationResult.UNKNOWN_ERROR
 
 
+@pytest.mark.parametrize("error_code", ["BucketAlreadyExists", "BucketAlreadyOwnedByYou"])
+def test_get_or_create_bucket_treats_idempotent_create_errors_as_success(error_code) -> None:
+    """Idempotent bucket-create races should still verify successfully."""
+    # Given
+    connection_info = Mock(spec=S3ConnectionInfo)
+    connection_info.bucket = "test_bucket"
+    s3_manager = S3Manager(connection_info)
+    s3_manager._wait_until_exists = Mock()
+
+    client = Mock()
+    client.head_bucket.side_effect = ClientError(
+        {"Error": {"Code": "404", "Message": "Not Found"}}, "HeadBucket"
+    )
+    client.create_bucket.side_effect = ClientError(
+        {"Error": {"Code": error_code, "Message": "Already exists"}}, "CreateBucket"
+    )
+
+    # When / Then
+    assert s3_manager.get_or_create_bucket(client) == S3VerificationResult.SUCCESS
+    s3_manager._wait_until_exists.assert_called_once_with(client, "bucket")
+
+
 def test_ensure_path_returns_invalid_credentials_on_auth_client_error() -> None:
     """An auth-related ClientError while writing the '.keep' marker must be reported."""
     # Given
