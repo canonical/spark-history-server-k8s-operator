@@ -6,11 +6,16 @@ from unittest.mock import Mock
 
 import boto3
 import pytest
-from botocore.exceptions import ClientError
+from botocore.exceptions import (
+    ClientError,
+    EndpointConnectionError,
+    ProxyConnectionError,
+    SSLError,
+)
 from moto import mock_aws
 
 from core.domain import S3ConnectionInfo
-from managers.s3 import S3Manager, is_proxy_skipped
+from managers.s3 import S3Manager, S3VerificationResult, is_proxy_skipped
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.client import S3Client
@@ -151,6 +156,87 @@ def test_verify_uses_when_required_checksum_config(s3: S3Client, monkeypatch) ->
     assert captured_configs
     assert captured_configs[0].request_checksum_calculation == "when_required"
     assert captured_configs[0].response_checksum_validation == "when_required"
+
+
+def test_verify_retries_transient_endpoint_errors(monkeypatch) -> None:
+    """Transient endpoint failures should be retried before succeeding."""
+    # Given
+    connection_info = Mock(spec=S3ConnectionInfo)
+    connection_info.endpoint = "https://s3.example.com"
+    connection_info.access_key = ""
+    connection_info.secret_key = ""
+    connection_info.bucket = "test_bucket"
+    connection_info.path = "path"
+    connection_info.tls_ca_chain = []
+    connection_info.region = ""
+    s3_manager = S3Manager(connection_info)
+
+    client = Mock()
+    client.list_buckets.side_effect = [
+        EndpointConnectionError(endpoint_url=connection_info.endpoint),
+        EndpointConnectionError(endpoint_url=connection_info.endpoint),
+        {"Buckets": []},
+    ]
+    monkeypatch.setattr(s3_manager.session, "client", Mock(return_value=client))
+    monkeypatch.setattr(s3_manager, "get_or_create_bucket", Mock(return_value=True))
+    monkeypatch.setattr(s3_manager, "ensure_path", Mock(return_value=True))
+    monkeypatch.setattr(S3Manager._list_buckets.retry, "sleep", lambda _: None)
+
+    # When
+    result = s3_manager.verify_result()
+
+    # Then
+    assert result == S3VerificationResult.SUCCESS
+    assert client.list_buckets.call_count == 3
+
+
+@pytest.mark.parametrize(
+    "error, expected",
+    [
+        (
+            ClientError({"Error": {"Code": "403", "Message": "Forbidden"}}, "ListBuckets"),
+            S3VerificationResult.INVALID_CREDENTIALS,
+        ),
+        (
+            EndpointConnectionError(endpoint_url="https://s3.example.com"),
+            S3VerificationResult.ENDPOINT_UNREACHABLE,
+        ),
+        (
+            ProxyConnectionError(proxy_url="http://proxy.example.com", error="proxy down"),
+            S3VerificationResult.PROXY_ERROR,
+        ),
+        (
+            SSLError(endpoint_url="https://s3.example.com", error="tls failed"),
+            S3VerificationResult.SSL_ERROR,
+        ),
+    ],
+)
+def test_verify_classifies_connection_errors(monkeypatch, error, expected) -> None:
+    """S3 verification should surface different failure classes distinctly."""
+    # Given
+    connection_info = Mock(spec=S3ConnectionInfo)
+    connection_info.endpoint = "https://s3.example.com"
+    connection_info.access_key = ""
+    connection_info.secret_key = ""
+    connection_info.bucket = "test_bucket"
+    connection_info.path = "path"
+    connection_info.tls_ca_chain = []
+    connection_info.region = ""
+    s3_manager = S3Manager(connection_info)
+
+    client = Mock()
+    client.list_buckets.side_effect = error
+    monkeypatch.setattr(s3_manager.session, "client", Mock(return_value=client))
+    monkeypatch.setattr(S3Manager._list_buckets.retry, "sleep", lambda _: None)
+
+    # When
+    result = s3_manager.verify_result()
+
+    # Then
+    assert result == expected
+    assert client.list_buckets.call_count == (
+        5 if expected == S3VerificationResult.ENDPOINT_UNREACHABLE else 1
+    )
 
 
 def test_get_or_create_bucket_does_not_raise_on_client_error() -> None:

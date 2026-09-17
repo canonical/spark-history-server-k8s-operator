@@ -11,6 +11,7 @@ from ops.testing import Container, Context, Relation, State
 
 from constants import CONTAINER
 from core.context import Status
+from managers.s3 import S3VerificationResult
 
 if TYPE_CHECKING:
     from charm import SparkHistoryServerCharm
@@ -58,11 +59,13 @@ def test_pebble_ready(
     assert out.unit_status == Status.MISSING_STORAGE_RELATION.value
 
 
+@patch("managers.s3.S3Manager.verify_result", return_value=S3VerificationResult.SUCCESS)
 @patch("managers.s3.S3Manager.verify", return_value=True)
 @patch("workload.SparkHistoryServer.exec")
 def test_s3_relation_connection_ok(
     exec_calls,
     verify_call,
+    verify_result_call,
     tmp_path: Path,
     history_server_ctx: Context[SparkHistoryServerCharm],
     history_server_container: Container,
@@ -98,11 +101,13 @@ def test_s3_relation_connection_ok(
     )
 
 
+@patch("managers.s3.S3Manager.verify_result", return_value=S3VerificationResult.SUCCESS)
 @patch("managers.s3.S3Manager.verify", return_value=True)
 @patch("workload.SparkHistoryServer.exec")
 def test_s3_relation_connection_ok_tls(
     exec_calls,
     verify_call,
+    verify_result_call,
     tmp_path: Path,
     history_server_ctx: Context[SparkHistoryServerCharm],
     history_server_container: Container,
@@ -158,11 +163,16 @@ def test_s3_relation_connection_ok_tls(
     assert len(envs["SPARK_HISTORY_OPTS"]) == 0
 
 
+@patch(
+    "managers.s3.S3Manager.verify_result",
+    return_value=S3VerificationResult.INVALID_CREDENTIALS,
+)
 @patch("managers.s3.S3Manager.verify", return_value=False)
 @patch("workload.SparkHistoryServer.exec")
 def test_s3_relation_connection_ko(
     exec_calls,
     verify_call,
+    verify_result_call,
     history_server_ctx: Context[SparkHistoryServerCharm],
     history_server_container: Container,
     s3_relation: Relation,
@@ -173,6 +183,29 @@ def test_s3_relation_connection_ko(
     )
     out = history_server_ctx.run(history_server_ctx.on.relation_changed(s3_relation), state)
     assert out.unit_status == Status.INVALID_STORAGE_CREDENTIALS.value
+
+
+@patch(
+    "managers.s3.S3Manager.verify_result",
+    return_value=S3VerificationResult.ENDPOINT_UNREACHABLE,
+)
+@patch("managers.s3.S3Manager.verify", return_value=False)
+@patch("workload.SparkHistoryServer.exec")
+def test_s3_relation_endpoint_unreachable(
+    exec_calls,
+    verify_call,
+    verify_result_call,
+    history_server_ctx: Context[SparkHistoryServerCharm],
+    history_server_container: Container,
+    s3_relation: Relation,
+) -> None:
+    """Transient S3 connectivity issues should not be reported as invalid credentials."""
+    state = State(
+        relations=[s3_relation],
+        containers=[history_server_container],
+    )
+    out = history_server_ctx.run(history_server_ctx.on.relation_changed(s3_relation), state)
+    assert out.unit_status == Status.OBJECT_STORAGE_ENDPOINT_UNREACHABLE.value
 
 
 @patch("managers.s3.S3Manager.verify", return_value=False)
@@ -242,11 +275,13 @@ def test_ingress_relation_creation(
     assert out.unit_status == Status.MISSING_STORAGE_RELATION.value
 
 
+@patch("managers.s3.S3Manager.verify_result", return_value=S3VerificationResult.SUCCESS)
 @patch("managers.s3.S3Manager.verify", return_value=True)
 @patch("workload.SparkHistoryServer.exec")
 def test_with_ingress(
     exec_calls,
     verify_call,
+    verify_result_call,
     tmp_path: Path,
     history_server_ctx: Context[SparkHistoryServerCharm],
     history_server_container: Container,
@@ -267,11 +302,13 @@ def test_with_ingress(
     assert "spark.ui.proxyBase" in spark_properties
 
 
+@patch("managers.s3.S3Manager.verify_result", return_value=S3VerificationResult.SUCCESS)
 @patch("managers.s3.S3Manager.verify", return_value=True)
 @patch("workload.SparkHistoryServer.exec")
 def test_with_ingress_subdomain(
     exec_calls,
     verify_call,
+    verify_result_call,
     tmp_path: Path,
     history_server_ctx: Context[SparkHistoryServerCharm],
     history_server_container: Container,
@@ -294,11 +331,13 @@ def test_with_ingress_subdomain(
     assert "spark.ui.proxyBase" not in spark_properties
 
 
+@patch("managers.s3.S3Manager.verify_result", return_value=S3VerificationResult.SUCCESS)
 @patch("managers.s3.S3Manager.verify", return_value=True)
 @patch("workload.SparkHistoryServer.exec")
 def test_remove_ingress(
     exec_calls,
     verify_call,
+    verify_result_call,
     tmp_path: Path,
     history_server_ctx: Context[SparkHistoryServerCharm],
     history_server_container: Container,
