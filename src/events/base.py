@@ -20,7 +20,7 @@ from core.context import (
 from core.domain import AzureStorageConnectionInfo
 from core.workload import SparkHistoryWorkloadBase
 from managers.azure_storage import AzureStorageManager
-from managers.s3 import S3Manager
+from managers.s3 import S3Manager, S3VerificationResult
 
 
 class BaseEventHandler(Object):
@@ -29,6 +29,21 @@ class BaseEventHandler(Object):
     workload: SparkHistoryWorkloadBase
     charm: CharmBase
     context: Context
+
+    def _get_s3_status(self, s3: S3ConnectionInfo | None) -> StatusBase | None:
+        """Return a status for S3-specific errors when present."""
+        if not s3:
+            return None
+
+        status_by_result = {
+            S3VerificationResult.MISSING_PATH: Status.MISSING_STORAGE_PATH.value,
+            S3VerificationResult.INVALID_CREDENTIALS: Status.INVALID_STORAGE_CREDENTIALS.value,
+            S3VerificationResult.SSL_ERROR: Status.OBJECT_STORAGE_SSL_ERROR.value,
+            S3VerificationResult.PROXY_ERROR: Status.OBJECT_STORAGE_PROXY_ERROR.value,
+            S3VerificationResult.ENDPOINT_UNREACHABLE: Status.OBJECT_STORAGE_ENDPOINT_UNREACHABLE.value,
+            S3VerificationResult.UNKNOWN_ERROR: Status.OBJECT_STORAGE_UNKNOWN_ERROR.value,
+        }
+        return status_by_result.get(S3Manager(s3).verify_result())
 
     def get_app_status(
         self,
@@ -52,8 +67,8 @@ class BaseEventHandler(Object):
             # We already assessed that one of the two is present
             return Status.MISSING_STORAGE_PATH.value
 
-        if s3 and not S3Manager(s3).verify():
-            return Status.INVALID_STORAGE_CREDENTIALS.value
+        if s3_status := self._get_s3_status(s3):
+            return s3_status
 
         if azure and not AzureStorageManager(azure).verify():
             return Status.INVALID_STORAGE_CREDENTIALS.value
@@ -77,21 +92,16 @@ def compute_status(hook: Callable) -> Callable[[BaseEventHandler, EventBase], No
     def wrapper_hook(event_handler: BaseEventHandler, event: EventBase):
         """Return output after resetting statuses."""
         res = hook(event_handler, event)
-        if event_handler.charm.unit.is_leader():
-            event_handler.charm.app.status = event_handler.get_app_status(
-                event_handler.context.s3,
-                event_handler.context.azure_storage,
-                event_handler.context.ingress,
-                event_handler.context.auth_proxy_config,
-                event_handler.context.oauth2_proxy_config,
-            )
-        event_handler.charm.unit.status = event_handler.get_app_status(
+        status = event_handler.get_app_status(
             event_handler.context.s3,
             event_handler.context.azure_storage,
             event_handler.context.ingress,
             event_handler.context.auth_proxy_config,
             event_handler.context.oauth2_proxy_config,
         )
+        if event_handler.charm.unit.is_leader():
+            event_handler.charm.app.status = status
+        event_handler.charm.unit.status = status
         return res
 
     return wrapper_hook

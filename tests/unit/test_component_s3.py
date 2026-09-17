@@ -6,11 +6,16 @@ from unittest.mock import Mock
 
 import boto3
 import pytest
-from botocore.exceptions import ClientError
+from botocore.exceptions import (
+    ClientError,
+    EndpointConnectionError,
+    ProxyConnectionError,
+    SSLError,
+)
 from moto import mock_aws
 
 from core.domain import S3ConnectionInfo
-from managers.s3 import S3Manager, is_proxy_skipped
+from managers.s3 import S3Manager, S3VerificationResult, is_proxy_skipped
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.client import S3Client
@@ -153,8 +158,170 @@ def test_verify_uses_when_required_checksum_config(s3: S3Client, monkeypatch) ->
     assert captured_configs[0].response_checksum_validation == "when_required"
 
 
-def test_get_or_create_bucket_does_not_raise_on_client_error() -> None:
-    """A ClientError while creating the bucket must be reported, not propagated."""
+def test_verify_retries_transient_endpoint_errors(monkeypatch) -> None:
+    """Transient endpoint failures should be retried before succeeding."""
+    # Given
+    connection_info = Mock(spec=S3ConnectionInfo)
+    connection_info.endpoint = "https://s3.example.com"
+    connection_info.access_key = ""
+    connection_info.secret_key = ""
+    connection_info.bucket = "test_bucket"
+    connection_info.path = "path"
+    connection_info.tls_ca_chain = []
+    connection_info.region = ""
+    s3_manager = S3Manager(connection_info)
+
+    client = Mock()
+    client.list_buckets.side_effect = [
+        EndpointConnectionError(endpoint_url=connection_info.endpoint),
+        EndpointConnectionError(endpoint_url=connection_info.endpoint),
+        {"Buckets": []},
+    ]
+    monkeypatch.setattr(s3_manager.session, "client", Mock(return_value=client))
+    monkeypatch.setattr(
+        s3_manager,
+        "get_or_create_bucket",
+        Mock(return_value=S3VerificationResult.SUCCESS),
+    )
+    monkeypatch.setattr(
+        s3_manager,
+        "ensure_path",
+        Mock(return_value=S3VerificationResult.SUCCESS),
+    )
+    monkeypatch.setattr(S3Manager._list_buckets.retry, "sleep", lambda _: None)
+
+    # When
+    result = s3_manager.verify_result()
+
+    # Then
+    assert result == S3VerificationResult.SUCCESS
+    assert client.list_buckets.call_count == 3
+
+
+@pytest.mark.parametrize(
+    "error, expected, expected_calls",
+    [
+        (
+            ClientError({"Error": {"Code": "403", "Message": "Forbidden"}}, "ListBuckets"),
+            S3VerificationResult.INVALID_CREDENTIALS,
+            1,
+        ),
+        (
+            EndpointConnectionError(endpoint_url="https://s3.example.com"),
+            S3VerificationResult.ENDPOINT_UNREACHABLE,
+            5,
+        ),
+        (
+            ClientError(
+                {
+                    "Error": {"Code": "ServiceUnavailable", "Message": "Service Unavailable"},
+                    "ResponseMetadata": {"HTTPStatusCode": 503},
+                },
+                "ListBuckets",
+            ),
+            S3VerificationResult.ENDPOINT_UNREACHABLE,
+            5,
+        ),
+        (
+            ProxyConnectionError(proxy_url="http://proxy.example.com", error="proxy down"),
+            S3VerificationResult.PROXY_ERROR,
+            1,
+        ),
+        (
+            SSLError(endpoint_url="https://s3.example.com", error="tls failed"),
+            S3VerificationResult.SSL_ERROR,
+            1,
+        ),
+    ],
+)
+def test_verify_classifies_connection_errors(monkeypatch, error, expected, expected_calls) -> None:
+    """S3 verification should surface different failure classes distinctly."""
+    # Given
+    connection_info = Mock(spec=S3ConnectionInfo)
+    connection_info.endpoint = "https://s3.example.com"
+    connection_info.access_key = ""
+    connection_info.secret_key = ""
+    connection_info.bucket = "test_bucket"
+    connection_info.path = "path"
+    connection_info.tls_ca_chain = []
+    connection_info.region = ""
+    s3_manager = S3Manager(connection_info)
+
+    client = Mock()
+    client.list_buckets.side_effect = error
+    monkeypatch.setattr(s3_manager.session, "client", Mock(return_value=client))
+    monkeypatch.setattr(S3Manager._list_buckets.retry, "sleep", lambda _: None)
+
+    # When
+    result = s3_manager.verify_result()
+
+    # Then
+    assert result == expected
+    assert client.list_buckets.call_count == expected_calls
+
+
+@pytest.mark.parametrize("method_name", ["get_or_create_bucket", "ensure_path"])
+def test_verify_classifies_bucket_and_path_setup_errors(monkeypatch, method_name) -> None:
+    """Bucket/path setup errors should reuse the same S3 failure classification."""
+    # Given
+    connection_info = Mock(spec=S3ConnectionInfo)
+    connection_info.endpoint = "https://s3.example.com"
+    connection_info.access_key = ""
+    connection_info.secret_key = ""
+    connection_info.bucket = "test_bucket"
+    connection_info.path = "path"
+    connection_info.tls_ca_chain = []
+    connection_info.region = ""
+    s3_manager = S3Manager(connection_info)
+
+    client = Mock()
+    client.list_buckets.return_value = {"Buckets": []}
+    monkeypatch.setattr(s3_manager.session, "client", Mock(return_value=client))
+    monkeypatch.setattr(
+        s3_manager,
+        "get_or_create_bucket",
+        Mock(return_value=S3VerificationResult.SUCCESS),
+    )
+    monkeypatch.setattr(
+        s3_manager,
+        "ensure_path",
+        Mock(return_value=S3VerificationResult.SUCCESS),
+    )
+    monkeypatch.setattr(
+        s3_manager,
+        method_name,
+        Mock(side_effect=EndpointConnectionError(endpoint_url=connection_info.endpoint)),
+    )
+    monkeypatch.setattr(S3Manager._list_buckets.retry, "sleep", lambda _: None)
+
+    # When
+    result = s3_manager.verify_result()
+
+    # Then
+    assert result == S3VerificationResult.ENDPOINT_UNREACHABLE
+
+
+def test_get_or_create_bucket_returns_invalid_credentials_on_auth_client_error() -> None:
+    """An auth-related ClientError while creating the bucket must be reported."""
+    # Given
+    connection_info = Mock(spec=S3ConnectionInfo)
+    connection_info.bucket = "test_bucket"
+    s3_manager = S3Manager(connection_info)
+
+    client = Mock()
+    client.head_bucket.side_effect = ClientError(
+        {"Error": {"Code": "404", "Message": "Not Found"}}, "HeadBucket"
+    )
+    client.create_bucket.side_effect = ClientError(
+        {"Error": {"Code": "403", "Message": "Forbidden"}}, "CreateBucket"
+    )
+
+    # When / Then
+    assert s3_manager.get_or_create_bucket(client) == S3VerificationResult.INVALID_CREDENTIALS
+
+
+def test_get_or_create_bucket_returns_unknown_error_on_non_auth_client_error() -> None:
+    """A non-auth bucket-creation ClientError should be classified distinctly."""
     # Given
     connection_info = Mock(spec=S3ConnectionInfo)
     connection_info.bucket = "test_bucket"
@@ -169,11 +336,53 @@ def test_get_or_create_bucket_does_not_raise_on_client_error() -> None:
     )
 
     # When / Then
-    assert s3_manager.get_or_create_bucket(client) is False
+    assert s3_manager.get_or_create_bucket(client) == S3VerificationResult.UNKNOWN_ERROR
 
 
-def test_ensure_path_does_not_raise_on_client_error() -> None:
-    """A ClientError while writing the '.keep' marker must be reported, not propagated."""
+@pytest.mark.parametrize("error_code", ["BucketAlreadyExists", "BucketAlreadyOwnedByYou"])
+def test_get_or_create_bucket_treats_idempotent_create_errors_as_success(error_code) -> None:
+    """Idempotent bucket-create races should still verify successfully."""
+    # Given
+    connection_info = Mock(spec=S3ConnectionInfo)
+    connection_info.bucket = "test_bucket"
+    s3_manager = S3Manager(connection_info)
+    s3_manager._wait_until_exists = Mock()
+
+    client = Mock()
+    client.head_bucket.side_effect = ClientError(
+        {"Error": {"Code": "404", "Message": "Not Found"}}, "HeadBucket"
+    )
+    client.create_bucket.side_effect = ClientError(
+        {"Error": {"Code": error_code, "Message": "Already exists"}}, "CreateBucket"
+    )
+
+    # When / Then
+    assert s3_manager.get_or_create_bucket(client) == S3VerificationResult.SUCCESS
+    s3_manager._wait_until_exists.assert_called_once_with(client, "bucket")
+
+
+def test_ensure_path_returns_invalid_credentials_on_auth_client_error() -> None:
+    """An auth-related ClientError while writing the '.keep' marker must be reported."""
+    # Given
+    connection_info = Mock(spec=S3ConnectionInfo)
+    connection_info.bucket = "test_bucket"
+    connection_info.path = "path"
+    s3_manager = S3Manager(connection_info)
+
+    client = Mock()
+    client.head_object.side_effect = ClientError(
+        {"Error": {"Code": "404", "Message": "Not Found"}}, "HeadObject"
+    )
+    client.put_object.side_effect = ClientError(
+        {"Error": {"Code": "403", "Message": "Forbidden"}}, "PutObject"
+    )
+
+    # When / Then
+    assert s3_manager.ensure_path(client) == S3VerificationResult.INVALID_CREDENTIALS
+
+
+def test_ensure_path_returns_unknown_error_on_non_auth_client_error() -> None:
+    """A non-auth path-creation ClientError should be classified distinctly."""
     # Given
     connection_info = Mock(spec=S3ConnectionInfo)
     connection_info.bucket = "test_bucket"
@@ -189,7 +398,7 @@ def test_ensure_path_does_not_raise_on_client_error() -> None:
     )
 
     # When / Then
-    assert s3_manager.ensure_path(client) is False
+    assert s3_manager.ensure_path(client) == S3VerificationResult.UNKNOWN_ERROR
 
 
 @pytest.mark.parametrize(
