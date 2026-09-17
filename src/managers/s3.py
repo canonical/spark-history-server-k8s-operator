@@ -232,11 +232,13 @@ class S3Manager(WithLogging):
             except Exception as error:
                 return self._verification_error_result(error)
 
-            if not self.get_or_create_bucket(s3):
-                return S3VerificationResult.INVALID_CREDENTIALS
-
-        if not self.ensure_path(s3):
-            return S3VerificationResult.INVALID_CREDENTIALS
+            try:
+                if not self.get_or_create_bucket(s3):
+                    return S3VerificationResult.INVALID_CREDENTIALS
+                if not self.ensure_path(s3):
+                    return S3VerificationResult.INVALID_CREDENTIALS
+            except Exception as error:
+                return self._verification_error_result(error)
 
         return S3VerificationResult.SUCCESS
 

@@ -208,6 +208,66 @@ def test_s3_relation_endpoint_unreachable(
     assert out.unit_status == Status.OBJECT_STORAGE_ENDPOINT_UNREACHABLE.value
 
 
+@patch("managers.s3.S3Manager.verify_result", return_value=S3VerificationResult.PROXY_ERROR)
+@patch("managers.s3.S3Manager.verify", return_value=False)
+@patch("workload.SparkHistoryServer.exec")
+def test_s3_relation_proxy_error(
+    exec_calls,
+    verify_call,
+    verify_result_call,
+    history_server_ctx: Context[SparkHistoryServerCharm],
+    history_server_container: Container,
+    s3_relation: Relation,
+) -> None:
+    """Proxy failures should be surfaced with a dedicated object storage status."""
+    state = State(
+        relations=[s3_relation],
+        containers=[history_server_container],
+    )
+    out = history_server_ctx.run(history_server_ctx.on.relation_changed(s3_relation), state)
+    assert out.unit_status == Status.OBJECT_STORAGE_PROXY_ERROR.value
+
+
+@patch("managers.s3.S3Manager.verify_result", return_value=S3VerificationResult.SSL_ERROR)
+@patch("managers.s3.S3Manager.verify", return_value=False)
+@patch("workload.SparkHistoryServer.exec")
+def test_s3_relation_ssl_error(
+    exec_calls,
+    verify_call,
+    verify_result_call,
+    history_server_ctx: Context[SparkHistoryServerCharm],
+    history_server_container: Container,
+    s3_relation: Relation,
+) -> None:
+    """TLS/SSL failures should be surfaced with a dedicated object storage status."""
+    state = State(
+        relations=[s3_relation],
+        containers=[history_server_container],
+    )
+    out = history_server_ctx.run(history_server_ctx.on.relation_changed(s3_relation), state)
+    assert out.unit_status == Status.OBJECT_STORAGE_SSL_ERROR.value
+
+
+@patch("managers.s3.S3Manager.verify_result", return_value=S3VerificationResult.UNKNOWN_ERROR)
+@patch("managers.s3.S3Manager.verify", return_value=False)
+@patch("workload.SparkHistoryServer.exec")
+def test_s3_relation_unknown_error(
+    exec_calls,
+    verify_call,
+    verify_result_call,
+    history_server_ctx: Context[SparkHistoryServerCharm],
+    history_server_container: Container,
+    s3_relation: Relation,
+) -> None:
+    """Unexpected S3 failures should not be reported as invalid credentials."""
+    state = State(
+        relations=[s3_relation],
+        containers=[history_server_container],
+    )
+    out = history_server_ctx.run(history_server_ctx.on.relation_changed(s3_relation), state)
+    assert out.unit_status == Status.OBJECT_STORAGE_UNKNOWN_ERROR.value
+
+
 @patch("managers.s3.S3Manager.verify", return_value=False)
 @patch("workload.SparkHistoryServer.exec")
 def test_s3_relation_no_path_ko(

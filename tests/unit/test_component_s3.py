@@ -239,6 +239,39 @@ def test_verify_classifies_connection_errors(monkeypatch, error, expected) -> No
     )
 
 
+@pytest.mark.parametrize("method_name", ["get_or_create_bucket", "ensure_path"])
+def test_verify_classifies_bucket_and_path_setup_errors(monkeypatch, method_name) -> None:
+    """Bucket/path setup errors should reuse the same S3 failure classification."""
+    # Given
+    connection_info = Mock(spec=S3ConnectionInfo)
+    connection_info.endpoint = "https://s3.example.com"
+    connection_info.access_key = ""
+    connection_info.secret_key = ""
+    connection_info.bucket = "test_bucket"
+    connection_info.path = "path"
+    connection_info.tls_ca_chain = []
+    connection_info.region = ""
+    s3_manager = S3Manager(connection_info)
+
+    client = Mock()
+    client.list_buckets.return_value = {"Buckets": []}
+    monkeypatch.setattr(s3_manager.session, "client", Mock(return_value=client))
+    monkeypatch.setattr(s3_manager, "get_or_create_bucket", Mock(return_value=True))
+    monkeypatch.setattr(s3_manager, "ensure_path", Mock(return_value=True))
+    monkeypatch.setattr(
+        s3_manager,
+        method_name,
+        Mock(side_effect=EndpointConnectionError(endpoint_url=connection_info.endpoint)),
+    )
+    monkeypatch.setattr(S3Manager._list_buckets.retry, "sleep", lambda _: None)
+
+    # When
+    result = s3_manager.verify_result()
+
+    # Then
+    assert result == S3VerificationResult.ENDPOINT_UNREACHABLE
+
+
 def test_get_or_create_bucket_does_not_raise_on_client_error() -> None:
     """A ClientError while creating the bucket must be reported, not propagated."""
     # Given
