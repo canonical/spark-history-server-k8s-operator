@@ -91,21 +91,16 @@ def compute_status(hook: Callable) -> Callable[[BaseEventHandler, EventBase], No
     def wrapper_hook(event_handler: BaseEventHandler, event: EventBase):
         """Return output after resetting statuses."""
         res = hook(event_handler, event)
-        if event_handler.charm.unit.is_leader():
-            event_handler.charm.app.status = event_handler.get_app_status(
-                event_handler.context.s3,
-                event_handler.context.azure_storage,
-                event_handler.context.ingress,
-                event_handler.context.auth_proxy_config,
-                event_handler.context.oauth2_proxy_config,
-            )
-        event_handler.charm.unit.status = event_handler.get_app_status(
+        status = event_handler.get_app_status(
             event_handler.context.s3,
             event_handler.context.azure_storage,
             event_handler.context.ingress,
             event_handler.context.auth_proxy_config,
             event_handler.context.oauth2_proxy_config,
         )
+        if event_handler.charm.unit.is_leader():
+            event_handler.charm.app.status = status
+        event_handler.charm.unit.status = status
         return res
 
     return wrapper_hook
