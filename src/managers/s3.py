@@ -144,7 +144,7 @@ class S3Manager(WithLogging):
             aws_secret_access_key=self.connection_info.secret_key,
         )
 
-    def get_or_create_bucket(self, client: S3Client) -> bool:
+    def get_or_create_bucket(self, client: S3Client) -> S3VerificationResult:
         """Create bucket if it does not exists."""
         bucket_name = self.connection_info.bucket
         bucket_exists = True
@@ -152,46 +152,38 @@ class S3Manager(WithLogging):
         try:
             client.head_bucket(Bucket=bucket_name)
         except ClientError as ex:
-            if _is_auth_or_permission_error(ex):
-                self.logger.error("Wrong credentials or access to bucket is forbidden")
-                return False
             if _is_not_found_error(ex):
                 bucket_exists = False
             else:
-                raise
+                return self._verification_error_result(ex)
 
         if not bucket_exists:
             try:
                 client.create_bucket(Bucket=bucket_name)
                 self._wait_until_exists(client, "bucket")
             except ClientError as ex:
-                if _is_auth_or_permission_error(ex):
-                    self.logger.error(f"Could not create bucket {bucket_name}: {ex}")
-                    return False
-                raise
+                self.logger.error(f"Could not create bucket {bucket_name}: {ex}")
+                return self._verification_error_result(ex)
             self.logger.info(f"Created bucket {bucket_name}")
 
-        return True
+        return S3VerificationResult.SUCCESS
 
-    def ensure_path(self, client: S3Client) -> bool:
+    def ensure_path(self, client: S3Client) -> S3VerificationResult:
         """Create path if it does not exists."""
         path = self.connection_info.path
         path_exists = True
         if not path:
-            return False
+            return S3VerificationResult.UNKNOWN_ERROR
         try:
             client.head_object(
                 Bucket=self.connection_info.bucket,
                 Key=os.path.join(path, ".keep"),
             )
         except ClientError as ex:
-            if _is_auth_or_permission_error(ex):
-                self.logger.error("Wrong credentials or access to bucket is forbidden")
-                return False
             if _is_not_found_error(ex):
                 path_exists = False
             else:
-                raise
+                return self._verification_error_result(ex)
 
         if not path_exists:
             try:
@@ -201,15 +193,13 @@ class S3Manager(WithLogging):
                 )
                 self._wait_until_exists(client, "key")
             except ClientError as ex:
-                if _is_auth_or_permission_error(ex):
-                    self.logger.error(
-                        f"Could not create path {path} in bucket {self.connection_info.bucket}: {ex}"
-                    )
-                    return False
-                raise
+                self.logger.error(
+                    f"Could not create path {path} in bucket {self.connection_info.bucket}: {ex}"
+                )
+                return self._verification_error_result(ex)
             self.logger.info(f"Created path {path} in bucket {self.connection_info.bucket}")
 
-        return True
+        return S3VerificationResult.SUCCESS
 
     @retry(
         wait=wait_fixed(5),
@@ -309,10 +299,12 @@ class S3Manager(WithLogging):
                 return self._verification_error_result(error)
 
             try:
-                if not self.get_or_create_bucket(s3):
-                    return S3VerificationResult.INVALID_CREDENTIALS
-                if not self.ensure_path(s3):
-                    return S3VerificationResult.INVALID_CREDENTIALS
+                bucket_result = self.get_or_create_bucket(s3)
+                if bucket_result != S3VerificationResult.SUCCESS:
+                    return bucket_result
+                path_result = self.ensure_path(s3)
+                if path_result != S3VerificationResult.SUCCESS:
+                    return path_result
             except Exception as error:
                 return self._verification_error_result(error)
 

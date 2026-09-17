@@ -178,8 +178,16 @@ def test_verify_retries_transient_endpoint_errors(monkeypatch) -> None:
         {"Buckets": []},
     ]
     monkeypatch.setattr(s3_manager.session, "client", Mock(return_value=client))
-    monkeypatch.setattr(s3_manager, "get_or_create_bucket", Mock(return_value=True))
-    monkeypatch.setattr(s3_manager, "ensure_path", Mock(return_value=True))
+    monkeypatch.setattr(
+        s3_manager,
+        "get_or_create_bucket",
+        Mock(return_value=S3VerificationResult.SUCCESS),
+    )
+    monkeypatch.setattr(
+        s3_manager,
+        "ensure_path",
+        Mock(return_value=S3VerificationResult.SUCCESS),
+    )
     monkeypatch.setattr(S3Manager._list_buckets.retry, "sleep", lambda _: None)
 
     # When
@@ -269,8 +277,16 @@ def test_verify_classifies_bucket_and_path_setup_errors(monkeypatch, method_name
     client = Mock()
     client.list_buckets.return_value = {"Buckets": []}
     monkeypatch.setattr(s3_manager.session, "client", Mock(return_value=client))
-    monkeypatch.setattr(s3_manager, "get_or_create_bucket", Mock(return_value=True))
-    monkeypatch.setattr(s3_manager, "ensure_path", Mock(return_value=True))
+    monkeypatch.setattr(
+        s3_manager,
+        "get_or_create_bucket",
+        Mock(return_value=S3VerificationResult.SUCCESS),
+    )
+    monkeypatch.setattr(
+        s3_manager,
+        "ensure_path",
+        Mock(return_value=S3VerificationResult.SUCCESS),
+    )
     monkeypatch.setattr(
         s3_manager,
         method_name,
@@ -285,7 +301,7 @@ def test_verify_classifies_bucket_and_path_setup_errors(monkeypatch, method_name
     assert result == S3VerificationResult.ENDPOINT_UNREACHABLE
 
 
-def test_get_or_create_bucket_returns_false_on_auth_client_error() -> None:
+def test_get_or_create_bucket_returns_invalid_credentials_on_auth_client_error() -> None:
     """An auth-related ClientError while creating the bucket must be reported."""
     # Given
     connection_info = Mock(spec=S3ConnectionInfo)
@@ -301,10 +317,29 @@ def test_get_or_create_bucket_returns_false_on_auth_client_error() -> None:
     )
 
     # When / Then
-    assert s3_manager.get_or_create_bucket(client) is False
+    assert s3_manager.get_or_create_bucket(client) == S3VerificationResult.INVALID_CREDENTIALS
 
 
-def test_ensure_path_returns_false_on_auth_client_error() -> None:
+def test_get_or_create_bucket_returns_unknown_error_on_non_auth_client_error() -> None:
+    """A non-auth bucket-creation ClientError should be classified distinctly."""
+    # Given
+    connection_info = Mock(spec=S3ConnectionInfo)
+    connection_info.bucket = "test_bucket"
+    s3_manager = S3Manager(connection_info)
+
+    client = Mock()
+    client.head_bucket.side_effect = ClientError(
+        {"Error": {"Code": "404", "Message": "Not Found"}}, "HeadBucket"
+    )
+    client.create_bucket.side_effect = ClientError(
+        {"Error": {"Code": "400", "Message": "XAmzContentSHA256Mismatch"}}, "CreateBucket"
+    )
+
+    # When / Then
+    assert s3_manager.get_or_create_bucket(client) == S3VerificationResult.UNKNOWN_ERROR
+
+
+def test_ensure_path_returns_invalid_credentials_on_auth_client_error() -> None:
     """An auth-related ClientError while writing the '.keep' marker must be reported."""
     # Given
     connection_info = Mock(spec=S3ConnectionInfo)
@@ -321,7 +356,27 @@ def test_ensure_path_returns_false_on_auth_client_error() -> None:
     )
 
     # When / Then
-    assert s3_manager.ensure_path(client) is False
+    assert s3_manager.ensure_path(client) == S3VerificationResult.INVALID_CREDENTIALS
+
+
+def test_ensure_path_returns_unknown_error_on_non_auth_client_error() -> None:
+    """A non-auth path-creation ClientError should be classified distinctly."""
+    # Given
+    connection_info = Mock(spec=S3ConnectionInfo)
+    connection_info.bucket = "test_bucket"
+    connection_info.path = "path"
+    s3_manager = S3Manager(connection_info)
+
+    client = Mock()
+    client.head_object.side_effect = ClientError(
+        {"Error": {"Code": "404", "Message": "Not Found"}}, "HeadObject"
+    )
+    client.put_object.side_effect = ClientError(
+        {"Error": {"Code": "400", "Message": "XAmzContentSHA256Mismatch"}}, "PutObject"
+    )
+
+    # When / Then
+    assert s3_manager.ensure_path(client) == S3VerificationResult.UNKNOWN_ERROR
 
 
 @pytest.mark.parametrize(
