@@ -36,6 +36,7 @@ class BaseEventHandler(Object):
             return None
 
         status_by_result = {
+            S3VerificationResult.MISSING_PATH: Status.MISSING_STORAGE_PATH.value,
             S3VerificationResult.INVALID_CREDENTIALS: Status.INVALID_STORAGE_CREDENTIALS.value,
             S3VerificationResult.SSL_ERROR: Status.OBJECT_STORAGE_SSL_ERROR.value,
             S3VerificationResult.PROXY_ERROR: Status.OBJECT_STORAGE_PROXY_ERROR.value,

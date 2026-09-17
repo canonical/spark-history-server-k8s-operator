@@ -123,6 +123,7 @@ class S3VerificationResult(Enum):
     """Verification result for S3 connectivity and access checks."""
 
     SUCCESS = auto()
+    MISSING_PATH = auto()
     INVALID_CREDENTIALS = auto()
     SSL_ERROR = auto()
     PROXY_ERROR = auto()
@@ -173,7 +174,7 @@ class S3Manager(WithLogging):
         path = self.connection_info.path
         path_exists = True
         if not path:
-            return S3VerificationResult.UNKNOWN_ERROR
+            return S3VerificationResult.MISSING_PATH
         try:
             client.head_object(
                 Bucket=self.connection_info.bucket,

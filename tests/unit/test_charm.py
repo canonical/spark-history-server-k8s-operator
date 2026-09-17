@@ -76,6 +76,7 @@ def test_s3_relation_connection_ok(
         containers=[history_server_container],
     )
     out = history_server_ctx.run(history_server_ctx.on.relation_changed(s3_relation), state)
+    verify_result_call.assert_called()
     assert out.unit_status == Status.ACTIVE.value
 
     # Check containers modifications
@@ -119,6 +120,7 @@ def test_s3_relation_connection_ok_tls(
         containers=[history_server_container],
     )
     inter = history_server_ctx.run(history_server_ctx.on.relation_changed(s3_relation_tls), state)
+    verify_result_call.assert_called()
     assert inter.unit_status == Status.ACTIVE.value
 
     # Check containers modifications
@@ -182,6 +184,7 @@ def test_s3_relation_connection_ko(
         containers=[history_server_container],
     )
     out = history_server_ctx.run(history_server_ctx.on.relation_changed(s3_relation), state)
+    verify_result_call.assert_called()
     assert out.unit_status == Status.INVALID_STORAGE_CREDENTIALS.value
 
 
@@ -205,6 +208,7 @@ def test_s3_relation_endpoint_unreachable(
         containers=[history_server_container],
     )
     out = history_server_ctx.run(history_server_ctx.on.relation_changed(s3_relation), state)
+    verify_result_call.assert_called()
     assert out.unit_status == Status.OBJECT_STORAGE_ENDPOINT_UNREACHABLE.value
 
 
@@ -225,6 +229,7 @@ def test_s3_relation_proxy_error(
         containers=[history_server_container],
     )
     out = history_server_ctx.run(history_server_ctx.on.relation_changed(s3_relation), state)
+    verify_result_call.assert_called()
     assert out.unit_status == Status.OBJECT_STORAGE_PROXY_ERROR.value
 
 
@@ -245,6 +250,7 @@ def test_s3_relation_ssl_error(
         containers=[history_server_container],
     )
     out = history_server_ctx.run(history_server_ctx.on.relation_changed(s3_relation), state)
+    verify_result_call.assert_called()
     assert out.unit_status == Status.OBJECT_STORAGE_SSL_ERROR.value
 
 
@@ -265,6 +271,7 @@ def test_s3_relation_unknown_error(
         containers=[history_server_container],
     )
     out = history_server_ctx.run(history_server_ctx.on.relation_changed(s3_relation), state)
+    verify_result_call.assert_called()
     assert out.unit_status == Status.OBJECT_STORAGE_UNKNOWN_ERROR.value
 
 
@@ -354,6 +361,7 @@ def test_with_ingress(
     )
     out = history_server_ctx.run(history_server_ctx.on.relation_changed(ingress_relation), state)
 
+    verify_result_call.assert_called()
     assert out.unit_status == Status.ACTIVE.value
 
     spark_properties = parse_spark_properties(out, tmp_path)
@@ -383,6 +391,7 @@ def test_with_ingress_subdomain(
         history_server_ctx.on.relation_changed(ingress_subdomain_relation), state
     )
 
+    verify_result_call.assert_called()
     assert out.unit_status == Status.ACTIVE.value
 
     spark_properties = parse_spark_properties(out, tmp_path)
@@ -410,6 +419,7 @@ def test_remove_ingress(
     )
     out = history_server_ctx.run(history_server_ctx.on.relation_broken(ingress_relation), state)
 
+    verify_result_call.assert_called()
     assert out.unit_status == Status.ACTIVE.value
 
     spark_properties = parse_spark_properties(out, tmp_path)
