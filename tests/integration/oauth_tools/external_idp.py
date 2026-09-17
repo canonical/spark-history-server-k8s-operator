@@ -99,7 +99,10 @@ class DexIdpService(ExternalIdpService):
     def issuer_url(self) -> str:
         """The provider's issuer URL."""
         service = self._client.get(Service, "dex", namespace=self.namespace)
-        return f"http://{service.status.loadBalancer.ingress[0].ip}:5556/"
+        assert service.status is not None and service.status.loadBalancer is not None
+        ingress = service.status.loadBalancer.ingress
+        assert ingress
+        return f"http://{ingress[0].ip}:5556/"
 
     @property
     def namespace(self) -> str:
@@ -139,8 +142,9 @@ class DexIdpService(ExternalIdpService):
 
     def _restart_dex(self) -> list[str]:
         """Restart the dex pods."""
-        deleted = []
+        deleted: list[str] = []
         for pod in self._client.list(Pod, namespace=self.namespace, labels={"app": "dex"}):
+            assert pod.metadata is not None and pod.metadata.name is not None
             deleted.append(pod.metadata.name)
             self._client.delete(Pod, pod.metadata.name, namespace=self.namespace)
         return deleted
@@ -161,24 +165,29 @@ class DexIdpService(ExternalIdpService):
     @retry(stop=stop_after_attempt(10), wait=wait_fixed(10))
     def assert_pod_status(self, pod: Pod, status: str):
         """Assert that pod status is the desired one."""
-        current_status = self._client.get(
+        assert pod.metadata is not None and pod.metadata.name is not None
+        fetched_pod = self._client.get(
             Pod,
-            name=str(pod.metadata.name),
+            name=pod.metadata.name,
             # for_conditions=["Ready"],
             namespace=self.namespace,
-        ).status.to_dict()
+        )
+        assert fetched_pod.status is not None
+        current_status = fetched_pod.status.to_dict()
         conditions = [c for c in current_status.get("conditions", []) if c["status"] == "True"]
         assert any(c["type"] == status for c in conditions)
 
     @retry(stop=stop_after_attempt(10), wait=wait_fixed(10))
     def assert_deployment_status(self, deployment_name: str, status: str):
         """Assert that pod status is the desired one."""
-        current_status = self._client.get(
+        fetched_deployment = self._client.get(
             Deployment,
             name=deployment_name,
             # for_conditions=["Ready"],
             namespace=self.namespace,
-        ).status.to_dict()
+        )
+        assert fetched_deployment.status is not None
+        current_status = fetched_deployment.status.to_dict()
         conditions = [c for c in current_status.get("conditions", []) if c["status"] == "True"]
         assert any(c["type"] == status for c in conditions)
 
@@ -194,6 +203,7 @@ class DexIdpService(ExternalIdpService):
         ignore = ignore or []
         for pod in self._client.list(Pod, namespace=self.namespace, labels={"app": "dex"}):
             # Some pods may be deleted, if we are restarting
+            assert pod.metadata is not None and pod.metadata.name is not None
             if pod.metadata.name in ignore:
                 continue
             # assert that dex pod is in the correct status
@@ -219,8 +229,15 @@ class DexIdpService(ExternalIdpService):
         """Remove and clean up the dex manifests."""
         logger.info("Deleting dex resources")
         for obj in self._get_dex_manifest():
+            metadata = obj.metadata
+            assert (
+                metadata is not None
+                and metadata.name is not None
+                and metadata.namespace is not None
+            )
             try:
-                self._client.delete(type(obj), obj.metadata.name, namespace=obj.metadata.namespace)
+                # `type(obj)` is dynamic, so its exact NamespacedResource type can't be verified statically.
+                self._client.delete(type(obj), metadata.name, namespace=metadata.namespace)  # type: ignore[type-var]
             except ApiError:
                 pass
 
