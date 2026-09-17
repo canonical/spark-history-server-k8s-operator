@@ -49,11 +49,73 @@ TRANSIENT_S3_ERRORS = (
     TimeoutError,
 )
 
+AUTHENTICATION_ERROR_CODES = {
+    "401",
+    "403",
+    "AccessDenied",
+    "ExpiredToken",
+    "ExpiredTokenException",
+    "InvalidAccessKeyId",
+    "InvalidClientTokenId",
+    "InvalidSecretAccessKey",
+    "InvalidToken",
+    "SignatureDoesNotMatch",
+    "TokenRefreshRequired",
+}
+
+NOT_FOUND_ERROR_CODES = {
+    "404",
+    "NoSuchBucket",
+    "NoSuchKey",
+    "NotFound",
+}
+
+RETRYABLE_CLIENT_ERROR_CODES = {
+    "InternalError",
+    "RequestTimeout",
+    "RequestTimeoutException",
+    "ServiceUnavailable",
+    "SlowDown",
+}
+
+
+def _client_error_code(error: ClientError) -> str:
+    """Return the AWS error code for a botocore ClientError."""
+    return str(error.response.get("Error", {}).get("Code", ""))
+
+
+def _client_error_status(error: ClientError) -> str:
+    """Return the HTTP status code for a botocore ClientError."""
+    return str(error.response.get("ResponseMetadata", {}).get("HTTPStatusCode", ""))
+
+
+def _is_auth_or_permission_error(error: ClientError) -> bool:
+    """Return whether the client error indicates invalid credentials or access."""
+    return _client_error_status(error) in {"401", "403"} or _client_error_code(
+        error
+    ) in AUTHENTICATION_ERROR_CODES
+
+
+def _is_not_found_error(error: ClientError) -> bool:
+    """Return whether the client error indicates the bucket or object is missing."""
+    return _client_error_status(error) == "404" or _client_error_code(error) in NOT_FOUND_ERROR_CODES
+
+
+def _is_retryable_client_error(error: ClientError) -> bool:
+    """Return whether the client error likely reflects a transient endpoint problem."""
+    return _client_error_status(error) in {"500", "502", "503", "504"} or _client_error_code(
+        error
+    ) in RETRYABLE_CLIENT_ERROR_CODES
+
 
 def _should_retry_verification_error(error: BaseException) -> bool:
     """Return whether S3 verification should retry this failure."""
-    return isinstance(error, TRANSIENT_S3_ERRORS) and not isinstance(
-        error, (ProxyConnectionError, SSLError)
+    return (
+        isinstance(error, TRANSIENT_S3_ERRORS)
+        and not isinstance(error, (ProxyConnectionError, SSLError))
+    ) or (
+        isinstance(error, ClientError)
+        and _is_retryable_client_error(error)
     )
 
 
@@ -90,19 +152,23 @@ class S3Manager(WithLogging):
         try:
             client.head_bucket(Bucket=bucket_name)
         except ClientError as ex:
-            if "(403)" in ex.args[0]:
+            if _is_auth_or_permission_error(ex):
                 self.logger.error("Wrong credentials or access to bucket is forbidden")
                 return False
-            elif "(404)" in ex.args[0]:
+            if _is_not_found_error(ex):
                 bucket_exists = False
+            else:
+                raise
 
         if not bucket_exists:
             try:
                 client.create_bucket(Bucket=bucket_name)
                 self._wait_until_exists(client, "bucket")
             except ClientError as ex:
-                self.logger.error(f"Could not create bucket {bucket_name}: {ex}")
-                return False
+                if _is_auth_or_permission_error(ex):
+                    self.logger.error(f"Could not create bucket {bucket_name}: {ex}")
+                    return False
+                raise
             self.logger.info(f"Created bucket {bucket_name}")
 
         return True
@@ -119,11 +185,13 @@ class S3Manager(WithLogging):
                 Key=os.path.join(path, ".keep"),
             )
         except ClientError as ex:
-            if "(403)" in ex.args[0]:
+            if _is_auth_or_permission_error(ex):
                 self.logger.error("Wrong credentials or access to bucket is forbidden")
                 return False
-            elif "(404)" in ex.args[0]:
+            if _is_not_found_error(ex):
                 path_exists = False
+            else:
+                raise
 
         if not path_exists:
             try:
@@ -133,10 +201,12 @@ class S3Manager(WithLogging):
                 )
                 self._wait_until_exists(client, "key")
             except ClientError as ex:
-                self.logger.error(
-                    f"Could not create path {path} in bucket {self.connection_info.bucket}: {ex}"
-                )
-                return False
+                if _is_auth_or_permission_error(ex):
+                    self.logger.error(
+                        f"Could not create path {path} in bucket {self.connection_info.bucket}: {ex}"
+                    )
+                    return False
+                raise
             self.logger.info(f"Created path {path} in bucket {self.connection_info.bucket}")
 
         return True
@@ -193,8 +263,14 @@ class S3Manager(WithLogging):
     def _verification_error_result(self, error: Exception) -> S3VerificationResult:
         """Classify S3 verification failures."""
         if isinstance(error, ClientError):
-            self.logger.error(f"Invalid S3 credentials or permissions issue: {error}")
-            return S3VerificationResult.INVALID_CREDENTIALS
+            if _is_auth_or_permission_error(error):
+                self.logger.error(f"Invalid S3 credentials or permissions issue: {error}")
+                return S3VerificationResult.INVALID_CREDENTIALS
+            if _is_retryable_client_error(error):
+                self.logger.error(f"Could not reach the S3 endpoint after 5 attempts: {error}")
+                return S3VerificationResult.ENDPOINT_UNREACHABLE
+            self.logger.error(f"Unexpected S3 client error: {error}")
+            return S3VerificationResult.UNKNOWN_ERROR
         if isinstance(error, SSLError):
             self.logger.error(f"SSL validation failed when contacting the S3 endpoint: {error}")
             return S3VerificationResult.SSL_ERROR

@@ -191,27 +191,42 @@ def test_verify_retries_transient_endpoint_errors(monkeypatch) -> None:
 
 
 @pytest.mark.parametrize(
-    "error, expected",
+    "error, expected, expected_calls",
     [
         (
             ClientError({"Error": {"Code": "403", "Message": "Forbidden"}}, "ListBuckets"),
             S3VerificationResult.INVALID_CREDENTIALS,
+            1,
         ),
         (
             EndpointConnectionError(endpoint_url="https://s3.example.com"),
             S3VerificationResult.ENDPOINT_UNREACHABLE,
+            5,
+        ),
+        (
+            ClientError(
+                {
+                    "Error": {"Code": "ServiceUnavailable", "Message": "Service Unavailable"},
+                    "ResponseMetadata": {"HTTPStatusCode": 503},
+                },
+                "ListBuckets",
+            ),
+            S3VerificationResult.ENDPOINT_UNREACHABLE,
+            5,
         ),
         (
             ProxyConnectionError(proxy_url="http://proxy.example.com", error="proxy down"),
             S3VerificationResult.PROXY_ERROR,
+            1,
         ),
         (
             SSLError(endpoint_url="https://s3.example.com", error="tls failed"),
             S3VerificationResult.SSL_ERROR,
+            1,
         ),
     ],
 )
-def test_verify_classifies_connection_errors(monkeypatch, error, expected) -> None:
+def test_verify_classifies_connection_errors(monkeypatch, error, expected, expected_calls) -> None:
     """S3 verification should surface different failure classes distinctly."""
     # Given
     connection_info = Mock(spec=S3ConnectionInfo)
@@ -234,9 +249,7 @@ def test_verify_classifies_connection_errors(monkeypatch, error, expected) -> No
 
     # Then
     assert result == expected
-    assert client.list_buckets.call_count == (
-        5 if expected == S3VerificationResult.ENDPOINT_UNREACHABLE else 1
-    )
+    assert client.list_buckets.call_count == expected_calls
 
 
 @pytest.mark.parametrize("method_name", ["get_or_create_bucket", "ensure_path"])
@@ -272,8 +285,8 @@ def test_verify_classifies_bucket_and_path_setup_errors(monkeypatch, method_name
     assert result == S3VerificationResult.ENDPOINT_UNREACHABLE
 
 
-def test_get_or_create_bucket_does_not_raise_on_client_error() -> None:
-    """A ClientError while creating the bucket must be reported, not propagated."""
+def test_get_or_create_bucket_returns_false_on_auth_client_error() -> None:
+    """An auth-related ClientError while creating the bucket must be reported."""
     # Given
     connection_info = Mock(spec=S3ConnectionInfo)
     connection_info.bucket = "test_bucket"
@@ -284,15 +297,15 @@ def test_get_or_create_bucket_does_not_raise_on_client_error() -> None:
         {"Error": {"Code": "404", "Message": "Not Found"}}, "HeadBucket"
     )
     client.create_bucket.side_effect = ClientError(
-        {"Error": {"Code": "400", "Message": "XAmzContentSHA256Mismatch"}}, "CreateBucket"
+        {"Error": {"Code": "403", "Message": "Forbidden"}}, "CreateBucket"
     )
 
     # When / Then
     assert s3_manager.get_or_create_bucket(client) is False
 
 
-def test_ensure_path_does_not_raise_on_client_error() -> None:
-    """A ClientError while writing the '.keep' marker must be reported, not propagated."""
+def test_ensure_path_returns_false_on_auth_client_error() -> None:
+    """An auth-related ClientError while writing the '.keep' marker must be reported."""
     # Given
     connection_info = Mock(spec=S3ConnectionInfo)
     connection_info.bucket = "test_bucket"
@@ -304,7 +317,7 @@ def test_ensure_path_does_not_raise_on_client_error() -> None:
         {"Error": {"Code": "404", "Message": "Not Found"}}, "HeadObject"
     )
     client.put_object.side_effect = ClientError(
-        {"Error": {"Code": "400", "Message": "XAmzContentSHA256Mismatch"}}, "PutObject"
+        {"Error": {"Code": "403", "Message": "Forbidden"}}, "PutObject"
     )
 
     # When / Then
