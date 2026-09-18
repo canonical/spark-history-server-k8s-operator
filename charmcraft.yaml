@@ -19,6 +19,8 @@ charm-libs:
     version: "0"
   - lib: traefik_k8s.ingress
     version: "2"
+  - lib: istio_beacon_k8s.service_mesh
+    version: "0"
 
 # Files implicitly created by charmcraft without a part:
 # - dispatch (https://github.com/canonical/charmcraft/pull/1898)
