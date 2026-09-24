@@ -141,6 +141,23 @@ def deploy_identity_setup(
     )
 
     # oauth2proxy integrations
+    juju.integrate(
+        f"{charm_versions.oauth2proxy.application_name}:receive-ca-cert",
+        charm_versions.self_signed_certificate.application_name,
+    )
+    juju.wait(
+        lambda status: (
+            jubilant.all_active(
+                status,
+                charm_versions.oauth2proxy.application_name,
+                charm_versions.self_signed_certificate.application_name,
+            )
+            and jubilant.all_agents_idle(status)
+        ),
+        delay=10,
+        timeout=600,
+    )
+
     oauth2proxy_ingress_relation_name = "ingress"
     if ingress_mode == IngressMode.ISTIO_INGRESS:
         oauth2proxy_ingress_relation_name = "ingress-unauthenticated"
@@ -152,10 +169,7 @@ def deploy_identity_setup(
         f"{charm_versions.oauth2proxy.application_name}:oauth",
         charm_versions.hydra.application_name,
     )
-    juju.integrate(
-        f"{charm_versions.oauth2proxy.application_name}:receive-ca-cert",
-        charm_versions.self_signed_certificate.application_name,
-    )
+
     forward_auth_relation = "forward-auth"
     if ingress_mode == IngressMode.TRAEFIK:
         juju.config(
