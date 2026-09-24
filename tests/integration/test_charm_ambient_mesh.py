@@ -212,7 +212,7 @@ def test_observability_with_ambient_mesh(
         juju=juju,
         app_name=charm_versions.loki.application_name,
         filter_by_label={"juju_unit": f"{APP_NAME}/0"},
-        search_phrase="INFO HistoryServer",
+        search_phrase="INFO FsHistoryProvider",
     )
     assert_prometheus_data_exported(juju, check_field="jmx_scrape_duration_seconds")
     assert_prometheus_data_published(juju, check_field="jmx_scrape_duration_seconds")
