@@ -234,7 +234,7 @@ def deploy_observability_setup(
     juju.wait(lambda status: jubilant.all_active(status, APP_NAME), delay=10)
 
     juju.deploy("cos-lite", trust=True)
-    juju.wait(jubilant.all_agents_idle, delay=10)
+    juju.wait(jubilant.all_agents_idle, delay=10, timeout=600)
 
     juju.integrate(
         f"{telemetry_agent_charm.application_name}:grafana-dashboards-provider", "grafana"
