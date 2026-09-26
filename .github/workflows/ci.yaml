@@ -174,8 +174,6 @@ jobs:
         with:
           pattern: ${{ needs.build.outputs.artifact-prefix }}-*
           merge-multiple: true
-      - name: Setup tmate session
-        uses: canonical/action-tmate@main
       - name: Run spread job
         timeout-minutes: 110
         id: spread
