@@ -16,20 +16,44 @@ from charms.traefik_k8s.v2.ingress import (
     IngressPerAppRequirer,
     IngressPerAppRevokedEvent,
 )
+from data_platform_helpers.advanced_statuses.models import StatusObject
+from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
+from data_platform_helpers.advanced_statuses.types import Scope
 from ops import CharmBase, RelationChangedEvent
 
 from common.utils import WithLogging
 from core.context import INGRESS, OATHKEEPER, OAUTH2_PROXY, Context
 from core.workload import SparkHistoryWorkloadBase
-from events.base import BaseEventHandler, compute_status, defer_when_not_ready
+from events.base import BaseEventHandler, defer_when_not_ready
 from managers.history_server import HistoryServerManager
 
 
-class IngressEvents(BaseEventHandler, WithLogging):
+class _IngressStatuses:
+    """Status objects related to the ingress integration."""
+
+    INGRESS_NOT_READY = StatusObject(
+        status="waiting",
+        message="Waiting for ingress relation data",
+    )
+
+    MISSING_INGRESS_RELATION = StatusObject(
+        status="blocked",
+        message="Missing ingress integration for oauth proxy",
+        action="Integrate with ingress",
+    )
+
+
+IngressStatuses = _IngressStatuses()
+
+
+class IngressEvents(BaseEventHandler, WithLogging, ManagerStatusProtocol):
     """Class implementing ingress-related event hooks."""
 
     def __init__(self, charm: CharmBase, context: Context, workload: SparkHistoryWorkloadBase):
         super().__init__(charm, "ingress")
+
+        self.name = "ingress"
+        self.state = context
 
         self.charm = charm
         self.context = context
@@ -62,7 +86,6 @@ class IngressEvents(BaseEventHandler, WithLogging):
             self.charm.on[OAUTH2_PROXY].relation_changed, self._on_oauth2_proxy_changed
         )
 
-    @compute_status
     @defer_when_not_ready
     def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
         """Handle the `IngressPerAppReadyEvent`."""
@@ -89,22 +112,6 @@ class IngressEvents(BaseEventHandler, WithLogging):
             self.context.s3, self.context.azure_storage, None, self.context.authorized_users
         )
 
-        self.charm.unit.status = self.get_app_status(
-            self.context.s3,
-            self.context.azure_storage,
-            None,
-            self.context.auth_proxy_config,
-            self.context.oauth2_proxy_config,
-        )
-        if self.charm.unit.is_leader():
-            self.charm.app.status = self.get_app_status(
-                self.context.s3,
-                self.context.azure_storage,
-                None,
-                self.context.auth_proxy_config,
-                self.context.oauth2_proxy_config,
-            )
-
     @defer_when_not_ready
     def _on_auth_proxy_removed(self, _: AuthProxyRelationRemovedEvent):
         """Handle the removal of the AuthProxy."""
@@ -112,22 +119,6 @@ class IngressEvents(BaseEventHandler, WithLogging):
         self.history_server.update(
             self.context.s3, self.context.azure_storage, self.context.ingress, None
         )
-
-        self.charm.unit.status = self.get_app_status(
-            self.context.s3,
-            self.context.azure_storage,
-            self.context.ingress,
-            None,
-            self.context.oauth2_proxy_config,
-        )
-        if self.charm.unit.is_leader():
-            self.charm.app.status = self.get_app_status(
-                self.context.s3,
-                self.context.azure_storage,
-                self.context.ingress,
-                None,
-                self.context.oauth2_proxy_config,
-            )
 
     @defer_when_not_ready
     def _on_oauth2_proxy_removed(self, _: AuthKeeperProxyRelationRemovedEvent):
@@ -137,23 +128,6 @@ class IngressEvents(BaseEventHandler, WithLogging):
             self.context.s3, self.context.azure_storage, self.context.ingress, None
         )
 
-        self.charm.unit.status = self.get_app_status(
-            self.context.s3,
-            self.context.azure_storage,
-            self.context.ingress,
-            self.context.auth_proxy_config,
-            None,
-        )
-        if self.charm.unit.is_leader():
-            self.charm.app.status = self.get_app_status(
-                self.context.s3,
-                self.context.azure_storage,
-                self.context.ingress,
-                self.context.auth_proxy_config,
-                None,
-            )
-
-    @compute_status
     @defer_when_not_ready
     def _on_auth_proxy_changed(self, _: RelationChangedEvent):
         """Handle the change of configuration of the AuthProxy."""
@@ -167,7 +141,6 @@ class IngressEvents(BaseEventHandler, WithLogging):
         # auth proxy config
         self.auth_proxy.update_auth_proxy_config(auth_proxy_config=self.context.auth_proxy_config)
 
-    @compute_status
     @defer_when_not_ready
     def _on_oauth2_proxy_changed(self, _: RelationChangedEvent):
         """Handle the change of configuration of the AuthProxy."""
@@ -182,3 +155,18 @@ class IngressEvents(BaseEventHandler, WithLogging):
         self.oauth2proxy.update_auth_proxy_config(
             auth_proxy_config=self.context.oauth2_proxy_config
         )
+
+    def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
+        """Return the list of statuses for this component."""
+        if not self.context.ingress_relation and (
+            self.context.oathkeeper_relation or self.context.oauth2_proxy_relation
+        ):
+            return [IngressStatuses.MISSING_INGRESS_RELATION]
+
+        if not self.context.ingress_relation:
+            return []
+
+        if not self.context.ingress:
+            return [IngressStatuses.INGRESS_NOT_READY]
+
+        return []

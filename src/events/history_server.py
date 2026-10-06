@@ -4,21 +4,58 @@
 
 """Spark History Server workload related event handlers."""
 
+import ops
+from data_platform_helpers.advanced_statuses.models import StatusObject
+from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
+from data_platform_helpers.advanced_statuses.types import Scope
 from ops import ConfigChangedEvent
 from ops.charm import CharmBase
 
 from common.utils import WithLogging
 from core.context import Context
 from core.workload import SparkHistoryWorkloadBase
-from events.base import BaseEventHandler, compute_status
 from managers.history_server import HistoryServerManager
 
 
-class HistoryServerEvents(BaseEventHandler, WithLogging):
+class _CharmStatuses:
+    """Generic status objects related to the charm."""
+
+    ACTIVE_IDLE = StatusObject(status="active", message="")
+
+    MISSING_STORAGE_RELATION = StatusObject(
+        status="blocked",
+        message="Missing relation with object storage",
+        action="Integrate with S3 or Azure Storage",
+    )
+
+    MULTIPLE_AUTH_PROXY_RELATIONS = StatusObject(
+        status="blocked",
+        message="Too many auth proxy integrations",
+        action="Keep only one Oauth2proxy or Authkeeper integration",
+    )
+
+    MULTIPLE_STORAGE_RELATIONS = StatusObject(
+        status="blocked",
+        message="Too many object storages",
+        action="Keep only one object storage integration",
+    )
+
+    NOT_RUNNING = StatusObject(status="waiting", message="History server is not serving running")
+
+    WAITING_PEBBLE = StatusObject(status="maintenance", message="Waiting for Pebble")
+
+
+CharmStatuses = _CharmStatuses()
+
+
+class HistoryServerEvents(ops.Object, WithLogging, ManagerStatusProtocol):
     """Class implementing Spark History Server event hooks."""
 
     def __init__(self, charm: CharmBase, context: Context, workload: SparkHistoryWorkloadBase):
         super().__init__(charm, "history-server")
+
+        self.name = "history-server"
+        self.state = context
 
         self.charm = charm
         self.context = context
@@ -34,7 +71,6 @@ class HistoryServerEvents(BaseEventHandler, WithLogging):
         self.framework.observe(self.charm.on.install, self._update_event)
         self.framework.observe(self.charm.on.config_changed, self._on_config_changed)
 
-    @compute_status
     def _on_spark_history_server_pebble_ready(self, event):
         """Handle on Pebble ready event."""
         self.logger.info("Pebble ready")
@@ -45,7 +81,6 @@ class HistoryServerEvents(BaseEventHandler, WithLogging):
             self.context.authorized_users,
         )
 
-    @compute_status
     def _update_event(self, _) -> None:
         self.history_server.update(
             self.context.s3,
@@ -63,18 +98,21 @@ class HistoryServerEvents(BaseEventHandler, WithLogging):
             self.context.ingress,
             self.context.authorized_users,
         )
-        self.charm.unit.status = self.get_app_status(
-            self.context.s3,
-            self.context.azure_storage,
-            self.context.ingress,
-            self.context.auth_proxy_config,
-            self.context.oauth2_proxy_config,
-        )
-        if self.charm.unit.is_leader():
-            self.charm.app.status = self.get_app_status(
-                self.context.s3,
-                self.context.azure_storage,
-                self.context.ingress,
-                self.context.auth_proxy_config,
-                self.context.oauth2_proxy_config,
-            )
+
+    def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
+        """Return the list of statuses for this component."""
+        statuses = []
+
+        if not self.workload.ready():
+            statuses.append(CharmStatuses.WAITING_PEBBLE)
+
+        if not self.context.s3_relation and not self.context.azure_storage_relation:
+            statuses.append(CharmStatuses.MISSING_STORAGE_RELATION)
+
+        if self.context.s3_relation and self.context.azure_storage_relation:
+            statuses.append(CharmStatuses.MULTIPLE_STORAGE_RELATIONS)
+
+        if self.context.oauth2_proxy_relation and self.context.oathkeeper_relation:
+            statuses.append(CharmStatuses.MULTIPLE_AUTH_PROXY_RELATIONS)
+
+        return statuses

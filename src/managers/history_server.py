@@ -165,7 +165,7 @@ class HistoryServerConfig(WithLogging):
                 "spark.com.canonical.charmedspark.history.AuthorizationServletFilter.param.authorizedParameter": AUTH_PROXY_HEADERS[
                     1
                 ]
-                if (self.context._oathkeeper_relation)
+                if (self.context.oathkeeper_relation)
                 else OAUTH2_PROXY_HEADERS[1],
                 "spark.com.canonical.charmedspark.history.AuthorizationServletFilter.param.authorizedEntities": users,
             }

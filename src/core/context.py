@@ -4,17 +4,18 @@
 
 """Charm Context definition and parsing logic."""
 
-from enum import Enum
 from typing import cast
 
 from charms.oathkeeper.v0.auth_proxy import AuthProxyConfig as OathkeeperAuthProxyConfig
 from charms.oauth2_proxy_k8s.v0.auth_proxy import AuthProxyConfig
 from charms.traefik_k8s.v2.ingress import IngressProviderAppData, IngressUrl
+from data_platform_helpers.advanced_statuses.components import StatusesState
+from data_platform_helpers.advanced_statuses.protocol import StatusesStateProtocol
 from object_storage import AzureStorageRequirer, S3Requirer
-from ops import ActiveStatus, BlockedStatus, CharmBase, MaintenanceStatus, ModelError, Relation
+from ops import CharmBase, ModelError, Relation
 
 from common.utils import WithLogging
-from constants import AZURE_RELATION_NAME, S3_RELATION_NAME
+from constants import AZURE_RELATION_NAME, S3_RELATION_NAME, STATUS_RELATION_NAME
 from core.domain import AzureStorageConnectionInfo, S3ConnectionInfo
 
 OATHKEEPER = "auth-proxy"
@@ -25,7 +26,7 @@ AUTH_PROXY_HEADERS = ["X-User", "X-Email"]
 OAUTH2_PROXY_HEADERS = ["X-Auth-Request-User", "X-Auth-Request-Email"]
 
 
-class Context(WithLogging):
+class Context(WithLogging, StatusesStateProtocol):
     """Properties and relations of the charm."""
 
     def __init__(self, charm: CharmBase):
@@ -34,6 +35,7 @@ class Context(WithLogging):
 
         self.s3_requirer = S3Requirer(self.charm, S3_RELATION_NAME)
         self.azure_storage_requirer = AzureStorageRequirer(self.charm, AZURE_RELATION_NAME)
+        self.statuses = StatusesState(self.charm, STATUS_RELATION_NAME)
 
     # --------------
     # --- CONFIG ---
@@ -43,7 +45,7 @@ class Context(WithLogging):
         """The comma-separated list of authorized users."""
         return (
             str(self.charm.config[AUTHORIZED_USERS])
-            if (self._oathkeeper_relation or self._oauth2_proxy_relation)
+            if (self.oathkeeper_relation or self.oauth2_proxy_relation)
             else None
         )
 
@@ -59,17 +61,17 @@ class Context(WithLogging):
         )
 
     @property
-    def _s3_relation(self) -> Relation | None:
+    def s3_relation(self) -> Relation | None:
         """The S3 relation."""
         return self.charm.model.get_relation(S3_RELATION_NAME)
 
     @property
-    def _ingress_relation(self) -> Relation | None:
+    def ingress_relation(self) -> Relation | None:
         """The ingress relation."""
         return self.charm.model.get_relation(INGRESS)
 
     @property
-    def _oathkeeper_relation(self) -> Relation | None:
+    def oathkeeper_relation(self) -> Relation | None:
         """Checks if oathkeeper is related."""
         relations = list(self.model.relations[OATHKEEPER])
         if len(relations) > 1:
@@ -80,7 +82,7 @@ class Context(WithLogging):
         return relations[0] if relations else None
 
     @property
-    def _oauth2_proxy_relation(self) -> Relation | None:
+    def oauth2_proxy_relation(self) -> Relation | None:
         """Checks if oauth2_proxy is related."""
         relations = list(self.model.relations[OAUTH2_PROXY])
 
@@ -97,8 +99,8 @@ class Context(WithLogging):
     def s3(self) -> S3ConnectionInfo | None:
         """The server state of the current running Unit."""
         relation_data = (
-            self.s3_requirer.get_storage_connection_info(self._s3_relation)
-            if self._s3_relation
+            self.s3_requirer.get_storage_connection_info(self.s3_relation)
+            if self.s3_relation
             else None
         )
         return S3ConnectionInfo(cast(dict, relation_data)) if relation_data else None
@@ -106,7 +108,7 @@ class Context(WithLogging):
     @property
     def ingress(self) -> IngressUrl | None:
         """Return the Ingress information when available."""
-        relation = self._ingress_relation
+        relation = self.ingress_relation
         if not relation or not relation.app:
             return None
 
@@ -128,7 +130,7 @@ class Context(WithLogging):
     @property
     def oauth2_proxy_config(self) -> AuthProxyConfig | None:
         """Configure the auth proxy relation."""
-        if self._oauth2_proxy_relation:
+        if self.oauth2_proxy_relation:
             return AuthProxyConfig(
                 protected_urls=[str(self.ingress.url)] if self.ingress else [],
                 allowed_endpoints=[],
@@ -140,7 +142,7 @@ class Context(WithLogging):
     @property
     def auth_proxy_config(self) -> OathkeeperAuthProxyConfig | None:
         """Configure the auth proxy relation."""
-        if self._oathkeeper_relation:
+        if self.oathkeeper_relation:
             return OathkeeperAuthProxyConfig(
                 protected_urls=[str(self.ingress.url)] if self.ingress else [],
                 headers=AUTH_PROXY_HEADERS,
@@ -159,7 +161,7 @@ class Context(WithLogging):
         )
 
     @property
-    def _azure_storage_relation(self) -> Relation | None:
+    def azure_storage_relation(self) -> Relation | None:
         """The Azure relation."""
         return self.charm.model.get_relation(AZURE_RELATION_NAME)
 
@@ -167,28 +169,8 @@ class Context(WithLogging):
     def azure_storage(self) -> AzureStorageConnectionInfo | None:
         """The server state of the current running Unit."""
         relation_data = (
-            self.azure_storage_requirer.get_storage_connection_info(self._azure_storage_relation)
-            if self._azure_storage_relation
+            self.azure_storage_requirer.get_storage_connection_info(self.azure_storage_relation)
+            if self.azure_storage_relation
             else None
         )
         return AzureStorageConnectionInfo(relation_data) if relation_data else None
-
-
-class Status(Enum):
-    """Class bundling all statuses that the charm may fall into."""
-
-    ACTIVE = ActiveStatus("")
-    INVALID_STORAGE_CREDENTIALS = BlockedStatus(
-        "Invalid object storage credentials or permission issue. Please check logs."
-    )
-    MISSING_INGRESS_RELATION = BlockedStatus("Missing INGRESS relation")
-    MISSING_STORAGE_PATH = BlockedStatus("Missing object storage folder path")
-    MISSING_STORAGE_RELATION = BlockedStatus("Missing relation with storage (s3 or azure storage)")
-    MULTIPLE_AUTH_PROXY_RELATIONS = BlockedStatus(
-        "Spark History Server can be related to only one auth proxy backend (Oauth2proxy or Authkeeper) at a time."
-    )
-    MULTIPLE_OBJECT_STORAGE_RELATIONS = BlockedStatus(
-        "Spark History Server can be related to only one storage backend at a time."
-    )
-    NOT_RUNNING = BlockedStatus("History server not running. Please check logs.")
-    WAITING_PEBBLE = MaintenanceStatus("Waiting for Pebble")

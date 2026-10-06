@@ -4,21 +4,48 @@
 
 """S3 Integration related event handlers."""
 
+from data_platform_helpers.advanced_statuses.models import StatusObject
+from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
+from data_platform_helpers.advanced_statuses.types import Scope
 from object_storage import StorageConnectionInfoChangedEvent, StorageConnectionInfoGoneEvent
 from ops import CharmBase
 
 from common.utils import WithLogging
 from core.context import Context
 from core.workload import SparkHistoryWorkloadBase
-from events.base import BaseEventHandler, compute_status, defer_when_not_ready
+from events.base import BaseEventHandler, defer_when_not_ready
 from managers.history_server import HistoryServerManager
 
 
-class S3Events(BaseEventHandler, WithLogging):
+class _S3Statuses:
+    """Status objects related to the object storage integration."""
+
+    OBJECT_STORAGE_NOT_READY = StatusObject(
+        status="waiting",
+        message="Waiting for object storage relation data",
+    )
+
+    @staticmethod
+    def missing_parameters(fields: list[str]) -> StatusObject:
+        """Return a status for missing object storage relation data."""
+        fields_str = ", ".join(f"'{field}'" for field in fields)
+        return StatusObject(
+            status="waiting",
+            message=f"Missing object storage parameter(s): {fields_str}",
+            action=f"Set object storage parameter(s): {fields_str}",
+        )
+
+
+S3Statuses = _S3Statuses()
+
+
+class S3Events(BaseEventHandler, WithLogging, ManagerStatusProtocol):
     """Class implementing S3 Integration event hooks."""
 
     def __init__(self, charm: CharmBase, context: Context, workload: SparkHistoryWorkloadBase):
         super().__init__(charm, "s3")
+        self.name = "s3"
+        self.state = context
 
         self.charm = charm
         self.context = context
@@ -34,7 +61,6 @@ class S3Events(BaseEventHandler, WithLogging):
             self.s3_requirer.on.storage_connection_info_gone, self._on_s3_credential_gone
         )
 
-    @compute_status
     @defer_when_not_ready
     def _on_s3_credential_changed(self, _: StorageConnectionInfoChangedEvent):
         """Handle the `StorageConnectionInfoChangedEvent` event from S3 integrator."""
@@ -57,18 +83,15 @@ class S3Events(BaseEventHandler, WithLogging):
             self.context.authorized_users,
         )
 
-        self.charm.unit.status = self.get_app_status(
-            None,
-            self.context.azure_storage,
-            self.context.ingress,
-            self.context.auth_proxy_config,
-            self.context.oauth2_proxy_config,
-        )
-        if self.charm.unit.is_leader():
-            self.charm.app.status = self.get_app_status(
-                None,
-                self.context.azure_storage,
-                self.context.ingress,
-                self.context.auth_proxy_config,
-                self.context.oauth2_proxy_config,
-            )
+    def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
+        """Return the list of statuses for this component."""
+        if not self.context.s3_relation:
+            return []
+
+        if not (s3_info := self.context.s3):
+            return [S3Statuses.OBJECT_STORAGE_NOT_READY]
+
+        if not s3_info.path:
+            return [S3Statuses.missing_parameters(fields=["path"])]
+
+        return []
