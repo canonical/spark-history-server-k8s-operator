@@ -8,17 +8,8 @@ import os
 from urllib.parse import ParseResult, urlparse, urlunparse
 
 from common.utils import WithLogging, is_proxy_skipped
-from core.context import (
-    AUTH_PROXY_HEADERS,
-    OAUTH2_PROXY_HEADERS,
-    Context,
-    IngressUrl,
-    S3ConnectionInfo,
-)
-from core.domain import AzureStorageConnectionInfo
+from core.context import AUTH_PROXY_HEADERS, OAUTH2_PROXY_HEADERS, Context
 from core.workload import SparkHistoryWorkloadBase
-from managers.azure_storage import AzureStorageManager
-from managers.s3 import S3Manager
 from managers.tls import TLSManager
 
 
@@ -196,21 +187,14 @@ class HistoryServerManager(WithLogging):
 
         self.tls = TLSManager(workload)
 
-    def update(
-        self,
-        s3: S3ConnectionInfo | None,
-        azure: AzureStorageConnectionInfo | None,
-        ingress: IngressUrl | None,
-        authorized_users: str | None,
-    ) -> None:
+    def update(self) -> None:
         """Update the Spark History server service if needed."""
         if not self.workload.ready():
             return
 
-        self.workload.stop()
+        s3 = self.context.s3
+        azure = self.context.azure_storage
 
-        s3_manager = S3Manager(s3) if s3 else None
-        azure_manager = AzureStorageManager(azure) if azure else None
         config = HistoryServerConfig(self.context)
 
         self.workload.write(config.contents, str(self.workload.paths.spark_properties))
@@ -220,11 +204,10 @@ class HistoryServerManager(WithLogging):
 
         self.tls.reset()
 
-        if (not s3_manager or not s3_manager.verify()) and (
-            not azure_manager or not azure_manager.verify()
-        ):
+        if not s3 and not azure:
             self.logger.info("Neither S3 nor Azure Storage are ready")
             return
+
         if s3 and (tls_ca_chain := s3.tls_ca_chain):
             self.tls.import_ca("\n".join(tls_ca_chain))
             self.workload.set_environment(
@@ -234,4 +217,4 @@ class HistoryServerManager(WithLogging):
                 }
             )
 
-        self.workload.start()
+        self.workload.restart()

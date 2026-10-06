@@ -5,7 +5,7 @@ from dataclasses import replace
 
 import pytest
 from ops import pebble
-from ops.testing import Container, Context, Model, Mount, Relation
+from ops.testing import Container, Context, Exec, Model, Mount, Relation
 
 # from scenario.state import next_relation_id
 from charm import SparkHistoryServerCharm
@@ -60,6 +60,12 @@ def history_server_container(tmp_path):
         layers={"base": layer},
         service_statuses={"history-server": pebble.ServiceStatus.ACTIVE},
         mounts={"etc": etc, "jmx": jmx},
+        execs=[
+            Exec(["rm"]),
+            Exec(["chown", "-R"]),
+            Exec(["chmod", "-R", "660"]),
+            Exec(["keytool"]),
+        ],
     )
 
 

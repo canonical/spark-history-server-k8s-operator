@@ -8,19 +8,56 @@ from __future__ import annotations
 
 import os
 import tempfile
+from dataclasses import dataclass
+from enum import Enum, auto
 from functools import cached_property
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 import boto3
 from botocore.client import Config
-from botocore.exceptions import ClientError, ProxyConnectionError, SSLError
-from tenacity import retry, retry_if_exception_cause_type, stop_after_attempt, wait_fixed
+from botocore.exceptions import (
+    ClientError,
+    ConnectionClosedError,
+    ConnectTimeoutError,
+    EndpointConnectionError,
+    ProxyConnectionError,
+    ReadTimeoutError,
+    SSLError,
+)
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed
 
 from common.utils import WithLogging, is_proxy_skipped
 from core.domain import S3ConnectionInfo
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.client import S3Client
+    from mypy_boto3_s3.type_defs import ListObjectsV2OutputTypeDef
+
+WRONG_CREDENTIALS_CODES = {
+    "InvalidAccessKeyId",
+    "SignatureDoesNotMatch",
+    "AuthorizationHeaderMalformed",
+    "ExpiredToken",
+}
+MISMATCH_CODES = {"AccessDenied", "NoSuchBucket", "PermanentRedirect"}
+
+
+class S3VerifyCode(Enum):
+    """Broad categories for S3 verification results."""
+
+    OK = auto()
+    WRONG_CREDENTIALS = auto()
+    CONFIGURATION_MISMATCH = auto()
+    ACTIONABLE_CONNECTIVITY = auto()
+    OTHER_ISSUE = auto()
+
+
+@dataclass(frozen=True)
+class S3VerifyResult:
+    """Result of S3 verification."""
+
+    ok: bool
+    code: S3VerifyCode
 
 
 class S3Manager(WithLogging):
@@ -37,85 +74,8 @@ class S3Manager(WithLogging):
             aws_secret_access_key=self.connection_info.secret_key,
         )
 
-    def get_or_create_bucket(self, client: S3Client) -> bool:
-        """Create bucket if it does not exists."""
-        bucket_name = self.connection_info.bucket
-        bucket_exists = True
-
-        try:
-            client.head_bucket(Bucket=bucket_name)
-        except ClientError as ex:
-            if "(403)" in ex.args[0]:
-                self.logger.error("Wrong credentials or access to bucket is forbidden")
-                return False
-            elif "(404)" in ex.args[0]:
-                bucket_exists = False
-
-        if not bucket_exists:
-            try:
-                client.create_bucket(Bucket=bucket_name)
-                self._wait_until_exists(client, "bucket")
-            except ClientError as ex:
-                self.logger.error(f"Could not create bucket {bucket_name}: {ex}")
-                return False
-            self.logger.info(f"Created bucket {bucket_name}")
-
-        return True
-
-    def ensure_path(self, client: S3Client) -> bool:
-        """Create path if it does not exists."""
-        path = self.connection_info.path
-        path_exists = True
-        if not path:
-            return False
-        try:
-            client.head_object(
-                Bucket=self.connection_info.bucket,
-                Key=os.path.join(path, ".keep"),
-            )
-        except ClientError as ex:
-            if "(403)" in ex.args[0]:
-                self.logger.error("Wrong credentials or access to bucket is forbidden")
-                return False
-            elif "(404)" in ex.args[0]:
-                path_exists = False
-
-        if not path_exists:
-            try:
-                client.put_object(
-                    Bucket=self.connection_info.bucket,
-                    Key=os.path.join(path, ".keep"),
-                )
-                self._wait_until_exists(client, "key")
-            except ClientError as ex:
-                self.logger.error(
-                    f"Could not create path {path} in bucket {self.connection_info.bucket}: {ex}"
-                )
-                return False
-            self.logger.info(f"Created path {path} in bucket {self.connection_info.bucket}")
-
-        return True
-
-    @retry(
-        wait=wait_fixed(5),
-        stop=stop_after_attempt(20),
-        retry=retry_if_exception_cause_type(ClientError),
-        reraise=True,
-    )
-    def _wait_until_exists(
-        self, client: S3Client, resource_type: Literal["bucket", "key"]
-    ) -> None:
-        """Poll s3 API until resource is found."""
-        if resource_type == "bucket":
-            client.head_bucket(Bucket=self.connection_info.bucket)
-        else:
-            client.head_object(
-                Bucket=self.connection_info.bucket,
-                Key=os.path.join(self.connection_info.path, ".keep"),
-            )
-
-    def verify(self) -> bool:
-        """Verify S3 credentials and configuration."""
+    def _get_proxy_config(self) -> dict[str, str]:
+        """Return proxy configuration based on charm environment variables."""
         proxy_config: dict[str, str] = {}
 
         if not is_proxy_skipped(self.connection_info.endpoint or ""):
@@ -124,44 +84,103 @@ class S3Manager(WithLogging):
             if os.environ.get("JUJU_CHARM_HTTP_PROXY"):
                 proxy_config["http"] = os.environ["JUJU_CHARM_HTTP_PROXY"]
 
-        with tempfile.NamedTemporaryFile() as ca_file:
-            if tls_ca_chain := self.connection_info.tls_ca_chain:
-                ca_file.write("\n".join(tls_ca_chain).encode())
-                ca_file.flush()
+        return proxy_config
 
-            s3 = self.session.client(
-                "s3",
-                region_name=self.connection_info.region or "us-east-1",
-                endpoint_url=self.connection_info.endpoint or "https://s3.amazonaws.com",
-                verify=ca_file.name if self.connection_info.tls_ca_chain else None,
-                config=Config(
-                    # "when_supported" (the boto3 >= 1.36 default) makes every write use
-                    # aws-chunked encoding with a trailing CRC32 checksum. Several S3-compatible
-                    # backends (e.g. Ceph radosgw behind an Apache proxy) don't support that and
-                    # reject the request with XAmzContentSHA256Mismatch, so only compute/validate
-                    # checksums when the S3 API actually requires them.
-                    request_checksum_calculation="when_required",
-                    response_checksum_validation="when_required",
-                    proxies=proxy_config,
-                ),
+    def _client(self, ca_file_path: str | None = None) -> S3Client:
+        """Build the S3 client."""
+        return self.session.client(
+            "s3",
+            region_name=self.connection_info.region or "us-east-1",
+            endpoint_url=self.connection_info.endpoint or "https://s3.amazonaws.com",
+            verify=ca_file_path,
+            config=Config(
+                # "when_supported" (the boto3 >= 1.36 default) makes every write use
+                # aws-chunked encoding with a trailing CRC32 checksum. Several S3-compatible
+                # backends (e.g. Ceph radosgw behind an Apache proxy) don't support that and
+                # reject the request with XAmzContentSHA256Mismatch, so only compute/validate
+                # checksums when the S3 API actually requires them.
+                request_checksum_calculation="when_required",
+                response_checksum_validation="when_required",
+                proxies=self._get_proxy_config(),
+            ),
+        )
+
+    @retry(
+        wait=wait_fixed(2),
+        stop=stop_after_attempt(3),
+        retry=retry_if_exception_type(
+            (
+                ProxyConnectionError,
+                EndpointConnectionError,
+                ConnectTimeoutError,
+                ReadTimeoutError,
+                ConnectionClosedError,
             )
+        ),
+        reraise=True,
+    )
+    def _check_bucket_and_path(self, client: S3Client) -> ListObjectsV2OutputTypeDef:
+        """Check the existence of the configured bucket and path."""
+        normalized_prefix = f"{self.connection_info.path.rstrip('/')}/"
+        # Note: list_objects_v2() demands fewer permissions than the previous
+        # list_buckets() implementation.
+        return client.list_objects_v2(
+            Bucket=self.connection_info.bucket,
+            Prefix=normalized_prefix,
+            MaxKeys=1,
+        )
 
-            try:
-                s3.list_buckets()
-            except ClientError as client_error:
-                self.logger.error(f"Invalid S3 credentials...{client_error}")
-                return False
-            except SSLError as ssl_error:
-                self.logger.error(f"SSL validation failed... {ssl_error}")
-                return False
-            except ProxyConnectionError as proxy_error:
-                self.logger.error(f"Could not communicate with/through proxy {proxy_error}")
-                return False
-            except Exception as e:
-                self.logger.error(f"S3 related error {e}")
-                return False
+    def _classify_client_error(self, error: ClientError) -> S3VerifyResult:
+        """Map client errors to broad verification categories."""
+        code = error.response.get("Error", {}).get("Code", "")
 
-            if not self.get_or_create_bucket(s3):
-                return False
+        if code in WRONG_CREDENTIALS_CODES:
+            self.logger.error(f"Invalid S3 credentials... {error}")
+            return S3VerifyResult(False, S3VerifyCode.WRONG_CREDENTIALS)
 
-        return self.ensure_path(s3)
+        if code in MISMATCH_CODES:
+            self.logger.error(f"S3 configuration mismatch... {error}")
+            return S3VerifyResult(False, S3VerifyCode.CONFIGURATION_MISMATCH)
+
+        self.logger.error(f"S3 related error {error}")
+        return S3VerifyResult(False, S3VerifyCode.OTHER_ISSUE)
+
+    def verify(self) -> S3VerifyResult:
+        """Verify S3 credentials and configuration."""
+        if not self.connection_info.path:
+            return S3VerifyResult(False, S3VerifyCode.CONFIGURATION_MISMATCH)
+
+        try:
+            with tempfile.NamedTemporaryFile() as ca_file:
+                ca_file_path = None
+                if tls_ca_chain := self.connection_info.tls_ca_chain:
+                    ca_file.write("\n".join(tls_ca_chain).encode())
+                    ca_file.flush()
+                    ca_file_path = ca_file.name
+
+                response = self._check_bucket_and_path(self._client(ca_file_path=ca_file_path))
+        except ClientError as error:
+            return self._classify_client_error(error)
+        except (
+            SSLError,
+            ProxyConnectionError,
+            EndpointConnectionError,
+            ConnectTimeoutError,
+            ReadTimeoutError,
+            ConnectionClosedError,
+        ) as error:
+            self.logger.error(f"Could not reach S3... {error}")
+            return S3VerifyResult(False, S3VerifyCode.ACTIONABLE_CONNECTIVITY)
+        except Exception as error:
+            self.logger.error(f"S3 related error {error}")
+            return S3VerifyResult(False, S3VerifyCode.OTHER_ISSUE)
+
+        if response.get("KeyCount", 0) == 0 and not response.get("Contents"):
+            self.logger.error(
+                "S3 configuration mismatch: no objects found under bucket %s and path %s",
+                self.connection_info.bucket,
+                self.connection_info.path,
+            )
+            return S3VerifyResult(False, S3VerifyCode.CONFIGURATION_MISMATCH)
+
+        return S3VerifyResult(True, S3VerifyCode.OK)

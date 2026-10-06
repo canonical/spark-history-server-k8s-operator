@@ -74,30 +74,15 @@ class HistoryServerEvents(ops.Object, WithLogging, ManagerStatusProtocol):
     def _on_spark_history_server_pebble_ready(self, event):
         """Handle on Pebble ready event."""
         self.logger.info("Pebble ready")
-        self.history_server.update(
-            self.context.s3,
-            self.context.azure_storage,
-            self.context.ingress,
-            self.context.authorized_users,
-        )
+        self.history_server.update()
 
     def _update_event(self, _) -> None:
-        self.history_server.update(
-            self.context.s3,
-            self.context.azure_storage,
-            self.context.ingress,
-            self.context.authorized_users,
-        )
+        self.history_server.update()
 
     def _on_config_changed(self, _: ConfigChangedEvent):
         """Handle the on config changed event."""
         self.logger.info("On config changed event.")
-        self.history_server.update(
-            self.context.s3,
-            self.context.azure_storage,
-            self.context.ingress,
-            self.context.authorized_users,
-        )
+        self.history_server.update()
 
     def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
         """Return the list of statuses for this component."""

@@ -91,12 +91,7 @@ class IngressEvents(BaseEventHandler, WithLogging, ManagerStatusProtocol):
         """Handle the `IngressPerAppReadyEvent`."""
         self.logger.info("This app's ingress URL: %s", event.url)
 
-        self.history_server.update(
-            self.context.s3,
-            self.context.azure_storage,
-            self.context.ingress,
-            self.context.authorized_users,
-        )
+        self.history_server.update()
 
         # auth proxy config
         self.auth_proxy.update_auth_proxy_config(auth_proxy_config=self.context.auth_proxy_config)
@@ -108,36 +103,25 @@ class IngressEvents(BaseEventHandler, WithLogging, ManagerStatusProtocol):
     def _on_ingress_revoked(self, _: IngressPerAppRevokedEvent):
         """Handle the `IngressPerAppRevokedEvent`."""
         self.logger.info("This app no longer has ingress")
-        self.history_server.update(
-            self.context.s3, self.context.azure_storage, None, self.context.authorized_users
-        )
+        self.history_server.update()
 
     @defer_when_not_ready
     def _on_auth_proxy_removed(self, _: AuthProxyRelationRemovedEvent):
         """Handle the removal of the AuthProxy."""
         self.logger.info("AuthProxy configuration gone")
-        self.history_server.update(
-            self.context.s3, self.context.azure_storage, self.context.ingress, None
-        )
+        self.history_server.update()
 
     @defer_when_not_ready
     def _on_oauth2_proxy_removed(self, _: AuthKeeperProxyRelationRemovedEvent):
         """Handle the removal of the AuthProxy."""
         self.logger.info("AuthProxy configuration gone")
-        self.history_server.update(
-            self.context.s3, self.context.azure_storage, self.context.ingress, None
-        )
+        self.history_server.update()
 
     @defer_when_not_ready
     def _on_auth_proxy_changed(self, _: RelationChangedEvent):
         """Handle the change of configuration of the AuthProxy."""
         self.logger.info("AuthProxy configuration changed.")
-        self.history_server.update(
-            self.context.s3,
-            self.context.azure_storage,
-            self.context.ingress,
-            self.context.authorized_users,
-        )
+        self.history_server.update()
         # auth proxy config
         self.auth_proxy.update_auth_proxy_config(auth_proxy_config=self.context.auth_proxy_config)
 
@@ -145,12 +129,7 @@ class IngressEvents(BaseEventHandler, WithLogging, ManagerStatusProtocol):
     def _on_oauth2_proxy_changed(self, _: RelationChangedEvent):
         """Handle the change of configuration of the AuthProxy."""
         self.logger.info("AuthProxy configuration changed.")
-        self.history_server.update(
-            self.context.s3,
-            self.context.azure_storage,
-            self.context.ingress,
-            self.context.authorized_users,
-        )
+        self.history_server.update()
         # auth proxy config
         self.oauth2proxy.update_auth_proxy_config(
             auth_proxy_config=self.context.oauth2_proxy_config

@@ -68,23 +68,13 @@ class AzureStorageEvents(BaseEventHandler, WithLogging, ManagerStatusProtocol):
     def _on_azure_storage_connection_info_changed(self, _: StorageConnectionInfoChangedEvent):
         """Handle the `StorageConnectionInfoChangedEvent` event from Object Storage integrator."""
         self.logger.info("Azure Storage connection info changed")
-        self.history_server.update(
-            self.context.s3,
-            self.context.azure_storage,
-            self.context.ingress,
-            self.context.authorized_users,
-        )
+        self.history_server.update()
 
     @defer_when_not_ready
     def _on_azure_storage_connection_info_gone(self, _: StorageConnectionInfoGoneEvent):
         """Handle the `StorageConnectionInfoGoneEvent` event for Object Storage integrator."""
         self.logger.info("Azure Storage connection info gone")
-        self.history_server.update(
-            self.context.s3,
-            None,
-            self.context.ingress,
-            self.context.authorized_users,
-        )
+        self.history_server.update()
 
     def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
         """Return the list of statuses for this component."""

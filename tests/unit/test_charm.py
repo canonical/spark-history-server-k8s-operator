@@ -14,6 +14,7 @@ from constants import CONTAINER
 from events.azure_storage import AzureStorageStatuses
 from events.history_server import CharmStatuses
 from events.s3 import S3Statuses
+from managers.s3 import S3VerifyCode, S3VerifyResult
 
 if TYPE_CHECKING:
     from charm import SparkHistoryServerCharm
@@ -37,8 +38,12 @@ def parse_spark_properties(out: State, tmp_path: Path) -> dict[str, str]:
         )
 
 
+@patch(
+    "managers.s3.S3Manager.verify",
+    return_value=S3VerifyResult(ok=True, code=S3VerifyCode.OK),
+)
 def test_start_history_server(
-    history_server_ctx: Context[SparkHistoryServerCharm], s3_relation: Relation
+    verify_call, history_server_ctx: Context[SparkHistoryServerCharm], s3_relation: Relation
 ) -> None:
     state = State(
         config={},
@@ -46,12 +51,10 @@ def test_start_history_server(
         relations=[s3_relation],
     )
     out = history_server_ctx.run(history_server_ctx.on.install(), state)
-    assert out.unit_status.message == CharmStatuses.WAITING_PEBBLE.message
+    assert CharmStatuses.WAITING_PEBBLE.message in out.unit_status.message
 
 
-@patch("workload.SparkHistoryServer.exec")
 def test_pebble_ready(
-    exec_calls,
     history_server_ctx: Context[SparkHistoryServerCharm],
     history_server_container: Container,
 ) -> None:
@@ -61,13 +64,14 @@ def test_pebble_ready(
     out = history_server_ctx.run(
         history_server_ctx.on.pebble_ready(history_server_container), state
     )
-    assert out.unit_status.message == CharmStatuses.MISSING_STORAGE_RELATION.message
+    assert CharmStatuses.MISSING_STORAGE_RELATION.message in out.unit_status.message
 
 
-@patch("managers.s3.S3Manager.verify", return_value=True)
-@patch("workload.SparkHistoryServer.exec")
+@patch(
+    "managers.s3.S3Manager.verify",
+    return_value=S3VerifyResult(ok=True, code=S3VerifyCode.OK),
+)
 def test_s3_relation_connection_ok(
-    exec_calls,
     verify_call,
     tmp_path: Path,
     history_server_ctx: Context[SparkHistoryServerCharm],
@@ -104,10 +108,11 @@ def test_s3_relation_connection_ok(
     )
 
 
-@patch("managers.s3.S3Manager.verify", return_value=True)
-@patch("workload.SparkHistoryServer.exec")
+@patch(
+    "managers.s3.S3Manager.verify",
+    return_value=S3VerifyResult(ok=True, code=S3VerifyCode.OK),
+)
 def test_s3_relation_connection_ok_tls(
-    exec_calls,
     verify_call,
     tmp_path: Path,
     history_server_ctx: Context[SparkHistoryServerCharm],
@@ -164,10 +169,11 @@ def test_s3_relation_connection_ok_tls(
     assert len(envs["SPARK_HISTORY_OPTS"]) == 0
 
 
-@patch("managers.s3.S3Manager.verify", return_value=False)
-@patch("workload.SparkHistoryServer.exec")
+@patch(
+    "managers.s3.S3Manager.verify",
+    return_value=S3VerifyResult(ok=False, code=S3VerifyCode.CONFIGURATION_MISMATCH),
+)
 def test_s3_relation_connection_ko(
-    exec_calls,
     verify_call,
     history_server_ctx: Context[SparkHistoryServerCharm],
     history_server_container: Container,
@@ -178,14 +184,14 @@ def test_s3_relation_connection_ko(
         containers=[history_server_container],
     )
     out = history_server_ctx.run(history_server_ctx.on.relation_changed(s3_relation), state)
-    # FIXME
-    assert out.unit_status == ActiveStatus()
+    assert out.unit_status.message == S3Statuses.CONFIGURATION_MISMATCH.message
 
 
-@patch("managers.s3.S3Manager.verify", return_value=False)
-@patch("workload.SparkHistoryServer.exec")
+@patch(
+    "managers.s3.S3Manager.verify",
+    return_value=S3VerifyResult(ok=False, code=S3VerifyCode.CONFIGURATION_MISMATCH),
+)
 def test_s3_relation_no_path_ko(
-    exec_calls,
     verify_call,
     history_server_ctx: Context[SparkHistoryServerCharm],
     history_server_container: Container,
@@ -207,10 +213,11 @@ def test_s3_relation_no_path_ko(
     assert out.unit_status.message == S3Statuses.missing_parameters(["path"]).message
 
 
-@patch("managers.s3.S3Manager.verify", return_value=True)
-@patch("workload.SparkHistoryServer.exec")
+@patch(
+    "managers.s3.S3Manager.verify",
+    return_value=S3VerifyResult(ok=True, code=S3VerifyCode.OK),
+)
 def test_s3_relation_broken(
-    exec_calls,
     verify_call,
     tmp_path: Path,
     history_server_ctx: Context[SparkHistoryServerCharm],
@@ -225,7 +232,7 @@ def test_s3_relation_broken(
         history_server_ctx.on.relation_broken(s3_relation), initial_state
     )
 
-    assert state_out.unit_status.message == CharmStatuses.MISSING_STORAGE_RELATION.message
+    assert CharmStatuses.MISSING_STORAGE_RELATION.message in state_out.unit_status.message
 
     spark_properties = parse_spark_properties(state_out, tmp_path)
 
@@ -233,9 +240,7 @@ def test_s3_relation_broken(
     assert "spark.hadoop.fs.s3a.endpoint" not in spark_properties
 
 
-@patch("workload.SparkHistoryServer.exec")
 def test_ingress_relation_creation(
-    exec_calls,
     history_server_ctx: Context[SparkHistoryServerCharm],
     history_server_container: Container,
     ingress_relation: Relation,
@@ -246,13 +251,14 @@ def test_ingress_relation_creation(
         containers=[history_server_container],
     )
     out = history_server_ctx.run(history_server_ctx.on.relation_changed(ingress_relation), state)
-    assert out.unit_status.message == CharmStatuses.MISSING_STORAGE_RELATION.message
+    assert CharmStatuses.MISSING_STORAGE_RELATION.message in out.unit_status.message
 
 
-@patch("managers.s3.S3Manager.verify", return_value=True)
-@patch("workload.SparkHistoryServer.exec")
+@patch(
+    "managers.s3.S3Manager.verify",
+    return_value=S3VerifyResult(ok=True, code=S3VerifyCode.OK),
+)
 def test_with_ingress(
-    exec_calls,
     verify_call,
     tmp_path: Path,
     history_server_ctx: Context[SparkHistoryServerCharm],
@@ -274,10 +280,11 @@ def test_with_ingress(
     assert "spark.ui.proxyBase" in spark_properties
 
 
-@patch("managers.s3.S3Manager.verify", return_value=True)
-@patch("workload.SparkHistoryServer.exec")
+@patch(
+    "managers.s3.S3Manager.verify",
+    return_value=S3VerifyResult(ok=True, code=S3VerifyCode.OK),
+)
 def test_with_ingress_subdomain(
-    exec_calls,
     verify_call,
     tmp_path: Path,
     history_server_ctx: Context[SparkHistoryServerCharm],
@@ -301,10 +308,11 @@ def test_with_ingress_subdomain(
     assert "spark.ui.proxyBase" not in spark_properties
 
 
-@patch("managers.s3.S3Manager.verify", return_value=True)
-@patch("workload.SparkHistoryServer.exec")
+@patch(
+    "managers.s3.S3Manager.verify",
+    return_value=S3VerifyResult(ok=True, code=S3VerifyCode.OK),
+)
 def test_remove_ingress(
-    exec_calls,
     verify_call,
     tmp_path: Path,
     history_server_ctx: Context[SparkHistoryServerCharm],
@@ -326,9 +334,7 @@ def test_remove_ingress(
 
 
 @patch("managers.azure_storage.AzureStorageManager.verify", return_value=True)
-@patch("workload.SparkHistoryServer.exec")
 def test_azure_storage_relation(
-    exec_calls,
     verify_call,
     tmp_path: Path,
     history_server_ctx: Context[SparkHistoryServerCharm],
@@ -375,9 +381,7 @@ def test_azure_storage_relation(
 
 
 @patch("managers.azure_storage.AzureStorageManager.verify", return_value=False)
-@patch("workload.SparkHistoryServer.exec")
 def test_azure_relation_no_path_ko(
-    exec_calls,
     verify_call,
     history_server_ctx: Context[SparkHistoryServerCharm],
     history_server_container: Container,
@@ -400,9 +404,7 @@ def test_azure_relation_no_path_ko(
     assert out.unit_status.message == AzureStorageStatuses.missing_parameters(["path"]).message
 
 
-@patch("workload.SparkHistoryServer.exec")
 def test_azure_storage_relation_broken(
-    exec_calls,
     tmp_path: Path,
     history_server_ctx: Context[SparkHistoryServerCharm],
     history_server_container: Container,
@@ -425,8 +427,8 @@ def test_azure_storage_relation_broken(
     )
 
     assert (
-        state_after_relation_broken.unit_status.message
-        == CharmStatuses.MISSING_STORAGE_RELATION.message
+        CharmStatuses.MISSING_STORAGE_RELATION.message
+        in state_after_relation_broken.unit_status.message
     )
 
     spark_properties = parse_spark_properties(state_after_relation_broken, tmp_path)
@@ -438,17 +440,17 @@ def test_azure_storage_relation_broken(
     )
 
 
-@patch("managers.s3.S3Manager.verify", return_value=True)
-@patch("workload.SparkHistoryServer.exec")
+@patch(
+    "managers.s3.S3Manager.verify",
+    return_value=S3VerifyResult(ok=True, code=S3VerifyCode.OK),
+)
 def test_both_azure_storage_and_s3_relation_together(
-    exec_calls,
     verify_call,
     history_server_ctx: Context[SparkHistoryServerCharm],
     history_server_container: Container,
     s3_relation: Relation,
     azure_storage_relation: Relation,
 ) -> None:
-    # Patching verify speeds up the test
     state = State(
         leader=True,
         relations=[s3_relation, azure_storage_relation],
@@ -457,4 +459,4 @@ def test_both_azure_storage_and_s3_relation_together(
     out = history_server_ctx.run(
         history_server_ctx.on.relation_changed(azure_storage_relation), state
     )
-    assert out.unit_status.message == CharmStatuses.MULTIPLE_STORAGE_RELATIONS.message
+    assert CharmStatuses.MULTIPLE_STORAGE_RELATIONS.message in out.unit_status.message

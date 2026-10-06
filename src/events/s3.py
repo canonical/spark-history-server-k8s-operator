@@ -15,6 +15,7 @@ from core.context import Context
 from core.workload import SparkHistoryWorkloadBase
 from events.base import BaseEventHandler, defer_when_not_ready
 from managers.history_server import HistoryServerManager
+from managers.s3 import S3Manager, S3VerifyCode, S3VerifyResult
 
 
 class _S3Statuses:
@@ -30,10 +31,28 @@ class _S3Statuses:
         """Return a status for missing object storage relation data."""
         fields_str = ", ".join(f"'{field}'" for field in fields)
         return StatusObject(
-            status="waiting",
+            status="blocked",
             message=f"Missing object storage parameter(s): {fields_str}",
             action=f"Set object storage parameter(s): {fields_str}",
         )
+
+    WRONG_CREDENTIALS = StatusObject(
+        status="blocked",
+        message="Wrong object storage credentials",
+    )
+    CONFIGURATION_MISMATCH = StatusObject(
+        status="blocked",
+        message="Object storage configuration does not match the remote service",
+    )
+    ACTIONABLE_CONNECTIVITY = StatusObject(
+        status="waiting",
+        message="Object storage connectivity issue",
+        action="Check network reachability and verify proxy settings and TLS CA chain",
+    )
+    OTHER_ISSUE = StatusObject(
+        status="blocked",
+        message="Object storage reported an unexpected error",
+    )
 
 
 S3Statuses = _S3Statuses()
@@ -54,6 +73,7 @@ class S3Events(BaseEventHandler, WithLogging, ManagerStatusProtocol):
         self.history_server = HistoryServerManager(self.context, self.workload)
 
         self.s3_requirer = self.context.s3_requirer
+        self.cached_verify_result: S3VerifyResult | None = None
         self.framework.observe(
             self.s3_requirer.on.storage_connection_info_changed, self._on_s3_credential_changed
         )
@@ -65,33 +85,50 @@ class S3Events(BaseEventHandler, WithLogging, ManagerStatusProtocol):
     def _on_s3_credential_changed(self, _: StorageConnectionInfoChangedEvent):
         """Handle the `StorageConnectionInfoChangedEvent` event from S3 integrator."""
         self.logger.info("S3 Credentials changed")
-        self.history_server.update(
-            self.context.s3,
-            self.context.azure_storage,
-            self.context.ingress,
-            self.context.authorized_users,
-        )
+        self._verify(recompute=True)
+        self.history_server.update()
 
     @defer_when_not_ready
     def _on_s3_credential_gone(self, _: StorageConnectionInfoGoneEvent):
         """Handle the `StorageConnectionInfoGoneEvent` event for S3 integrator."""
         self.logger.info("S3 Credentials gone")
-        self.history_server.update(
-            None,
-            self.context.azure_storage,
-            self.context.ingress,
-            self.context.authorized_users,
-        )
+        self.cached_verify_result = None
+        self.history_server.update()
+
+    def _verify(self, recompute: bool = False) -> S3VerifyResult | None:
+        """Verify the current S3 configuration and cache the result."""
+        if not (s3_info := self.context.s3):
+            self.cached_verify_result = None
+            return None
+
+        if self.cached_verify_result is not None and not recompute:
+            return self.cached_verify_result
+
+        self.cached_verify_result = S3Manager(s3_info).verify()
+        return self.cached_verify_result
 
     def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
         """Return the list of statuses for this component."""
         if not self.context.s3_relation:
             return []
 
-        if not (s3_info := self.context.s3):
+        if not self.context.s3:
             return [S3Statuses.OBJECT_STORAGE_NOT_READY]
 
-        if not s3_info.path:
+        if not self.context.s3.path:
             return [S3Statuses.missing_parameters(fields=["path"])]
 
-        return []
+        if not (result := self._verify(recompute=recompute)):
+            return [S3Statuses.OBJECT_STORAGE_NOT_READY]
+
+        match result.code:
+            case S3VerifyCode.OK:
+                return []
+            case S3VerifyCode.WRONG_CREDENTIALS:
+                return [S3Statuses.WRONG_CREDENTIALS]
+            case S3VerifyCode.CONFIGURATION_MISMATCH:
+                return [S3Statuses.CONFIGURATION_MISMATCH]
+            case S3VerifyCode.ACTIONABLE_CONNECTIVITY:
+                return [S3Statuses.ACTIONABLE_CONNECTIVITY]
+            case _:
+                return [S3Statuses.OTHER_ISSUE]
