@@ -85,7 +85,10 @@ class S3Events(BaseEventHandler, WithLogging, ManagerStatusProtocol):
     def _on_s3_credential_changed(self, _: StorageConnectionInfoChangedEvent):
         """Handle the `StorageConnectionInfoChangedEvent` event from S3 integrator."""
         self.logger.info("S3 Credentials changed")
-        self._verify(recompute=True)
+        if s3_info := self.context.s3:
+            self.cached_verify_result = S3Manager(s3_info).verify()
+        else:
+            self.cached_verify_result = None
         self.history_server.update()
 
     @defer_when_not_ready
@@ -94,18 +97,6 @@ class S3Events(BaseEventHandler, WithLogging, ManagerStatusProtocol):
         self.logger.info("S3 Credentials gone")
         self.cached_verify_result = None
         self.history_server.update()
-
-    def _verify(self, recompute: bool = False) -> S3VerifyResult | None:
-        """Verify the current S3 configuration and cache the result."""
-        if not (s3_info := self.context.s3):
-            self.cached_verify_result = None
-            return None
-
-        if self.cached_verify_result is not None and not recompute:
-            return self.cached_verify_result
-
-        self.cached_verify_result = S3Manager(s3_info).verify()
-        return self.cached_verify_result
 
     def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
         """Return the list of statuses for this component."""
@@ -118,7 +109,10 @@ class S3Events(BaseEventHandler, WithLogging, ManagerStatusProtocol):
         if not self.context.s3.path:
             return [S3Statuses.missing_parameters(fields=["path"])]
 
-        if not (result := self._verify(recompute=recompute)):
+        if recompute or self.cached_verify_result is None:
+            self.cached_verify_result = S3Manager(self.context.s3).verify()
+
+        if not (result := self.cached_verify_result):
             return [S3Statuses.OBJECT_STORAGE_NOT_READY]
 
         match result.code:
