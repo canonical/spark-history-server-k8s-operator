@@ -178,12 +178,24 @@ class Status(Enum):
     """Class bundling all statuses that the charm may fall into."""
 
     ACTIVE = ActiveStatus("")
+    OBJECT_STORAGE_ENDPOINT_UNREACHABLE = BlockedStatus(
+        "Cannot reach object storage endpoint. Please check network connectivity and logs."
+    )
     INVALID_STORAGE_CREDENTIALS = BlockedStatus(
         "Invalid object storage credentials or permission issue. Please check logs."
     )
     MISSING_INGRESS_RELATION = BlockedStatus("Missing INGRESS relation")
     MISSING_STORAGE_PATH = BlockedStatus("Missing object storage folder path")
     MISSING_STORAGE_RELATION = BlockedStatus("Missing relation with storage (s3 or azure storage)")
+    OBJECT_STORAGE_PROXY_ERROR = BlockedStatus(
+        "Cannot reach object storage through the configured proxy. Please check proxy settings and logs."
+    )
+    OBJECT_STORAGE_SSL_ERROR = BlockedStatus(
+        "Object storage TLS/SSL validation failed. Please check certificates and logs."
+    )
+    OBJECT_STORAGE_UNKNOWN_ERROR = BlockedStatus(
+        "Unexpected object storage error. Please check logs."
+    )
     MULTIPLE_AUTH_PROXY_RELATIONS = BlockedStatus(
         "Spark History Server can be related to only one auth proxy backend (Oauth2proxy or Authkeeper) at a time."
     )
