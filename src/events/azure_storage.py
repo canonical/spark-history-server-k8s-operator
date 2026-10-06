@@ -14,6 +14,7 @@ from common.utils import WithLogging
 from core.context import Context
 from core.workload import SparkHistoryWorkloadBase
 from events.base import BaseEventHandler, defer_when_not_ready
+from managers.azure_storage import AzureStorageManager
 from managers.history_server import HistoryServerManager
 
 
@@ -23,6 +24,11 @@ class _AzureStorageStatuses:
     OBJECT_STORAGE_NOT_READY = StatusObject(
         status="waiting",
         message="Waiting for object storage relation data",
+    )
+    STORAGE_NOT_ACCESSIBLE = StatusObject(
+        status="blocked",
+        message="Object storage is not accessible",
+        action="Check object storage credentials and configuration",
     )
 
     @staticmethod
@@ -55,6 +61,7 @@ class AzureStorageEvents(BaseEventHandler, WithLogging, ManagerStatusProtocol):
         self.history_server = HistoryServerManager(self.context, self.workload)
 
         self.azure_storage_requirer = self.context.azure_storage_requirer
+        self.cached_verify_result: bool | None = None
         self.framework.observe(
             self.azure_storage_requirer.on.storage_connection_info_changed,
             self._on_azure_storage_connection_info_changed,
@@ -68,6 +75,10 @@ class AzureStorageEvents(BaseEventHandler, WithLogging, ManagerStatusProtocol):
     def _on_azure_storage_connection_info_changed(self, _: StorageConnectionInfoChangedEvent):
         """Handle the `StorageConnectionInfoChangedEvent` event from Object Storage integrator."""
         self.logger.info("Azure Storage connection info changed")
+        if azure_storage_info := self.context.azure_storage:
+            self.cached_verify_result = AzureStorageManager(azure_storage_info).verify()
+        else:
+            self.cached_verify_result = None
         self.history_server.update()
 
     @defer_when_not_ready
@@ -86,5 +97,11 @@ class AzureStorageEvents(BaseEventHandler, WithLogging, ManagerStatusProtocol):
 
         if not azure_storage_info.path:
             return [AzureStorageStatuses.missing_parameters(fields=["path"])]
+
+        if recompute or self.cached_verify_result is None:
+            self.cached_verify_result = AzureStorageManager(azure_storage_info).verify()
+
+        if not self.cached_verify_result:
+            return [AzureStorageStatuses.STORAGE_NOT_ACCESSIBLE]
 
         return []

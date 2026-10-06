@@ -42,7 +42,7 @@ class HistoryServerWorkloadStatus(ManagerStatusProtocol):
         context: Context,
         workload: SparkHistoryWorkloadBase,
     ) -> None:
-        self.name = "polaris-workload"
+        self.name = "history-server-workload"
         self.state = context
         self.workload = workload
 

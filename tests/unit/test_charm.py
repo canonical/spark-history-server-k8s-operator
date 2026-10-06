@@ -404,6 +404,30 @@ def test_azure_relation_no_path_ko(
     assert out.unit_status.message == AzureStorageStatuses.missing_parameters(["path"]).message
 
 
+@patch("managers.azure_storage.AzureStorageManager.verify", return_value=False)
+def test_azure_storage_relation_verify_ko(
+    verify_call,
+    history_server_ctx: Context[SparkHistoryServerCharm],
+    history_server_container: Container,
+    azure_storage_relation: Relation,
+) -> None:
+    """Assert that a connectivity issue to Azure Storage leads to a blocked state."""
+    # Given
+    state = State(
+        leader=True,
+        relations=[azure_storage_relation],
+        containers=[history_server_container],
+    )
+
+    # When
+    out = history_server_ctx.run(
+        history_server_ctx.on.relation_changed(azure_storage_relation), state
+    )
+
+    # Then
+    assert AzureStorageStatuses.STORAGE_NOT_ACCESSIBLE.message in out.unit_status.message
+
+
 def test_azure_storage_relation_broken(
     tmp_path: Path,
     history_server_ctx: Context[SparkHistoryServerCharm],

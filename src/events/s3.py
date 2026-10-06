@@ -95,7 +95,6 @@ class S3Events(BaseEventHandler, WithLogging, ManagerStatusProtocol):
     def _on_s3_credential_gone(self, _: StorageConnectionInfoGoneEvent):
         """Handle the `StorageConnectionInfoGoneEvent` event for S3 integrator."""
         self.logger.info("S3 Credentials gone")
-        self.cached_verify_result = None
         self.history_server.update()
 
     def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
