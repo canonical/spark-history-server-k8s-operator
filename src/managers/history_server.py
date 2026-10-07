@@ -206,6 +206,7 @@ class HistoryServerManager(WithLogging):
 
         if not s3 and not azure:
             self.logger.info("Neither S3 nor Azure Storage are ready")
+            self.workload.stop()
             return
 
         if s3 and (tls_ca_chain := s3.tls_ca_chain):

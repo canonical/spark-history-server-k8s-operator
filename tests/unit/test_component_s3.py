@@ -6,7 +6,11 @@ from unittest.mock import Mock
 
 import boto3
 import pytest
-from botocore.exceptions import ClientError, EndpointConnectionError, SSLError
+from botocore.exceptions import (
+    ClientError,
+    ProxyConnectionError,
+    SSLError,
+)
 from moto import mock_aws
 
 from core.domain import S3ConnectionInfo
@@ -139,11 +143,11 @@ def test_verify_classifies_client_errors(error_code: str, expected: S3VerifyCode
     "error",
     [
         SSLError(endpoint_url="https://s3.amazonaws.com", error="certificate verify failed"),
-        EndpointConnectionError(endpoint_url="https://s3.amazonaws.com"),
+        ProxyConnectionError(proxy_url="http://proxy.invalid", error="proxy error"),
     ],
 )
-def test_verify_classifies_connectivity_errors(error) -> None:
-    """Connectivity errors are grouped together."""
+def test_verify_classifies_actionable_connectivity_errors(error) -> None:
+    """TLS and proxy errors are grouped as actionable connectivity issues."""
     # Given
     s3_manager = S3Manager(_connection_info())
     client = Mock()

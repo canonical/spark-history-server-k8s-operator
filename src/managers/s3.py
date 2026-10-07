@@ -148,6 +148,7 @@ class S3Manager(WithLogging):
     def verify(self) -> S3VerifyResult:
         """Verify S3 credentials and configuration."""
         if not self.connection_info.path:
+            # Note: the code does not really matter, as we have a dedicated status for this
             return S3VerifyResult(False, S3VerifyCode.CONFIGURATION_MISMATCH)
 
         try:
@@ -161,18 +162,17 @@ class S3Manager(WithLogging):
                 response = self._check_bucket_and_path(self._client(ca_file_path=ca_file_path))
         except ClientError as error:
             return self._classify_client_error(error)
+        except (SSLError, ProxyConnectionError) as error:
+            self.logger.error(f"Could not reach S3 because of TLS or proxy issues: {error}")
+            return S3VerifyResult(False, S3VerifyCode.ACTIONABLE_CONNECTIVITY)
         except (
-            SSLError,
-            ProxyConnectionError,
             EndpointConnectionError,
             ConnectTimeoutError,
             ReadTimeoutError,
             ConnectionClosedError,
+            Exception,
         ) as error:
-            self.logger.error(f"Could not reach S3... {error}")
-            return S3VerifyResult(False, S3VerifyCode.ACTIONABLE_CONNECTIVITY)
-        except Exception as error:
-            self.logger.error(f"S3 related error {error}")
+            self.logger.error(f"Could not reach S3: {error}")
             return S3VerifyResult(False, S3VerifyCode.OTHER_ISSUE)
 
         if response.get("KeyCount", 0) == 0 and not response.get("Contents"):
