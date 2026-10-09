@@ -6,11 +6,15 @@ from unittest.mock import Mock
 
 import boto3
 import pytest
-from botocore.exceptions import ClientError
+from botocore.exceptions import (
+    ClientError,
+    ProxyConnectionError,
+    SSLError,
+)
 from moto import mock_aws
 
 from core.domain import S3ConnectionInfo
-from managers.s3 import S3Manager, is_proxy_skipped
+from managers.s3 import S3Manager, S3VerifyCode, is_proxy_skipped
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.client import S3Client
@@ -36,104 +40,59 @@ def s3(aws_credentials):
         yield boto3.client("s3", region_name="us-east-1")
 
 
-def test_bucket_created_on_verify(s3: S3Client) -> None:
-    """If the bucket does not exist, we create it."""
-    # Given
-    bucket_name = "test_bucket"
+def _connection_info(path: str = "path") -> Mock:
     connection_info = Mock(spec=S3ConnectionInfo)
     connection_info.endpoint = ""
     connection_info.access_key = ""
     connection_info.secret_key = ""
-    connection_info.bucket = bucket_name
-    connection_info.path = "path"
+    connection_info.bucket = "test-bucket"
+    connection_info.path = path
     connection_info.tls_ca_chain = []
     connection_info.region = ""
-    s3_manager = S3Manager(connection_info)
-
-    assert not len(s3.list_buckets()["Buckets"])
-
-    # When
-    s3_manager.verify()
-
-    # Then
-    assert len(buckets := s3.list_buckets()["Buckets"]) == 1
-    assert buckets[0].get("Name", "") == bucket_name
-    # Note that the path provided as been transformed into a directory structure
-    assert "Contents" in s3.list_objects_v2(Bucket=bucket_name, Prefix="path/", MaxKeys=1)
+    return connection_info
 
 
-def test_bucket_existing_path_created_on_verify(s3: S3Client) -> None:
-    """If the bucket does exist, we use it and add the path."""
+def test_verify_ok_when_path_exists(s3: S3Client) -> None:
+    """Verification succeeds when the configured prefix contains an object."""
     # Given
-    bucket_name = "test_bucket"
-    connection_info = Mock(spec=S3ConnectionInfo)
-    connection_info.endpoint = ""
-    connection_info.access_key = ""
-    connection_info.secret_key = ""
-    connection_info.bucket = bucket_name
-    connection_info.path = "path"
-    connection_info.tls_ca_chain = []
-    connection_info.region = ""
+    connection_info = _connection_info()
     s3_manager = S3Manager(connection_info)
 
-    s3.create_bucket(Bucket=bucket_name)
-    assert len(buckets := s3.list_buckets()["Buckets"]) == 1
-    assert buckets[0].get("Name", "") == bucket_name
+    s3.create_bucket(Bucket=connection_info.bucket)
+    s3.put_object(Bucket=connection_info.bucket, Key="path/eventlog", Body=b"data")
 
     # When
-    s3_manager.verify()
+    result = s3_manager.verify()
 
     # Then
-    assert len(buckets := s3.list_buckets()["Buckets"]) == 1
-    # Note that the path provided as been transformed into a directory structure
-    assert "Contents" in s3.list_objects_v2(Bucket=bucket_name, Prefix="path/", MaxKeys=1)
+    assert result.ok is True
+    assert result.code == S3VerifyCode.OK
 
 
-def test_path_existing_still_ok_on_verify(s3: S3Client) -> None:
-    """If the path already exists, safe to overwrite it."""
+def test_verify_configuration_mismatch_when_path_missing(s3: S3Client) -> None:
+    """Verification fails when the configured prefix has no objects."""
     # Given
-    bucket_name = "test_bucket"
-    connection_info = Mock(spec=S3ConnectionInfo)
-    connection_info.endpoint = ""
-    connection_info.access_key = ""
-    connection_info.secret_key = ""
-    connection_info.bucket = bucket_name
-    connection_info.path = "path"
-    connection_info.tls_ca_chain = []
-    connection_info.region = ""
+    connection_info = _connection_info()
     s3_manager = S3Manager(connection_info)
 
-    s3.create_bucket(Bucket=bucket_name)
-    s3.put_object(Bucket=bucket_name, Key="path/")
-    assert len(buckets := s3.list_buckets()["Buckets"]) == 1
-    assert buckets[0].get("Name", "") == bucket_name
+    s3.create_bucket(Bucket=connection_info.bucket)
 
     # When
-    s3_manager.verify()
+    result = s3_manager.verify()
 
     # Then
-    assert len(buckets := s3.list_buckets()["Buckets"]) == 1
-    # Note that the path provided as been transformed into a directory structure
-    assert "Contents" in s3.list_objects_v2(Bucket=bucket_name, Prefix="path/", MaxKeys=3)
+    assert result.ok is False
+    assert result.code == S3VerifyCode.CONFIGURATION_MISMATCH
 
 
 def test_verify_uses_when_required_checksum_config(s3: S3Client, monkeypatch) -> None:
-    """verify() must not opt in to flexible checksums (aws-chunked + trailing CRC).
-
-    Several S3-compatible backends (e.g. Ceph radosgw behind a proxy) reject those
-    requests with XAmzContentSHA256Mismatch, so we only compute/validate checksums
-    when the S3 API actually requires them.
-    """
+    """verify() must not opt in to flexible checksums (aws-chunked + trailing CRC)."""
     # Given
-    connection_info = Mock(spec=S3ConnectionInfo)
-    connection_info.endpoint = ""
-    connection_info.access_key = ""
-    connection_info.secret_key = ""
-    connection_info.bucket = "test_bucket"
-    connection_info.path = "path"
-    connection_info.tls_ca_chain = []
-    connection_info.region = ""
+    connection_info = _connection_info()
     s3_manager = S3Manager(connection_info)
+
+    s3.create_bucket(Bucket=connection_info.bucket)
+    s3.put_object(Bucket=connection_info.bucket, Key="path/eventlog", Body=b"data")
 
     captured_configs = []
     original_client = s3_manager.session.client
@@ -153,43 +112,53 @@ def test_verify_uses_when_required_checksum_config(s3: S3Client, monkeypatch) ->
     assert captured_configs[0].response_checksum_validation == "when_required"
 
 
-def test_get_or_create_bucket_does_not_raise_on_client_error() -> None:
-    """A ClientError while creating the bucket must be reported, not propagated."""
+@pytest.mark.parametrize(
+    "error_code, expected",
+    [
+        ("InvalidAccessKeyId", S3VerifyCode.WRONG_CREDENTIALS),
+        ("NoSuchBucket", S3VerifyCode.CONFIGURATION_MISMATCH),
+        ("AccessDenied", S3VerifyCode.CONFIGURATION_MISMATCH),
+        ("PermanentRedirect", S3VerifyCode.CONFIGURATION_MISMATCH),
+        ("InternalError", S3VerifyCode.OTHER_ISSUE),
+    ],
+)
+def test_verify_classifies_client_errors(error_code: str, expected: S3VerifyCode) -> None:
+    """Client errors are mapped to broad verification categories."""
     # Given
-    connection_info = Mock(spec=S3ConnectionInfo)
-    connection_info.bucket = "test_bucket"
-    s3_manager = S3Manager(connection_info)
-
+    s3_manager = S3Manager(_connection_info())
     client = Mock()
-    client.head_bucket.side_effect = ClientError(
-        {"Error": {"Code": "404", "Message": "Not Found"}}, "HeadBucket"
+    client.list_objects_v2.side_effect = ClientError(
+        {"Error": {"Code": error_code, "Message": "boom"}}, "ListObjectsV2"
     )
-    client.create_bucket.side_effect = ClientError(
-        {"Error": {"Code": "400", "Message": "XAmzContentSHA256Mismatch"}}, "CreateBucket"
-    )
+    s3_manager.__dict__["session"] = Mock(client=Mock(return_value=client))
 
-    # When / Then
-    assert s3_manager.get_or_create_bucket(client) is False
+    # When
+    code = s3_manager.verify().code
+
+    # Then
+    assert code == expected
 
 
-def test_ensure_path_does_not_raise_on_client_error() -> None:
-    """A ClientError while writing the '.keep' marker must be reported, not propagated."""
+@pytest.mark.parametrize(
+    "error",
+    [
+        SSLError(endpoint_url="https://s3.amazonaws.com", error="certificate verify failed"),
+        ProxyConnectionError(proxy_url="http://proxy.invalid", error="proxy error"),
+    ],
+)
+def test_verify_classifies_actionable_connectivity_errors(error) -> None:
+    """TLS and proxy errors are grouped as actionable connectivity issues."""
     # Given
-    connection_info = Mock(spec=S3ConnectionInfo)
-    connection_info.bucket = "test_bucket"
-    connection_info.path = "path"
-    s3_manager = S3Manager(connection_info)
-
+    s3_manager = S3Manager(_connection_info())
     client = Mock()
-    client.head_object.side_effect = ClientError(
-        {"Error": {"Code": "404", "Message": "Not Found"}}, "HeadObject"
-    )
-    client.put_object.side_effect = ClientError(
-        {"Error": {"Code": "400", "Message": "XAmzContentSHA256Mismatch"}}, "PutObject"
-    )
+    client.list_objects_v2.side_effect = error
+    s3_manager.__dict__["session"] = Mock(client=Mock(return_value=client))
 
-    # When / Then
-    assert s3_manager.ensure_path(client) is False
+    # When
+    code = s3_manager.verify().code
+
+    # Then
+    assert code == S3VerifyCode.ACTIONABLE_CONNECTIVITY
 
 
 @pytest.mark.parametrize(
@@ -241,7 +210,6 @@ def test_ensure_path_does_not_raise_on_client_error() -> None:
 def test_skip_proxy(no_proxy_env, endpoint, expected, monkeypatch):
     """Test that we are properly detecting that we should skip domains given a NO_PROXY env var."""
     # Given
-    # Patch JUJU_CHARM_NO_PROXY env var
     monkeypatch.setenv("JUJU_CHARM_NO_PROXY", no_proxy_env)
 
     # When
