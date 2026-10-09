@@ -40,6 +40,10 @@ resources:
     # 4.0.2-22.04, release date 23/06/2026
     upstream-source: ghcr.io/canonical/charmed-spark@sha256:0505173879d2ed4ab103d860364aa759f13d7a29de33c89de02d47d431c54125
 
+peers:
+  status-peers:
+    interface: status_peers
+
 requires:
   s3-credentials:
     interface: s3
@@ -75,7 +79,6 @@ requires:
     description: |
       If this app relates to other applications on a charmed service mesh cross-model, use this relation to send that related app additional data needed to automatically generate traffic authorization policies. This is required because Juju does not natively provide all information required to build these policies when related cross-model.
     optional: true
-
 
 provides:
   metrics-endpoint:

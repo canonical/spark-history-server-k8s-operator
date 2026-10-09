@@ -3,7 +3,6 @@
 # See LICENSE file for licensing details.
 import logging
 import os
-import subprocess
 from pathlib import Path
 from platform import machine
 from typing import Generator, Iterable
@@ -210,21 +209,7 @@ def s3_bucket_and_creds(request: pytest.FixtureRequest) -> Iterable[S3Info]:
             (endpoint_url := os.environ.get("S3_SERVER_URL", None)) is None,
         )
     ):
-        logger.info("Cannot find object storage information in environment, looking into minio.")
-        setup_minio_output = (
-            subprocess.check_output(
-                "./tests/integration/setup/setup_minio.sh | tail -n 1", shell=True, stderr=None
-            )
-            .decode("utf-8")
-            .strip()
-        )
-
-        logger.info(f"Minio output:\n{setup_minio_output}")
-
-        s3_params = setup_minio_output.strip().split(",")
-        endpoint_url = s3_params[0]
-        access_key = s3_params[1]
-        secret_key = s3_params[2]
+        raise EnvironmentError("Cannot find required object storage information in environment.")
 
     session = boto3.session.Session(aws_access_key_id=access_key, aws_secret_access_key=secret_key)
     s3 = session.resource(

@@ -7,6 +7,10 @@
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v1.loki_push_api import LogForwarder
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
+from data_platform_helpers.advanced_statuses.handler import StatusHandler
+from data_platform_helpers.advanced_statuses.models import StatusObject
+from data_platform_helpers.advanced_statuses.protocol import ManagerStatusProtocol
+from data_platform_helpers.advanced_statuses.types import Scope
 from ops import CharmBase
 from ops.main import main
 
@@ -21,12 +25,34 @@ from constants import (
 )
 from core.context import Context
 from core.domain import User
+from core.workload import SparkHistoryWorkloadBase
 from events.azure_storage import AzureStorageEvents
-from events.history_server import HistoryServerEvents
+from events.history_server import CharmStatuses, HistoryServerEvents
 from events.ingress import IngressEvents
 from events.s3 import S3Events
 from events.service_mesh import ServiceMeshEvents
 from workload import SparkHistoryServer
+
+
+class HistoryServerWorkloadStatus(ManagerStatusProtocol):
+    """Report generic low-priority history server workload statuses."""
+
+    def __init__(
+        self,
+        context: Context,
+        workload: SparkHistoryWorkloadBase,
+    ) -> None:
+        self.name = "history-server-workload"
+        self.state = context
+        self.workload = workload
+
+    def get_statuses(self, scope: Scope, recompute: bool = False) -> list[StatusObject]:
+        """Return low-priority workload statuses."""
+        statuses: list[StatusObject] = [CharmStatuses.ACTIVE_IDLE]
+        if not self.workload.active():
+            statuses.append(CharmStatuses.NOT_RUNNING)
+
+        return statuses
 
 
 class SparkHistoryServerCharm(CharmBase, WithLogging):
@@ -62,6 +88,16 @@ class SparkHistoryServerCharm(CharmBase, WithLogging):
         self.service_mesh = ServiceMeshEvents(self, context, workload)
 
         self.unit.set_ports(HISTORY_SERVER_PORT)
+        self.history_server_workload_status = HistoryServerWorkloadStatus(context, workload)
+
+        self.status = StatusHandler(
+            self,
+            self.history_server,
+            self.s3,
+            self.azure_storage,
+            self.ingress,
+            self.history_server_workload_status,
+        )
 
 
 if __name__ == "__main__":  # pragma: nocover
