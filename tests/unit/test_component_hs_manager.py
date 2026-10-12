@@ -1,21 +1,32 @@
 # Copyright 2026 Canonical Limited
 # See LICENSE file for licensing details
 
-from unittest import mock
+
+from collections import namedtuple
 
 from pytest import MonkeyPatch
 
+from core.domain import S3ConnectionInfo
 from managers.history_server import HistoryServerConfig
+
+Context = namedtuple("Context", ["s3", "azure_storage", "ingress", "authorized_users"])
 
 
 def test_s3_proxy_credentials(monkeypatch: MonkeyPatch) -> None:
     """Proxy credentials are properly extracted and passed to the spark properties."""
     # Given
     monkeypatch.setenv("JUJU_CHARM_HTTP_PROXY", "http://username:password@10.152.193.234:80")
-    s3_manager_testing = mock.MagicMock()
-    s3_manager_testing.connection_info.endpoint = "http://192.168.1.1"
-
-    config = HistoryServerConfig(None, s3_manager_testing, None, None, None)  # type: ignore
+    s3_info = S3ConnectionInfo(
+        {
+            "endpoint": "http://192.168.1.1",
+            "access-key": "",
+            "secret-key": "",
+            "bucket": "test-bucket",
+            "path": "test-path",
+        }
+    )
+    context = Context(s3_info, None, None, None)
+    config = HistoryServerConfig(context)  # type: ignore
 
     # When
     s3_proxy_conf = config._s3_conf
@@ -33,10 +44,17 @@ def test_s3_proxy_plain_ip(monkeypatch: MonkeyPatch) -> None:
     # Given
     proxy_host = "10.152.193.234"
     monkeypatch.setenv("JUJU_CHARM_HTTPS_PROXY", f"http://{proxy_host}")
-    s3_manager_testing = mock.MagicMock()
-    s3_manager_testing.connection_info.endpoint = "https://192.168.1.1"
-
-    config = HistoryServerConfig(None, s3_manager_testing, None, None, None)  # type: ignore
+    s3_info = S3ConnectionInfo(
+        {
+            "endpoint": "https://192.168.1.1",  # https scheme
+            "access-key": "",
+            "secret-key": "",
+            "bucket": "test-bucket",
+            "path": "test-path",
+        }
+    )
+    context = Context(s3_info, None, None, None)
+    config = HistoryServerConfig(context)  # type: ignore
 
     # When
     s3_proxy_conf = config._s3_conf

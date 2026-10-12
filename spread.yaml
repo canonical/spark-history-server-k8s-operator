@@ -67,7 +67,14 @@ backends:
       sudo systemctl daemon-reload
       sudo systemctl restart ssh
 
-      sudo passwd --delete "$USER"
+      if [[ $SPREAD_SYSTEM == "self-hosted"* ]]
+      then
+        sudo passwd -d ubuntu
+      else
+        sudo passwd -d runner
+      fi
+
+      sudo systemctl reload ssh || sudo systemctl restart ssh
 
       ADDRESS "127.0.0.1"
     # HACK: spread does not pass environment variables set on runner
