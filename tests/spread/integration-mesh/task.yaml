@@ -7,7 +7,9 @@ systems:
   - self-hosted-linux-amd64-jammy-large
 
 prepare: |
-  k8s kubectl patch configmap -n kube-system cilium-config --type merge --patch '{"data":{"bpf-lb-sock-hostns-only": "true"}}'
+  # Cilium needs a specific configuration to not disrupt isio traffic
+  # See https://docs.cilium.io/en/latest/network/servicemesh/istio/#cilium-configuration
+  kubectl patch configmap -n kube-system cilium-config --type merge --patch '{"data":{"bpf-lb-sock-hostns-only": "true"}}'
 
   microceph cluster bootstrap
   microceph disk add loop,1G,3
