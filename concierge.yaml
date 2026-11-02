@@ -6,22 +6,34 @@ juju:
     logging-config: <root>=INFO; unit=DEBUG
 
 providers:
-  microk8s:
+  k8s:
     enable: true
-    channel: 1.32-strict/stable
     bootstrap: true
-    addons:
-      - dns
-      - hostpath-storage
-      - metallb:10.64.140.43-10.64.140.49
+    channel: 1.32-classic/stable
+    features:
+      load-balancer:
+        enabled: true
+        l2-mode: true
+        cidrs: 10.64.0.0/16
+      local-storage:
+      network:
+      dns:
+    bootstrap-constraints:
+      root-disk: 4G
 
 host:
   packages:
-    - pipx
     - jq
+    - pipx
+    - s3cmd
   snaps:
     charmcraft:
       channel: latest/stable
-    rockcraft:
+    kubectl:
       channel: latest/stable
     microceph:
+      channel: squid/stable
+    rockcraft:
+      channel: latest/stable
+    spark-client:
+      channel: 3.5/edge
