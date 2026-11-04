@@ -12,6 +12,7 @@ from playwright.sync_api import BrowserContext, Page
 from .helpers.auth import complete_authentication_flow, deploy_identity_setup
 from .helpers.history_server import (
     assert_jobs_in_history_server,
+    assert_ui_navigation,
     deploy_history_server_setup,
     get_ingress_url,
 )
@@ -58,6 +59,14 @@ def test_spark_job_logs_in_history_server(
 
     logger.info("Verifying history server has 1 app entry")
     assert_jobs_in_history_server(server_url=server_url, expected_count=1)
+
+
+def test_ingress_ui_navigation(
+    juju: jubilant.Juju, charm_versions: IntegrationTestsCharms, page: Page
+) -> None:
+    """Verify that the History Server web UI renders and its links work behind an Ingress."""
+    ingress_url = get_ingress_url(juju, charm_versions, IngressMode.TRAEFIK)
+    assert_ui_navigation(page=page, server_url=ingress_url)
 
 
 def test_login_flow(
