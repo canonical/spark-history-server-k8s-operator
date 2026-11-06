@@ -4,11 +4,13 @@
 
 import json
 import logging
+import re
 from pathlib import Path
 
 import jubilant
 import requests
 import yaml
+from playwright.sync_api import Page, expect
 from tenacity import Retrying, stop_after_attempt, wait_fixed
 
 from ..types import AzureInfo, IngressMode, IntegrationTestsCharms, S3Info
@@ -136,3 +138,43 @@ def assert_jobs_in_history_server(
             assert len(apps) >= expected_count, (
                 f"Expected at least {expected_count} applications, got {len(apps)}"
             )
+
+
+def assert_ui_navigation(page: Page, server_url: str) -> None:
+    """Navigate the History Server web UI and assert links, URLs and assets are correct."""
+    base_url = server_url.rstrip("/")
+    network_errors: list[str] = []
+
+    def on_response(response) -> None:
+        if response.status >= 400:
+            network_errors.append(f"{response.url} returned HTTP {response.status}")
+
+    page.on(
+        "requestfailed",
+        lambda request: network_errors.append(f"{request.url} failed: {request.failure}"),
+    )
+    page.on("response", on_response)
+
+    logger.info(f"Opening History Server UI at {base_url}/")
+    page.goto(f"{base_url}/", wait_until="networkidle")
+    expect(page.locator("#history-summary-table")).to_be_visible(timeout=30_000)
+
+    logger.info("Navigating to incomplete applications")
+    page.get_by_role("link", name="Show incomplete applications").click()
+    page.wait_for_load_state("networkidle")
+    expect(page).to_have_url(f"{base_url}/?showIncomplete=true")
+
+    logger.info("Navigating back to completed applications")
+    page.get_by_role("link", name="Back to completed applications").click()
+    page.wait_for_load_state("networkidle")
+    expect(page).to_have_url(f"{base_url}/?showIncomplete=false")
+
+    logger.info("Opening the first application UI")
+    page.locator("#history-summary-table tbody a").first.click()
+    page.wait_for_load_state("networkidle")
+    expect(page).to_have_url(re.compile(rf"^{re.escape(base_url)}/history/.+/jobs/?$"))
+    expect(page.locator("h3", has_text="Spark Jobs")).to_be_visible(timeout=30_000)
+
+    assert not network_errors, "Network errors while browsing the UI:\n" + "\n".join(
+        network_errors
+    )
