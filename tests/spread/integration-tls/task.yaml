@@ -4,9 +4,9 @@
 summary: integration-tls pytest suite
 
 systems:
-  - ubuntu-22.04
-  - ubuntu-22.04-arm
-  - self-hosted-linux-amd64-jammy-large
+  - ubuntu-26.04
+  - ubuntu-26.04-arm
+  - self-hosted-linux-amd64-resolute-large
 
 prepare: |
   # Install Java to get keytool (needed by the TLS test)

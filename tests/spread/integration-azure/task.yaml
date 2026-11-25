@@ -4,7 +4,7 @@
 summary: integration-azure pytest suite
 
 systems:
-  - ubuntu-22.04
+  - ubuntu-26.04
 
 prepare: |
   snap install azcli

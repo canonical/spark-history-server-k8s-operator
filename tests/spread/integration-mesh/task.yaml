@@ -4,7 +4,7 @@
 summary: integration-mesh pytest suite
 
 systems:
-  - self-hosted-linux-amd64-jammy-large
+  - self-hosted-linux-amd64-resolute-large
 
 prepare: |
   # Cilium needs a specific configuration to not disrupt isio traffic

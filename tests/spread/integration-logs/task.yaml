@@ -4,8 +4,8 @@
 summary: integration-logs pytest suite
 
 systems:
-  - ubuntu-22.04
-  - self-hosted-linux-amd64-jammy-large
+  - ubuntu-26.04
+  - self-hosted-linux-amd64-resolute-large
 
 prepare: |
   microceph cluster bootstrap
