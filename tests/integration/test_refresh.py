@@ -72,7 +72,7 @@ def test_refresh_from_previous_stable(
     base = status.apps[APP_NAME].base
     assert base is not None
     assert base.name == "ubuntu"
-    assert base.channel == "22.04"
+    assert base.channel == "26.04"
 
     address = status.apps[APP_NAME].units[f"{APP_NAME}/0"].address
     server_url = f"http://{address}:18080"
