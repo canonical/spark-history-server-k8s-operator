@@ -20,7 +20,7 @@ def deploy_istio_control_plane(
     logger.info("Deploying Istio control plane")
     juju.deploy(
         **charm_versions.istio.deploy_dict(),
-        config={"platform": kubernetes_provider},
+        config={"platform": kubernetes_provider} if kubernetes_provider != "k8s" else {},
     )
     juju.wait(
         lambda status: jubilant.all_active(status, charm_versions.istio.application_name), delay=5
