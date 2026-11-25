@@ -6,7 +6,7 @@ package-mode = false
 requires-poetry = ">=2.0.0"
 
 [tool.poetry.dependencies]
-python = ">=3.10,<4.0"
+python = ">=3.14,<4.0"
 ops = "^3.9.0"
 azure-storage-blob = "^12.31.1"
 boto3 = "^1.44.6"
@@ -132,5 +132,5 @@ markers = ["unstable"]
 [tool.pyright]
 include = ["src"]
 extraPaths = ["./lib", "src"]
-pythonVersion = "3.10"
+pythonVersion = "3.14"
 pythonPlatform = "All"

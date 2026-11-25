@@ -142,7 +142,9 @@ def test_verify_classifies_client_errors(error_code: str, expected: S3VerifyCode
 @pytest.mark.parametrize(
     "error",
     [
-        SSLError(endpoint_url="https://s3.amazonaws.com", error="certificate verify failed"),
+        SSLError(
+            endpoint_url="https://s3.amazonaws.com", error=Exception("certificate verify failed")
+        ),
         ProxyConnectionError(proxy_url="http://proxy.invalid", error="proxy error"),
     ],
 )

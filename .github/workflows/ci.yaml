@@ -23,7 +23,7 @@ permissions:
 jobs:
   lint:
     name: Lint
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     steps:
       - name: Checkout
@@ -35,7 +35,7 @@ jobs:
 
   unit-test:
     name: Unit tests
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     steps:
       - name: Checkout
@@ -49,7 +49,11 @@ jobs:
 
   build:
     name: Build charms
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@6f9c6da60190e1860d33e82da04498a56ea64725 # v51.0.0
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@5539aeb76df18b43f6b10f77bb45e51d6867f554 # v56.0.0
+    with:
+      # FIXME: Re-enable cache once charmcraftcache is updated for the base
+      cache: false
+    cache-mode: none
 
   collect-integration-tests:
     name: Collect integration test spread jobs

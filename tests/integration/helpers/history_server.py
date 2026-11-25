@@ -50,7 +50,7 @@ def deploy_history_server_setup(
         resources=resources,
         app=APP_NAME,
         num_units=1,
-        base="ubuntu@22.04",
+        base="ubuntu@26.04",
         trust=trust,
     )
 
