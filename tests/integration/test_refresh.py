@@ -6,14 +6,13 @@ from pathlib import Path
 import jubilant
 import yaml
 
-from tests.integration.helpers.history_server import assert_jobs_in_history_server
-from tests.integration.helpers.s3 import prepare_s3_storage_setup
-from tests.integration.types import IntegrationTestsCharms, S3Info
-
+from .helpers.history_server import assert_jobs_in_history_server
+from .helpers.s3 import prepare_s3_storage_setup
 from .helpers.spark import (
     run_spark_job,
     setup_spark_job,
 )
+from .types import IntegrationTestsCharms, S3Info
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
